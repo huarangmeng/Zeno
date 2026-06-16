@@ -1,0 +1,67 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: overloads resolve by arity, parameter type, access mode, and generic specificity
+
+module tests.pass.functionOverloading;
+
+struct Packet {
+    value: I32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn code(value: I32) -> I32 {
+    return value + 1;
+}
+
+fn code(value: I64) -> I64 {
+    return value + 1;
+}
+
+fn code(value: I32, extra: I32) -> I32 {
+    return value + extra;
+}
+
+fn inspect(packet: Packet) -> I32 {
+    return packet.value;
+}
+
+fn inspect(mut packet: Packet) -> I32 {
+    packet.value = packet.value + 1;
+    return packet.value;
+}
+
+fn inspect(move packet: Packet) -> I32 {
+    return packet.value;
+}
+
+fn identity<T: Copy>(value: T) -> T {
+    return value;
+}
+
+fn identity(value: I32) -> I32 {
+    return value + 10;
+}
+
+fn main() -> I32 {
+    let small: I32 = 1;
+    let wide: I64 = 2;
+    var packet = Packet { value: 7 };
+
+    let exact = code(small);
+    let ignoredWide = code(wide);
+    let arity = code(1, 2);
+    let read = inspect(packet);
+    let written = inspect(mut packet);
+    let owned = inspect(move packet);
+    let specific = identity(small);
+    let generic = identity(true);
+
+    if generic {
+        return exact + arity + read + written + owned + specific;
+    }
+
+    return 0;
+}

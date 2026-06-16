@@ -1,0 +1,3 @@
+fn describe(value: StringSlice) -> USize {
+    return value.len;
+}

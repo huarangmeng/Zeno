@@ -27,6 +27,16 @@
 - 在出错字段附近使用 `# expected-error:` 注释。
 - 每个测试应聚焦一个主要配置错误。
 
+`tests/spec/module-pass`：
+
+- 必须通过包图、模块图、导入解析和可见性检查的多文件包夹具。
+- 每个测试目录包含自己的 `Zeno.toml` 和 `src/`。
+
+`tests/spec/module-fail`：
+
+- 必须在模块路径、依赖、导入或可见性阶段被拒绝的多文件包夹具。
+- 在出错源码行或 manifest 字段附近使用 `expected-error` 注释。
+
 未来类别：
 
 - `run-pass`：能编译并产生预期输出的程序。
@@ -41,6 +51,23 @@
 - hosted `Zeno.toml` manifest 可以启用默认 allocator、abort panic 和符号化调用栈。
 - freestanding `Zeno.toml` manifest 可以禁用默认 allocator，并把 panic/OOM 降低为 trap。
 - kernel / embedded `Zeno.toml` manifest 可以指定 `panic.handler`、`oom.handler`、地址级调用栈和硬件 `trust` 能力。
+- `src/net/http.zn` 可以推断为模块路径 `net.http`，显式 `module net.http` 只能作为校验。
+- 同 package 内声明不需要 import，可以直接使用。
+- 同 package 内同名声明需要用 `net.http.Client` 这类模块限定名消歧。
+- `private` 顶层项和字段只在当前文件可见。
+- 默认顶层项、类型和字段是 package-visible，外部 package 只能访问 `pub` 项。
+- 函数和方法可以按参数数量、参数类型、`mut` / `move` 访问模式形成重载集。
+- 重载解析优先选择唯一精确匹配，泛型重载按使用到的具体类型单态化。
+- `import core.result.{Result, Ok}` 可以从模块导入多个公开项。
+- `import std.io` 可以导入模块绑定，并通过 `io.Error` 访问公开项。
+- path dependency 可以提供新的 import 根。
+- 同 package 文件可以在签名中互相引用，且不会执行代码。
+- 普通 `struct` 使用默认 Auto layout，`sizeOf`、`alignOf` 和 `offsetOf` 可在编译期求值。
+- `@layout(Source)` 保留源码字段顺序和自然对齐。
+- `@layout(C)` 接受 C-compatible 字段，并与目标 C ABI 对齐。
+- `@layout(Packed(N))` 接受 Copy 字段，并通过 unaligned load/store 访问字段。
+- 单真实存储字段结构体是零成本包装。
+- `Option<Box<T>>`、`Option<Shared<T>>` 和 `Option<NonZeroU32>` 使用 niche 优化，不增加大小。
 - `Copy` 值正常复制。
 - 普通整数 `+`、`-`、`*` 使用 wrapping 语义。
 - `checked*` 整数方法返回 `Option<T>`。
@@ -125,6 +152,26 @@
 - `oom.strategy = "handler"` 但没有 `oom.handler`。
 - `allocator.default = true` 但没有可解析默认 allocator。
 - hosted manifest 启用硬件、inline asm 或中断能力。
+- `[dependencies]` key 不是合法 Zeno 标识符。
+- dependency key 和当前包 `src/` 顶层目录冲突。
+- 包依赖图成环。
+- 文件路径和 `module` 声明不匹配。
+- 导入未在 `[dependencies]` 中声明的外部包根。
+- 从外部包导入非 `pub` 项。
+- 在其他文件中使用 `private` 项。
+- `private` 类型出现在非 `private` API 签名中。
+- package-visible 类型出现在 `pub` API 签名中。
+- 同 package 内多个声明同名时使用未限定名字。
+- 两个导入在同一作用域引入不同定义的同名项。
+- 两个函数只靠返回类型不同形成重载。
+- 两个函数或方法拥有相同重载键。
+- 重载调用没有唯一最佳候选，例如整数字面量同时匹配多个数值类型候选。
+- 同一个结构体声明多个 layout 策略。
+- `@layout(...)` 标在非结构体声明上。
+- `@layout(C)` 结构体包含非 C-compatible 字段，例如 `Vector<T>`、`String`、接口访问或闭包。
+- `@layout(Packed(N))` 的 `N` 不是 1、2、4、8 或 16。
+- `@layout(Packed(N))` 结构体包含非 `Copy` 字段、拥有资源字段或带 `destroy` 的字段。
+- packed 字段作为 `mut` 访问或长期访问逃逸。
 - use after move。
 - double move。
 - 非 `Copy` 拥有者普通赋值造成隐式复制。
@@ -205,6 +252,12 @@ help: 在移动前读取该值，或只移动一次
 性能验收应包含源码级和 codegen 级检查：
 
 - 泛型 `max<T: Ord, Copy>` 应为使用到的具体类型生成专门函数。
+- 函数重载应在类型检查期解析为直接调用，不生成重载表、名字查找或动态派发。
+- Auto layout 应减少典型结构体 padding；布局结果应可在编译期报告 size、align 和 offset。
+- `@layout(Source)` 不应重排字段。
+- 单字段包装在 Zeno 内部 ABI 中不应增加传参、返回或存储成本。
+- `Option<Box<T>>`、`Option<Shared<T>>` 和 `Option<NonZeroU32>` 不应额外存储 tag。
+- packed 字段读取应降低为目标支持的 unaligned load 或等价字节 load 序列，不产生未定义行为。
 - 普通整数 `+`、`-`、`*` 不应生成隐藏溢出检查。
 - `checkedAdd` 应降低为目标支持的 overflow intrinsic 或等价高效指令序列。
 - `U8.truncate(value)` 应降低为截断，不生成范围检查。
@@ -263,6 +316,12 @@ manifest-fail 主错误：
 
 ```toml
 strategy = "handler" # expected-error: oom.handler is required
+```
+
+module-fail 主错误：
+
+```zn
+let client: Client = net.http.connect(); // expected-error: unqualified name Client is ambiguous
 ```
 
 测试 harness 应把这些注释当作断言。

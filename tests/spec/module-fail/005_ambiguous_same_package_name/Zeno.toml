@@ -1,0 +1,27 @@
+# category: module-fail
+# purpose: unqualified same-package names are rejected when multiple declarations match
+
+[package]
+name = "app"
+entry = "main.main"
+
+[target]
+triple = "wasm32-unknown-unknown"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

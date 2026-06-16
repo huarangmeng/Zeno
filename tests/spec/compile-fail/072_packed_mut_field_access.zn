@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: packed fields cannot escape as mut access because they may be unaligned
+
+module tests.fail.packedMutFieldAccess;
+
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    length: U16,
+}
+
+fn normalize(mut value: U16) {
+    value = value + 1;
+}
+
+fn bad(mut header: Header) {
+    normalize(mut header.length); // expected-error: packed field cannot be passed as mut access
+}

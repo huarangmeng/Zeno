@@ -15,13 +15,15 @@ Zeno 的核心目标：
 - [docs/SPEC.md](docs/SPEC.md)：主语言规范。
 - [docs/GRAMMAR.md](docs/GRAMMAR.md)：词法与语法草案。
 - [docs/MANIFEST.md](docs/MANIFEST.md)：`Zeno.toml` 项目 manifest、profile 和 target 策略。
+- [docs/MODULES.md](docs/MODULES.md)：模块、包、依赖和导入解析规则。
+- [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。
 - [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
 - [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。
 - [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md)：C++20 + LLVM stage0 与自举路线。
 - [docs/TESTING.md](docs/TESTING.md)：规格测试、性能验收和诊断约定。
 - [examples](examples)：规范示例程序。
-- [tests/spec](tests/spec)：compile-pass / compile-fail 规格用例草案。
+- [tests/spec](tests/spec)：compile、manifest 和 module 规格用例草案。
 
 ## 当前状态
 

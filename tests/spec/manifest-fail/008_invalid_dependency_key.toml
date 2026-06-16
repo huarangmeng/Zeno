@@ -1,0 +1,22 @@
+# category: manifest-fail
+# purpose: dependency keys are import roots and must be legal Zeno identifiers
+
+[package]
+name = "app"
+
+[dependencies]
+my-lib = { path = "../my-lib" } # expected-error: dependency key must be a legal Zeno identifier
+
+[target]
+triple = "wasm32-unknown-unknown"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

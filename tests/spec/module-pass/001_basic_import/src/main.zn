@@ -1,0 +1,4 @@
+pub fn main() -> I32 {
+    let client = makeClient(41);
+    return addOne(client.id);
+}

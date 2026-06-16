@@ -1,0 +1,7 @@
+private struct Token {
+    value: I32,
+}
+
+fn makeToken() -> Token { // expected-error: private type Token cannot appear in a package-visible signature
+    return Token { value: 1 };
+}

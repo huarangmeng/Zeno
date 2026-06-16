@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: each struct can declare at most one layout strategy
+
+module tests.fail.multipleLayoutAttributes;
+
+@layout(Source)
+@layout(C)
+struct Bad { // expected-error: struct cannot declare more than one layout strategy
+    value: I32,
+}
+
+fn main() {}

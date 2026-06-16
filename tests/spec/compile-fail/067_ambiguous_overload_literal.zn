@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: integer literals do not choose between multiple numeric overloads without a unique target type
+
+module tests.fail.ambiguousOverloadLiteral;
+
+fn pick(value: I32) -> I32 {
+    return value;
+}
+
+fn pick(value: U32) -> U32 {
+    return value;
+}
+
+fn main() {
+    let value = pick(1); // expected-error: ambiguous overload; annotate the literal or variable type
+    let ignored = value;
+}

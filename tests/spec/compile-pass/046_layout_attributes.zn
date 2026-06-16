@@ -1,0 +1,57 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: layout attributes support Auto, Source, C, Packed, and zero-cost single-field wrappers
+
+module tests.pass.layoutAttributes;
+
+struct AutoEntry {
+    flag: Bool,
+    id: U64,
+    kind: U8,
+}
+
+@layout(Source)
+struct SourceEntry {
+    hotA: U64,
+    hotB: U64,
+    coldFlag: Bool,
+}
+
+@layout(C)
+pub struct CPoint {
+    pub x: F32,
+    pub y: F32,
+}
+
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    length: U16,
+}
+
+struct FileDescriptor {
+    value: I32,
+}
+
+fn inspect(value: U16) -> U16 {
+    return value;
+}
+
+fn main() -> I32 {
+    let auto = AutoEntry { flag: true, id: 9, kind: 1 };
+    let source = SourceEntry { hotA: 1, hotB: 2, coldFlag: false };
+    let point = CPoint { x: 1.0, y: 2.0 };
+    var header = Header { tag: 4, length: 20 };
+    let fd = FileDescriptor { value: 3 };
+
+    let length = inspect(header.length);
+    header.length = 24;
+
+    let ignoredAuto = auto.id;
+    let ignoredSource = source.hotA + source.hotB;
+    let ignoredPoint = point.x;
+    let ignoredLength = length;
+    let ignoredHeader = header.tag;
+
+    return fd.value;
+}

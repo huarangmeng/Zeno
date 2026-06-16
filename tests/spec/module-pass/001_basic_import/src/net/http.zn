@@ -1,0 +1,7 @@
+struct Client {
+    id: I32,
+}
+
+fn makeClient(id: I32) -> Client {
+    return Client { id: id };
+}

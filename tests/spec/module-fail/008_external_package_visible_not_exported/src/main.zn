@@ -1,0 +1,5 @@
+import dependency.internal.{hidden}; // expected-error: hidden is package-visible, not pub
+
+pub fn main() -> I32 {
+    return hidden();
+}

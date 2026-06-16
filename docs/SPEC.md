@@ -21,11 +21,9 @@ Zeno 代码应该让资源所有权、分配、同步、接口派发和调度成
 
 ## 2. 程序结构与 manifest
 
-一个 Zeno 源文件包含可选模块声明、导入和声明。
+一个 Zeno 源文件包含可选模块声明、导入和声明。包模式下模块路径默认由 `src/` 下的文件路径推断。
 
 ```zn
-module app.main;
-
 import core.result.{Result, Ok};
 import std.io;
 
@@ -67,6 +65,8 @@ manifest 会影响类型检查和 codegen，例如：
 
 manifest 不改变普通所有权、move、初始化、访问值和 `Send` / `Sync` 的核心规则。
 
+模块、包、文件路径、依赖和导入解析规则见 [MODULES.md](MODULES.md)。包模式构建中，`.zn` 文件可以省略 `module` 声明；若写出，必须和 `src/` 下的文件路径匹配。`import` 只用于外部依赖和内建包，不执行代码。
+
 ## 3. 词法规则
 
 长期目标支持 Unicode 源码文本，但 stage0 编译器只需要支持 ASCII 标识符：
@@ -82,7 +82,7 @@ v0.1 关键字：
 ```text
 as async await break const continue defer destroy else enum extern false
 fn for if impl import in interface let match module move mut
-pub return self Self static struct true trust try type var while
+private pub return self Self static struct true trust try type var while
 ```
 
 `unsafe` 不是用户语言关键字。符合规范的编译器必须拒绝普通包中的 `unsafe` 块、模式或声明。
@@ -107,15 +107,16 @@ pub return self Self static struct true trust try type var while
 | `for` | 遍历循环。 |
 | `if` | 条件表达式或条件语句。 |
 | `impl` | 给类型添加方法，或声明类型实现某个接口。 |
-| `import` | 导入模块或模块成员。 |
+| `import` | 导入外部依赖或内建包的模块 / 公开项。 |
 | `in` | `for item in items` 中连接循环变量和被遍历对象。 |
 | `interface` | 定义能力契约。 |
 | `let` | 创建不可变绑定。 |
 | `match` | 模式匹配表达式，必须穷尽。 |
-| `module` | 声明当前文件所属模块。 |
+| `module` | 可选声明当前文件所属模块；省略时由文件路径推断。 |
 | `move` | 显式转移所有权，或声明闭包按值捕获。 |
 | `mut` | 声明可变绑定、可写参数、可写接收者或调用点可写访问。 |
-| `pub` | 导出声明，使其对模块外可见。 |
+| `private` | 声明文件私有的顶层项或字段。 |
+| `pub` | 导出声明，使其对外部 package 可见。 |
 | `return` | 从当前函数返回。 |
 | `self` | 方法中的当前接收者值。 |
 | `Self` | 当前实现类型的类型名别名，只能在 `impl` 或 `interface` 相关上下文中使用。 |
@@ -143,6 +144,7 @@ v0.1 用户级属性：
 
 - `@noAlloc`：被标注函数及其可达调用图不得执行堆分配，除非编译器能证明该路径不可达。
 - `@noPanic`：被标注函数不得触发 `panic` 路径；若当前 profile 把 OOM 配置成 `panic`，会分配的 API 也算 panic 路径。它不等价于“不可能终止”，需要禁止堆分配时应使用 `@noAlloc`。
+- `@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`：声明结构体内存布局策略。普通结构体默认使用 Auto layout。
 
 编译器发行包专用属性：
 
@@ -237,6 +239,51 @@ Atomic<T>
 普通代码通常写 `Box<T>` 和 `Shared<T>`；需要显式 allocator 时用 `Box.newIn` / `Shared.newIn` 等 `In` 后缀构造 API，而不是把 allocator 传进所有调用点。
 
 `Box`、`Array`、`Vector`、`Shared`、`Mutex` 和原子类型必须在源码中显式出现，因为它们携带分配或同步成本。
+
+### 7.1 类型布局与 ABI
+
+结构体默认使用 Auto layout：编译器可以重排字段以减少 padding、降低数组元素跨度、改善默认缓存密度。字段初始化、字段访问、move 状态和销毁语义仍按源码字段名和声明顺序检查。
+
+需要手动字段顺序时写 `@layout(Source)`；需要 C 互操作时写 `@layout(C)`；需要字节级协议或磁盘格式时写 `@layout(Packed(N))`。
+
+```zn
+struct Entry {
+    flag: Bool,
+    id: U64,
+    kind: U8,
+}
+
+@layout(Source)
+struct HotState {
+    hotA: U64,
+    hotB: U64,
+    coldFlag: Bool,
+}
+
+@layout(C)
+pub struct CPoint {
+    pub x: F32,
+    pub y: F32,
+}
+
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    len: BigEndian<U16>,
+}
+```
+
+单真实存储字段结构体默认是零成本包装：它和唯一非零大小字段有相同大小、对齐和值表示，但类型系统仍把它们视为不同类型。
+
+```zn
+struct FileDescriptor {
+    value: I32,
+}
+```
+
+默认 enum layout 可以做 niche optimization。编译器必须保证 `Option<Box<T>>` 与 `Box<T>` 同大小，`Option<Shared<T>>` 与 `Shared<T>` 同大小；类似 `Option<NonZeroU32>` 也应使用无额外 tag 的表示。
+
+`pub` 只表示源码 API 对外部 package 可见，不表示布局或 ABI 稳定。完整布局规则见 [LAYOUT.md](LAYOUT.md)。
 
 ## 8. 整数运算与转换
 
@@ -396,7 +443,7 @@ impl File {
 
 1. 局部变量按初始化顺序的逆序销毁。
 2. 如果类型有 `destroy` 块，先运行该块。
-3. 结构体字段按声明顺序销毁。
+3. 结构体字段按源码声明顺序的逆序销毁；这不受 Auto layout 的内存字段重排影响。
 4. 部分初始化的值只销毁已经初始化的字段。
 5. `panic` 不属于常规错误流；具体 abort、trap 或 unwind 行为由 profile 失败策略决定。
 
@@ -658,6 +705,39 @@ fn badSave(packet: Packet, mut allocator: GlobalAllocator) -> Box<Packet> {
 ```
 
 函数按值返回。语义允许时必须支持返回值优化。返回 `Array<T>` 或 `Vector<T>` 表示返回拥有者；返回 `ArraySlice<T>` 表示返回非拥有访问，必须通过逃逸分析证明底层存储仍然有效。
+
+### 12.1 函数重载
+
+Zeno 支持函数和方法重载。多个函数或方法可以使用同一个名字，只要参数形状不同。
+
+重载键由名字、参数数量、参数类型、参数访问模式组成。方法还把接收者类型和接收者模式纳入重载键。返回类型不参与重载；只靠返回类型不同的两个声明是重复定义。
+
+```zn
+fn parse(text: StringSlice) -> I32 { ... }
+fn parse(text: StringSlice) -> U32 { ... } // error: return type is not an overload key
+```
+
+允许的重载例子：
+
+```zn
+fn size(text: StringSlice) -> USize { ... }
+fn size(bytes: ArraySlice<U8>) -> USize { ... }
+fn size(bytes: ArraySlice<U8>, radix: U8) -> USize { ... }
+
+fn inspect(packet: Packet) -> I32 { ... }
+fn inspect(move packet: Packet) -> I32 { ... }
+```
+
+调用解析在类型检查期完成：
+
+1. 收集当前可见的同名候选。
+2. 按参数数量和调用点的 `mut` / `move` 形式过滤。
+3. 检查参数类型、接口约束和泛型约束。
+4. 选择唯一最佳候选；没有候选或多个同等最佳候选时诊断为错误。
+
+最佳候选排序保持保守：精确非泛型匹配优先，然后是精确泛型匹配；需要语言允许的访问转换时排在精确匹配之后。Zeno 不做隐式数值转换、隐式分配或基于返回类型的选择。整数字面量可以由唯一候选推断类型；多个候选都能接收同一个 literal 时，调用方必须加类型标注。
+
+重载没有运行时派发成本。选中目标在编译期固定；泛型重载按普通泛型规则单态化。
 
 ## 13. 控制流
 

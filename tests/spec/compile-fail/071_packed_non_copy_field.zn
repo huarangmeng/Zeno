@@ -1,0 +1,16 @@
+// category: compile-fail
+// profile: hosted
+// purpose: packed structs cannot contain resource-owning or non-Copy fields
+
+module tests.fail.packedNonCopyField;
+
+struct Buffer {
+    bytes: Vector<U8>,
+}
+
+@layout(Packed(1))
+struct Bad {
+    buffer: Buffer, // expected-error: packed fields must be Copy and have no destroy behavior
+}
+
+fn main() {}

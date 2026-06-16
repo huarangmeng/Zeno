@@ -1,0 +1,7 @@
+fn addOne(value: I32) -> I32 {
+    return value + 1;
+}
+
+fn hiddenDouble(value: I32) -> I32 {
+    return value + value;
+}

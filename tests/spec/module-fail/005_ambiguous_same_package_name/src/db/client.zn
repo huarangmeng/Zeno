@@ -1,0 +1,7 @@
+struct Client {
+    id: I32,
+}
+
+fn connect() -> Client {
+    return Client { id: 2 };
+}

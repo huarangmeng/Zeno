@@ -62,6 +62,10 @@ path            = ident ("." ident)* ;
 import_items    = ".{" ident ("," ident)* ","? "}" ;
 ```
 
+包模式构建中 `module_decl` 可以省略。省略时模块路径由 `src/` 下的文件路径推断；写出时必须和文件路径一致。
+
+`import path;` 导入外部依赖或内建包中的模块绑定。`import path.{A, B};` 从外部模块导入多个公开项。同 package 内声明直接可用，不需要 import。v1 不支持 wildcard import、import alias 或 `pub import` re-export。
+
 ## 3. 声明
 
 ```ebnf
@@ -81,9 +85,9 @@ decl            = attribute* visibility? (
 attribute       = "@" ident attribute_args? ;
 attribute_args  = "(" attribute_arg_list? ")" ;
 attribute_arg_list = attribute_arg ("," attribute_arg)* ","? ;
-attribute_arg   = ident | literal ;
+attribute_arg   = ident attribute_args? | literal ;
 
-visibility      = "pub" ;
+visibility      = "pub" | "private" ;
 
 fn_decl         = async_marker? "fn" ident generic_params? fn_params return_type? block ;
 async_marker    = "async" ;
@@ -93,6 +97,10 @@ type_alias      = "type" ident generic_params? "=" type ";" ;
 trust_extern_decl = "trust" "extern" string_literal "fn" ident fn_params return_type? ";" ;
 trust_impl_decl = "trust" impl_decl ;
 ```
+
+同一作用域中可以出现多个同名 `fn_decl`，但它们必须形成合法重载集。重载键包含函数名、参数数量、参数类型和参数访问模式；返回类型不参与重载键。同一个重载键重复声明必须在语义阶段报错。
+
+`@layout(Source)`、`@layout(C)` 和 `@layout(Packed(1))` 都按普通属性解析。布局参数不是关键字；语义阶段检查它们只能用于结构体，并且每个结构体最多有一个布局策略。
 
 ## 4. 类型
 
@@ -193,7 +201,22 @@ pub struct Point: Copy {
     pub x: F64,
     pub y: F64,
 }
+
+@layout(Source)
+struct HotState {
+    hotA: U64,
+    hotB: U64,
+    coldFlag: Bool,
+}
+
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    length: U16,
+}
 ```
+
+未标注布局的结构体使用默认 Auto layout，语义阶段允许编译器重排字段。`Source` 保留源码字段顺序，`C` 遵守目标 C ABI，`Packed(N)` 用于字节级格式并限制字段访问方式。
 
 ## 7. 枚举
 
@@ -240,6 +263,8 @@ return_type     = "->" type ;
 - `self` 接收者是只读访问当前对象。
 - `mut self` 接收者是唯一可写访问当前对象；方法调用点不写 `mut`，但接收者必须是可写位置。
 - `move self` 接收者接收当前对象所有权；方法调用后原接收者不可再用。
+
+方法可以重载。方法重载键除了普通参数形状，还包含接收者类型和接收者模式。`fn open(self)`、`fn open(mut self)` 和 `fn open(move self)` 是不同重载键；同一个调用点只能选择其中唯一一个最佳候选。
 
 ```zn
 interface Writer {

@@ -1,0 +1,29 @@
+# category: module-fail
+# purpose: external packages can access only pub declarations
+
+[package]
+name = "app"
+
+[target]
+triple = "wasm32-unknown-unknown"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false
+
+[dependencies]
+dependency = { path = "dependency" }

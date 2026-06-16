@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C layout accepts only C-compatible field types
+
+module tests.fail.cLayoutNonCField;
+
+@layout(C)
+struct Bad {
+    bytes: Vector<U8>, // expected-error: Vector is not C-compatible in @layout(C)
+}
+
+fn main() {}

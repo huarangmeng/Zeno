@@ -1,0 +1,23 @@
+[package]
+name = "dependency"
+
+[target]
+triple = "wasm32-unknown-unknown"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

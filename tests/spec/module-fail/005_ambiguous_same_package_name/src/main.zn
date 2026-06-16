@@ -1,0 +1,4 @@
+pub fn main() -> I32 {
+    let client: Client = net.http.connect(); // expected-error: unqualified name Client is ambiguous; use a module-qualified name
+    return client.id;
+}

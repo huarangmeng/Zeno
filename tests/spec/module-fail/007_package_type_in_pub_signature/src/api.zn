@@ -1,0 +1,7 @@
+struct Token {
+    value: I32,
+}
+
+pub fn makeToken() -> Token { // expected-error: pub API cannot expose package-visible type Token
+    return Token { value: 1 };
+}

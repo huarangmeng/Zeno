@@ -1,0 +1,31 @@
+# category: module-pass
+# purpose: path dependencies add external import roots
+
+[package]
+name = "app"
+entry = "main.main"
+
+[dependencies]
+platform = { path = "platform" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

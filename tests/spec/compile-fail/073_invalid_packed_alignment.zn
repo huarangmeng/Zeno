@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: packed alignment must be one of the supported powers of two
+
+module tests.fail.invalidPackedAlignment;
+
+@layout(Packed(3))
+struct Bad { // expected-error: Packed alignment must be 1, 2, 4, 8, or 16
+    value: U32,
+}
+
+fn main() {}

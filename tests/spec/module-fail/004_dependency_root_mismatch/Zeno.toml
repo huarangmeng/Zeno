@@ -1,0 +1,30 @@
+# category: module-fail
+# purpose: dependency keys cannot conflict with same-package top-level source directories
+
+[package]
+name = "app"
+
+[dependencies]
+platform = { path = "platformPkg" } # expected-error: dependency key conflicts with src/platform
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

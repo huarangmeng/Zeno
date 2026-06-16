@@ -1,0 +1,3 @@
+fn localPid() -> I32 {
+    return 0;
+}

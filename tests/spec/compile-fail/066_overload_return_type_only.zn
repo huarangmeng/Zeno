@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: return type alone is not a valid overload difference
+
+module tests.fail.overloadReturnTypeOnly;
+
+fn parse(text: StringSlice) -> I32 {
+    let ignored = text;
+    return 1;
+}
+
+fn parse(text: StringSlice) -> U32 { // expected-error: overload cannot differ only by return type
+    let ignored = text;
+    return 1;
+}
+
+fn main() {}

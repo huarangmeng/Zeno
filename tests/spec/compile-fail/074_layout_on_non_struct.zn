@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: layout attributes apply only to struct declarations
+
+module tests.fail.layoutOnNonStruct;
+
+@layout(Source)
+fn bad() -> I32 { // expected-error: @layout can only be applied to struct declarations
+    return 1;
+}

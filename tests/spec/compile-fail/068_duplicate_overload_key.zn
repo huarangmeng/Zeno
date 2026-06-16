@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: duplicate overload keys are rejected
+
+module tests.fail.duplicateOverloadKey;
+
+fn hash(value: I32) -> I32 {
+    return value + 1;
+}
+
+fn hash(value: I32) -> I32 { // expected-error: duplicate overload key for hash(I32)
+    return value + 2;
+}
+
+fn main() {}
