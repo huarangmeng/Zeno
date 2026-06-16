@@ -8,7 +8,7 @@ import core.alloc.{AllocError, GlobalAllocator};
 import core.result.{Result, Ok};
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let bytes = try Array<U8>.filled(4, 0, mut allocator);
+    let bytes = Array<U8>.filledIn(4, 0, mut allocator);
     let value = bytes[4]; // expected-error: constant index is out of bounds
     return Ok(());
 }

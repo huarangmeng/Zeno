@@ -8,11 +8,41 @@ fn apply(value: I32, f: Fn<I32, I32>) -> I32 {
     return f(value);
 }
 
+fn callTwice(mut f: MutFn<Unit>) {
+    f();
+    f();
+}
+
+fn consumeOnce(move f: OnceFn<U64>) -> U64 {
+    return f();
+}
+
+struct Token {
+    value: U64,
+}
+
+fn take(move token: Token) -> U64 {
+    return token.value;
+}
+
 fn main() {
     let bias = 10;
     let shortResult = apply(5, (x: I32) => x + bias);
     let blockResult = apply(5, (x: I32) -> I32 {
         return x * 2;
     });
-    let ignoredCopy = shortResult + blockResult;
+
+    var count = 0;
+    var inc = () {
+        count = count + 1;
+    };
+    callTwice(mut inc);
+
+    let token = Token { value: 9 };
+    let movedValue = consumeOnce(move () -> U64 {
+        return take(move token);
+    });
+
+    let ignoredCopy = shortResult + blockResult + count;
+    let ignoredMove = movedValue;
 }

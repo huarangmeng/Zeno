@@ -10,14 +10,14 @@ enum ParseError {
     Empty,
 }
 
-fn parseDigit(text: String) -> Result<U8, ParseError> {
+fn parseDigit(text: StringSlice) -> Result<U8, ParseError> {
     if text.len == 0 {
         return Err(ParseError.Empty);
     }
     return Ok(1);
 }
 
-fn parsePair(a: String, b: String) -> Result<U8, ParseError> {
+fn parsePair(a: StringSlice, b: StringSlice) -> Result<U8, ParseError> {
     let left = try parseDigit(a);
     let right = try parseDigit(b);
     return Ok(left + right);

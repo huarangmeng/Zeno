@@ -15,7 +15,7 @@ struct Counter {
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let mutex = Mutex.new(Counter { value: 0 });
-    let shared = try Shared.new(move mutex, mut allocator);
+    let shared = Shared.newIn(move mutex, mut allocator);
     let forThread = shared.clone();
     let handle = try Thread.spawn(move () -> USize {
         return forThread.strongCount();

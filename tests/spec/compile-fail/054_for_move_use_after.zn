@@ -1,0 +1,27 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: source collection is unusable after move iteration
+
+module tests.fail.forMoveUseAfter;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn bad(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
+    var packets = Vector<Packet>.withCapacityIn(1, mut allocator);
+    packets.push(Packet { value: 1 });
+
+    for move packet in move packets {
+        let ignored = packet.value;
+    }
+
+    return Ok(packets.len); // expected-error: use of moved collection after consuming for iteration
+}

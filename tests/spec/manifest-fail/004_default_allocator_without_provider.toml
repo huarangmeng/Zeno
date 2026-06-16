@@ -1,0 +1,19 @@
+# category: manifest-fail
+# purpose: allocator.default true requires a resolvable provider
+
+[package]
+name = "missingAllocator"
+
+[target]
+triple = "x86_64-unknown-none"
+profile = "freestanding"
+
+[allocator]
+default = true # expected-error: default allocator requires allocator.symbol or a profile built-in provider
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

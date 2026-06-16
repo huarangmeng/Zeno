@@ -4,16 +4,15 @@
 
 module tests.pass.sharedCloneVisibleCost;
 
-import core.alloc.{AllocError, GlobalAllocator};
-import core.result.{Result, Ok};
+import core.alloc.GlobalAllocator;
 
 struct Packet {
     bytes: Array<U8>,
 }
 
-fn share(move packet: Packet, mut allocator: GlobalAllocator) -> Result<Shared<Packet>, AllocError> {
-    let first = try Shared.new(move packet, mut allocator);
+fn share(move packet: Packet, mut allocator: GlobalAllocator) -> Shared<Packet> {
+    let first = Shared.newIn(move packet, mut allocator);
     let second = first.clone();
     let ignored = move second;
-    return Ok(move first);
+    return move first;
 }

@@ -12,6 +12,6 @@ enum ParseError {
 }
 
 fn bad(value: U32) -> Result<U8, ParseError> {
-    let byte = try U8.fromChecked(value); // expected-error: try on Option in Result function requires explicit okOr
+    let byte = try U8.fromChecked(value); // expected-error: try on Option in Result function requires explicit okOr or okOrElse
     return Ok(byte);
 }

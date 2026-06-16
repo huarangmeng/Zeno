@@ -1,0 +1,27 @@
+# category: manifest-fail
+# purpose: hosted packages cannot enable hardware trust capabilities without an explicit low-level profile
+
+[package]
+name = "hostedHardware"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = true # expected-error: hosted profile cannot enable hardware trust capability
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

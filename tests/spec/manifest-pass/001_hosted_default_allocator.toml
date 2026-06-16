@@ -1,0 +1,28 @@
+# category: manifest-pass
+# purpose: hosted application can use a default allocator and symbolized panic stack
+
+[package]
+name = "hello"
+version = "0.1.0"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

@@ -14,6 +14,7 @@ Zeno 的核心目标：
 
 - [docs/SPEC.md](docs/SPEC.md)：主语言规范。
 - [docs/GRAMMAR.md](docs/GRAMMAR.md)：词法与语法草案。
+- [docs/MANIFEST.md](docs/MANIFEST.md)：`Zeno.toml` 项目 manifest、profile 和 target 策略。
 - [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
 - [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。

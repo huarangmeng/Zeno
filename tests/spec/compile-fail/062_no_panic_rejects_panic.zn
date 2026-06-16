@@ -1,0 +1,16 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: noPanic rejects direct panic paths
+
+module tests.fail.noPanicRejectsPanic;
+
+import core.panic.panic;
+
+@noPanic
+fn bad(value: I32) -> I32 {
+    if value >= 0 {
+        return value;
+    }
+
+    panic("negative value"); // expected-error: noPanic function cannot call panic
+}

@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: hosted
+// purpose: hosted code can use profile default allocator through allocation APIs without In suffix
+
+module tests.pass.defaultAllocationApis;
+
+struct Packet {
+    value: U8,
+}
+
+fn main() {
+    let page = Array<U8>.filled(4, 0);
+    var bytes = Vector<U8>.withCapacity(4);
+    bytes.push(1);
+
+    let boxed = Box.new(Packet { value: 2 });
+    let shared = Shared.new(Packet { value: 3 });
+    let text = String.from("hello");
+
+    let ignoredPage = move page;
+    let ignoredBytes = move bytes;
+    let ignoredBox = move boxed;
+    let ignoredShared = move shared;
+    let ignoredText = move text;
+}

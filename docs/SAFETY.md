@@ -27,7 +27,7 @@ Zeno 不暴露用户 `unsafe` 模式。和原始地址、C ABI、硬件交互相
 - inline asm。
 - 链接段、启动入口、中断入口等平台 ABI 约定。
 
-普通代码可以写驱动、内核模块和平台绑定，但底层操作必须被 `trust` 包住。推荐把 `trust` 封装成安全 API，让调用方使用类型化句柄、能力对象和 `Result`。
+普通代码可以写驱动、内核模块和平台绑定，但底层操作必须被 `trust` 包住，并且包的 `Zeno.toml` manifest 必须允许对应能力。推荐把 `trust` 封装成安全 API，让调用方使用类型化句柄、能力对象和 `Result`。
 
 ## 2. 所有权不变量
 
@@ -40,7 +40,7 @@ Zeno 不暴露用户 `unsafe` 模式。和原始地址、C ABI、硬件交互相
 - 活跃拥有者会被销毁一次。
 - 部分初始化状态会记录哪些字段需要销毁。
 
-深拷贝必须通过显式 `clone` API 表达。会分配的 `clone` 必须接收 allocator 并返回 `Result<T, AllocError>`。引用计数增加只能通过 `Shared<T>.clone` 等类型名显式暴露共享成本的 API 表达。
+深拷贝必须通过显式 `clone` API 表达。`Array<T>` / `Vector<T>` / `String` 这类可能分配的 clone 失败时调用当前 profile 的 `oom(layout) -> Never`；指定 allocator 时使用 `cloneIn`。引用计数增加只能通过 `Shared<T>.clone` 等类型名显式暴露共享成本的 API 表达。
 
 compile-fail 示例：
 
@@ -115,15 +115,15 @@ header.version = 1;
 
 ```zn
 let s = String.from("abc");
-let v: String = s;
-drop(move s);
-use(v); // expected-error: access may outlive storage
+let v = move s;
+drop(move v);
+use(s); // expected-error: use after move
 ```
 
 ```zn
 fn readThenWrite(read: ArraySlice<U8>, mut write: ArraySlice<U8>) {}
 
-var bytes = try Array<U8>.filled(4, 0, mut allocator);
+var bytes = Array<U8>.filledIn(4, 0, mut allocator);
 readThenWrite(bytes, mut bytes); // expected-error: writable access overlaps read-only access
 ```
 
@@ -161,7 +161,7 @@ fn firstByte(data: ArraySlice<U8>) -> Option<U8> {
 
 ```zn
 fn bad(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let local = try Array<U8>.filled(4, 0, mut allocator);
+    let local = Array<U8>.filledIn(4, 0, mut allocator);
     return Ok(local); // expected-error: returns slice to local storage
 }
 ```
@@ -201,7 +201,7 @@ struct BadPacket {
 
 ```zn
 fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let local = try Array<U8>.filled(4, 0, mut allocator);
+    let local = Array<U8>.filledIn(4, 0, mut allocator);
     return Ok(local.asSlice()); // expected-error: view outlives local storage
 }
 ```
@@ -219,9 +219,9 @@ fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError>
 
 ```zn
 fn badPush(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
-    var bytes = try Vector<U8>.withCapacity(4, mut allocator);
+    var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
     let view = bytes.asSlice();
-    try bytes.push(1); // expected-error: vector structural mutation while view is live
+    bytes.push(1); // expected-error: vector structural mutation while view is live
     return Ok(view.len);
 }
 ```
@@ -230,14 +230,14 @@ fn badPush(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
 
 ```zn
 fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    var bytes = try Vector<U8>.withCapacity(4, mut allocator);
+    var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
 
     {
         let view = bytes.asSlice();
         parseHeader(view);
     }
 
-    try bytes.push(1);
+    bytes.push(1);
     return Ok(());
 }
 ```
@@ -256,6 +256,9 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
 - 动态索引需要检查，除非编译器能证明范围安全。
 - `Array<T>`、`Vector<T>` 或 `ArraySlice<T>` 上的典型范围循环应消除冗余边界检查。
 - 拆分 API 必须证明可写访问不重叠。
+- `for item in data` 不移动非 `Copy` 元素，只创建只读元素访问。
+- `for mut item in mut data` 在循环体内持有当前元素的唯一可写访问；循环期间不能结构性修改同一个 `Vector<T>`。
+- `for move item in move data` 只能用于拥有集合，提前退出时必须销毁尚未迭代的元素。
 
 示例：
 
@@ -364,6 +367,7 @@ let bytes = try fs.readFile("config.zn");
 
 编译器必须生成信任报告，至少记录：
 
+- `Zeno.toml` 中启用的 `trust` 能力和 manifest hash。
 - `trust` 的源码位置。
 - 使用的能力类别，例如 `ffiC`、`rawMemory`、`mmio`、`inlineAsm`、`interrupt`。
 - 是否从公开 API 泄露裸能力。

@@ -1,0 +1,7 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: StringSlice cannot be stored in static storage
+
+module tests.fail.stringSliceStatic;
+
+static badText: StringSlice = "hello"; // expected-error: StringSlice cannot be stored in static; use const for literals or String for owned text

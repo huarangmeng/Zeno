@@ -4,7 +4,7 @@
 
 module tests.pass.boxInterfaceDispatch;
 
-import core.alloc.{AllocError, GlobalAllocator};
+import core.alloc.GlobalAllocator;
 import core.result.{Result, Ok};
 
 enum WriteError {
@@ -26,9 +26,9 @@ impl Writer for Counter {
     }
 }
 
-fn makeWriter(mut allocator: GlobalAllocator) -> Result<Box<Writer>, AllocError> {
+fn makeWriter(mut allocator: GlobalAllocator) -> Box<Writer> {
     let counter = Counter { total: 0 };
-    return Box.new(move counter, mut allocator);
+    return Box.newIn(move counter, mut allocator);
 }
 
 fn writeBox(mut writer: Box<Writer>, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {

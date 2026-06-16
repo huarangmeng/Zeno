@@ -1,0 +1,54 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: for supports read, mut, move, and integer range iteration modes
+
+module tests.pass.forIterationModes;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn consume(move packet: Packet) -> U32 {
+    return packet.value;
+}
+
+fn checksum(bytes: ArraySlice<U8>) -> U32 {
+    var sum: U32 = 0;
+    for byte in bytes {
+        sum = sum + byte as U32;
+    }
+    return sum;
+}
+
+fn fill(mut bytes: ArraySlice<U8>, value: U8) {
+    for mut byte in mut bytes {
+        byte = value;
+    }
+}
+
+fn sumByIndex(bytes: ArraySlice<U8>) -> U32 {
+    var sum: U32 = 0;
+    for i in 0..bytes.len {
+        sum = sum + bytes[i] as U32;
+    }
+    return sum;
+}
+
+fn consumePackets(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
+    var packets = Vector<Packet>.withCapacityIn(2, mut allocator);
+    packets.push(Packet { value: 1 });
+    packets.push(Packet { value: 2 });
+
+    var sum: U32 = 0;
+    for move packet in move packets {
+        sum = sum + consume(move packet);
+    }
+    return Ok(sum);
+}

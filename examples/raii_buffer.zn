@@ -1,16 +1,15 @@
 module examples.raiiBuffer;
 
-import core.alloc.{AllocError, GlobalAllocator};
-import core.result.{Result, Ok};
+import core.alloc.GlobalAllocator;
 
 struct Page {
     bytes: Array<U8>,
 }
 
 impl Page {
-    fn new(mut allocator: GlobalAllocator) -> Result<Page, AllocError> {
-        let bytes = try Array<U8>.filled(4096, 0, mut allocator);
-        return Ok(Page { bytes: move bytes });
+    fn new(mut allocator: GlobalAllocator) -> Page {
+        let bytes = Array<U8>.filledIn(4096, 0, mut allocator);
+        return Page { bytes: move bytes };
     }
 }
 
@@ -18,8 +17,7 @@ fn consumePage(move page: Page) {
     // page is destroyed at the end of this function.
 }
 
-pub fn demo(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let page = try Page.new(mut allocator);
+pub fn demo(mut allocator: GlobalAllocator) {
+    let page = Page.new(mut allocator);
     consumePage(move page);
-    return Ok(());
 }

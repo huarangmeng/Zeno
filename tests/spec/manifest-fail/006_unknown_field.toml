@@ -1,0 +1,21 @@
+# category: manifest-fail
+# purpose: unknown manifest fields are rejected instead of ignored
+
+[package]
+name = "unknownField"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+stackTrace = true # expected-error: unknown field; use panic.stack
+
+[oom]
+strategy = "abort"

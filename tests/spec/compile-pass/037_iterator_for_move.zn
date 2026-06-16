@@ -1,0 +1,35 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: concrete Iterator can be consumed by for move iteration
+
+module tests.pass.iteratorForMove;
+
+import core.option.{Option, Some, None};
+
+struct Counter {
+    current: U32,
+    end: U32,
+}
+
+impl Counter {
+    destroy {}
+}
+
+impl Iterator<U32> for Counter {
+    fn next(mut self) -> Option<U32> {
+        if self.current >= self.end {
+            return None;
+        }
+        let value = self.current;
+        self.current = self.current + 1;
+        return Some(value);
+    }
+}
+
+fn sum(move counter: Counter) -> U32 {
+    var total: U32 = 0;
+    for move value in move counter {
+        total = total + value;
+    }
+    return total;
+}

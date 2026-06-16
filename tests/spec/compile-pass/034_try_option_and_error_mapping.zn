@@ -37,6 +37,15 @@ fn parseByte(value: U32) -> Result<U8, ParseError> {
     return Ok(byte);
 }
 
+fn parseByteLazy(value: U32) -> Result<U8, ParseError> {
+    let byte = try U8.fromChecked(value).okOrElse(() => ParseError.OutOfRange);
+    return Ok(byte);
+}
+
+fn fallbackByte(value: U32) -> U8 {
+    return U8.fromChecked(value).unwrapOrElse(() => 255);
+}
+
 fn readRaw() -> Result<U8, IoError> {
     return Err(IoError.Missing);
 }

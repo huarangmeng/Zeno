@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: mut for iteration requires mutable access to the source collection
+
+module tests.fail.forMutRequiresMutSource;
+
+fn bad(bytes: ArraySlice<U8>) {
+    for mut byte in bytes {
+        byte = 0; // expected-error: for mut item requires `mut` source access
+    }
+}

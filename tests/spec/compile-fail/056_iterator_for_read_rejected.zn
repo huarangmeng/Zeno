@@ -1,0 +1,30 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: Iterator produces owned values and must use for move iteration
+
+module tests.fail.iteratorForReadRejected;
+
+import core.option.{Option, None};
+
+struct Counter {
+    current: U32,
+}
+
+impl Counter {
+    destroy {}
+}
+
+impl Iterator<U32> for Counter {
+    fn next(mut self) -> Option<U32> {
+        return None;
+    }
+}
+
+fn bad() -> U32 {
+    let counter = Counter { current: 0 };
+    var total: U32 = 0;
+    for value in counter {
+        total = total + value; // expected-error: Iterator traversal yields owned values; use `for move value in move counter`
+    }
+    return total;
+}

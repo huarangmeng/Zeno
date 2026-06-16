@@ -34,6 +34,7 @@ try handle.join();
 规则：
 
 - `Thread.spawn` 可能分配 OS 资源，也可能失败。
+- `Thread.spawn` 接收并消费 `OnceFn<T>`，任务闭包最多执行一次。
 - 捕获值必须 `move`，除非它们是 `Copy`。
 - 被移动进线程的捕获值必须是 `Send`。
 - 线程返回值必须是 `Send`，因为它会通过 `JoinHandle<T>` 回到 join 方。
@@ -67,7 +68,7 @@ try task.await();
 
 - runtime 是显式值。
 - 没有程序选择的 runtime 或 executor，任务不能运行。
-- `spawn` 可能分配，也可能失败。
+- `spawn` 可能分配，也可能失败，并且消费 `OnceFn<T>` 任务闭包。
 - 可跨 worker 运行的任务要求捕获状态和返回值是 `Send`。
 - 阻塞 API 应标注，或被路由到 blocking pool。
 - 库 API 不得偷偷捕获全局 runtime。
@@ -101,7 +102,7 @@ Zeno 优先让成本显式：
 - OS 线程通过 `Thread` 显式出现。
 - 任务调度通过 `Runtime` 显式出现。
 - async 暂停点通过 `async` / `await` 显式出现。
-- 堆分配仍然通过 `Vector`、`Box`、任务句柄或 allocator 参数可见。
+- 堆分配仍然通过 `Vector`、`Box`、任务句柄、默认分配 API 或 `In` 后缀 allocator API 可见。
 - 数据共享需要 `Shared`、原子类型、锁或其他同步类型。
 
 语言不能把普通阻塞调用偷偷变成虚拟线程挂起，除非 API 类型明确表达了这种行为。

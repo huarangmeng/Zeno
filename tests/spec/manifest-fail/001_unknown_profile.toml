@@ -1,0 +1,20 @@
+# category: manifest-fail
+# purpose: target.profile must be one of the known profile names
+
+[package]
+name = "badProfile"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "server" # expected-error: unknown target profile
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"

@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: closures that mutate captures cannot be used where Fn is required
+
+module tests.fail.mutFnNotFn;
+
+fn readOnly(f: Fn<Unit>) {
+    f();
+}
+
+fn bad() {
+    var count = 0;
+    var inc = () {
+        count = count + 1;
+    };
+    readOnly(inc); // expected-error: mutating closure implements MutFn, not Fn
+}

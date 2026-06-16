@@ -1,0 +1,48 @@
+// category: compile-pass
+// profile: hosted
+// purpose: string literals are StringSlice and owned strings use explicit String.from
+
+module tests.pass.stringLiteralAndStringFrom;
+
+const greeting: StringSlice = "hello";
+
+fn textLen(text: StringSlice) -> USize {
+    return text.len;
+}
+
+fn byteLen(text: StringSlice) -> USize {
+    return text.asBytes().len;
+}
+
+fn owned() -> String {
+    let text = String.from("hello");
+    return move text;
+}
+
+fn append() -> String {
+    var text = String.from("zeno");
+    text.push(" language");
+    return move text;
+}
+
+fn countChars(text: StringSlice) -> USize {
+    var count: USize = 0;
+    let chars = text.chars();
+    for move ch in move chars {
+        let ignored = ch;
+        count = count + 1;
+    }
+    return count;
+}
+
+fn main() {
+    let view = "literal";
+    let a = textLen(greeting) + textLen(view);
+    let b = byteLen("bytes");
+    let c = countChars("chars");
+    let ownedText = owned();
+    let appendedText = append();
+    let ignored = a + b + c;
+    let ignoredOwned = move ownedText;
+    let ignoredAppended = move appendedText;
+}

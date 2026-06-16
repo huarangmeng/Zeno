@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: read for iteration does not make the loop element writable
+
+module tests.fail.forReadItemCannotAssign;
+
+fn bad(mut bytes: ArraySlice<U8>) {
+    for byte in mut bytes {
+        byte = 0; // expected-error: read iteration item is not writable; use `for mut byte in mut bytes`
+    }
+}

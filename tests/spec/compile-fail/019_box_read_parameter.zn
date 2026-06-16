@@ -4,13 +4,12 @@
 
 module tests.fail.boxReadParameter;
 
-import core.alloc.{AllocError, GlobalAllocator};
-import core.result.Result;
+import core.alloc.GlobalAllocator;
 
 struct Packet {
     bytes: Array<U8>,
 }
 
-fn bad(packet: Packet, mut allocator: GlobalAllocator) -> Result<Box<Packet>, AllocError> {
-    return Box.new(move packet, mut allocator); // expected-error: read parameter cannot be moved into Box
+fn bad(packet: Packet, mut allocator: GlobalAllocator) -> Box<Packet> {
+    return Box.newIn(move packet, mut allocator); // expected-error: read parameter cannot be moved into Box
 }

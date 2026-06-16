@@ -2,6 +2,8 @@
 
 这份语法草案刻意保持小而清晰，便于 stage0 使用手写递归下降解析器或 Pratt 解析器。它还不是完整形式化语法，但仓库中的所有语法示例都应该能落在这个形状里。
 
+包级 `Zeno.toml` manifest 是构建配置，不属于 `.zn` 源码语法。
+
 ## 1. Token
 
 空白用于分隔 token，本身没有语义。
@@ -35,7 +37,7 @@ ident = [A-Za-z][A-Za-z0-9]*
 1_000_000
 ```
 
-字符串 literal 默认是 UTF-8 `String`：
+字符串 literal 默认是 UTF-8 `StringSlice`：
 
 ```zn
 "hello"
@@ -109,6 +111,7 @@ primitive_type  = "Bool"
                 | "F32" | "F64"
                 | "Char"
                 | "String"
+                | "StringSlice"
                 | "Unit"
                 | "Never" ;
 
@@ -135,6 +138,9 @@ Writer
 Box<ThreadWorker>
 Shared<SharedWorker>
 Fn<I32, I32>
+MutFn<I32, Unit>
+OnceFn<Result<Unit, Error>>
+Iterator<U8>
 ```
 
 接口名在类型位置上表示接口访问类型。泛型约束中的 `W: Writer` 表示静态派发约束。
@@ -296,7 +302,9 @@ move_expr       = "move" expr ;
 
 if_expr         = "if" expr block ("else" (if_expr | block))? ;
 while_expr      = "while" expr block ;
-for_expr        = "for" pattern "in" expr block ;
+for_expr        = "for" for_binding "in" expr block ;
+for_binding     = for_binding_mode? pattern ;
+for_binding_mode = "mut" | "move" ;
 match_expr      = "match" expr "{" match_arm* "}" ;
 match_arm       = pattern "=>" expr_or_block ","? ;
 
@@ -353,6 +361,8 @@ unit_expr       = "(" ")" ;
 - 在返回 `Option<U>` 的函数中对 `Option<T>` 使用 `try`。
 
 `try` 不触发隐式 `Option` 到 `Result` 转换，也不触发隐式错误类型转换。
+
+`for` 绑定上的 `mut` / `move` 表示元素访问模式；`in` 右侧的 `mut expr` / `move expr` 表示集合访问模式。语义阶段必须检查二者匹配，例如 `for mut item in mut items` 和 `for move item in move items`。
 
 ## 11. 运算符
 

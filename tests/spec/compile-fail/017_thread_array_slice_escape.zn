@@ -13,7 +13,7 @@ fn consume(bytes: ArraySlice<U8>) -> USize {
 }
 
 fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    var bytes = try Array<U8>.filled(4, 0, mut allocator);
+    var bytes = Array<U8>.filledIn(4, 0, mut allocator);
     let slice = bytes.asSlice();
     let handle = try Thread.spawn(move () -> USize {
         return consume(slice); // expected-error: ArraySlice cannot escape to a thread

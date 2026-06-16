@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: panic and oom return Never and can satisfy any expected return type
+
+module tests.pass.panicOomNever;
+
+import core.alloc.Layout;
+import core.panic.{panic, oom};
+
+fn requirePositive(value: I32) -> I32 {
+    if value > 0 {
+        return value;
+    }
+
+    panic("expected positive value");
+}
+
+fn failWithString() -> String {
+    panic("cannot build string");
+}
+
+fn failAllocation() -> Vector<U8> {
+    let layout = Layout { size: 64, align: 8 };
+    oom(layout);
+}

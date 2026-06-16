@@ -10,9 +10,10 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 
 - 基础接口。
 - `Option`、`Result`。
-- `ArraySlice`、`String`。
+- `ArraySlice`、`StringSlice`。
 - 编译器需要的 move / destroy 辅助能力。
 - 分配器接口定义，但不要求全局分配器。
+- `panic(message) -> Never`、`PanicInfo` 诊断访问值和 `oom(layout) -> Never` 的 profile 绑定声明。
 - 目标支持时提供原子类型。
 - 编译器发行包中的 intrinsic 声明。
 
@@ -22,7 +23,8 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 - `Array`。
 - `Vector`。
 - `Shared`。
-- `String` 的分配式构造和构建器。
+- `String` 的拥有式构造、增长和构建器。
+- 默认 allocator 入口。
 - 基于分配器的集合。
 
 `std`：
@@ -59,6 +61,8 @@ impl<T> Option<T> {
     fn isSome(self) -> Bool;
     fn isNone(self) -> Bool;
     fn okOr<E>(move self, move error: E) -> Result<T, E>;
+    fn okOrElse<E>(move self, move makeError: OnceFn<E>) -> Result<T, E>;
+    fn unwrapOrElse(move self, move makeFallback: OnceFn<T>) -> T;
 }
 
 impl<T: Copy> Option<T> {
@@ -68,11 +72,13 @@ impl<T: Copy> Option<T> {
 impl<T, E> Result<T, E> {
     fn isOk(self) -> Bool;
     fn isErr(self) -> Bool;
-    fn mapErr<F>(move self, mapper: Fn<E, F>) -> Result<T, F>;
+    fn mapErr<F>(move self, move mapper: OnceFn<E, F>) -> Result<T, F>;
 }
 ```
 
-`try expr` 可以用于 `Result<T, E>` 或 `Option<T>`，但不做隐式 `Option` 到 `Result` 转换，也不做隐式错误类型转换。需要跨类型传播时使用 `okOr` 或 `mapErr`。
+`try expr` 可以用于 `Result<T, E>` 或 `Option<T>`，但不做隐式 `Option` 到 `Result` 转换，也不做隐式错误类型转换。需要跨类型传播时使用 `okOr`、`okOrElse` 或 `mapErr`。
+
+`okOr(error)` 和 `unwrapOr(fallback)` 适合便宜值。`okOrElse(makeError)` 和 `unwrapOrElse(makeFallback)` 只在 `None` 路径调用闭包；`mapErr(mapper)` 只在 `Err` 路径调用闭包。这些 lazy API 接收 `OnceFn`，因为闭包最多调用一次，可以移动捕获资源。传入这些 API 的闭包默认是非逃逸 callable，不分配，编译器应能内联为普通分支。
 
 ## 3. 数值
 
@@ -152,21 +158,29 @@ impl<T> Array<T> {
 
 impl<T: Copy> Array<T> {
     fn get(self, index: USize) -> Option<T>;
-    fn filled<A: Allocator>(count: USize, value: T, mut allocator: A) -> Result<Array<T>, AllocError>;
-    fn clone<A: Allocator>(self, mut allocator: A) -> Result<Array<T>, AllocError>;
+    fn filled(count: USize, value: T) -> Array<T>;
+    fn filledIn<A: Allocator>(count: USize, value: T, mut allocator: A) -> Array<T>;
+    fn clone(self) -> Array<T>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Array<T>;
 }
 
 impl<T> Vector<T> {
-    fn withCapacity<A: Allocator>(capacity: USize, mut allocator: A) -> Result<Vector<T>, AllocError>;
+    fn withCapacity(capacity: USize) -> Vector<T>;
+    fn withCapacityIn<A: Allocator>(capacity: USize, mut allocator: A) -> Vector<T>;
     fn len(self) -> USize;
     fn capacity(self) -> USize;
     fn asSlice(self) -> ArraySlice<T>;
-    fn push(mut self, move value: T) -> Result<Unit, AllocError>;
+    fn reserve(mut self, additional: USize);
+    fn reserveExact(mut self, additional: USize);
+    fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn tryReserveExact(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn push(mut self, move value: T);
     fn pop(mut self) -> Option<T>;
 }
 
 impl<T: Copy> Vector<T> {
-    fn clone<A: Allocator>(self, mut allocator: A) -> Result<Vector<T>, AllocError>;
+    fn clone(self) -> Vector<T>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Vector<T>;
 }
 
 impl<T> ArraySlice<T> {
@@ -182,11 +196,32 @@ impl<T: Copy> ArraySlice<T> {
 
 `Array<T>`、`Vector<T>` 和 `ArraySlice<T>` 的索引语法会降低为检查访问，或在编译器能证明安全时降低为无冗余检查访问。
 
-`Array<T>.clone` 和 `Vector<T>.clone` 是显式深拷贝。v1 先为 `T: Copy` 元素提供集合 clone；非 `Copy` 元素的深拷贝接口后续单独设计。集合 clone 可能分配，所以必须接收 allocator 并返回 `Result<_, AllocError>`。`Array<T>` 和 `Vector<T>` 默认不是 `Copy`，也不能通过普通赋值隐藏复制成本。
+`Array<T>.clone` 和 `Vector<T>.clone` 是显式深拷贝。v1 先为 `T: Copy` 元素提供集合 clone；非 `Copy` 元素的深拷贝接口后续单独设计。普通 `clone` 可能分配，失败时调用当前 profile 的 `oom(layout) -> Never`。无 `In` 后缀的 clone 使用 profile 默认 allocator；需要指定 allocator 时使用 `cloneIn`。`Array<T>` 和 `Vector<T>` 默认不是 `Copy`，也不能通过普通赋值隐藏复制成本。
 
 在 API 参数位置，连续数据优先写成 `ArraySlice<T>`。调用方可以传入 `Array<T>`、`Vector<T>` 或已有的 `ArraySlice<T>`。需要增长时使用 `Vector<T>`，需要固定长度拥有者时使用 `Array<T>`。
 
+`Vector<T>.reserve(additional)` 和 `reserveExact(additional)` 用于提前扩容，失败时调用当前 profile 的 `oom(layout) -> Never`。`tryReserve(additional)` 和 `tryReserveExact(additional)` 是 v1 标准集合唯一的可恢复 OOM API；它们只预留容量，不插入元素，失败时保留原 `Vector<T>` 内容不变。调用方如果需要避免复杂流程中途 OOM，应先调用 `tryReserve`，成功后再执行后续 `push`。
+
 `Vector<T>` 的 `push`、`pop`、`reserve`、`insert`、`remove`、`clear`、`shrink` 等结构性修改要求当前没有活跃的 `ArraySlice<T>` 依赖该 `Vector<T>`。只读查询如 `len`、`capacity` 和新的只读 `asSlice` 可以继续使用。
+
+`for` 对核心连续集合是编译器识别的语法 lowering，不要求分配 iterator 对象：
+
+- `for item in data`：只读元素遍历，可用于 `Array<T>`、`Vector<T>` 和 `ArraySlice<T>`。
+- `for mut item in mut data`：唯一可写元素遍历，可用于 `Array<T>`、`Vector<T>` 和 `ArraySlice<T>`。
+- `for move item in move data`：消耗元素遍历，只用于拥有的 `Array<T>` 和 `Vector<T>`。
+- `for i in start..end`：整数半开区间遍历。
+
+这些形式不得通过隐藏接口派发或堆分配实现。
+
+通用拥有式迭代协议：
+
+```zn
+interface Iterator<T> {
+    fn next(mut self) -> Option<T>;
+}
+```
+
+`Iterator<T>` 表示拥有或生成 `T` 值的流。`for move item in move iterator` 可以用于实现了 `Iterator<T>` 的具体迭代器类型。核心集合的只读和可写元素遍历不强制走 `Iterator<T>`，因为它们产生的是短期元素访问，不应被包装进 `Option` 或长期对象。
 
 `ArraySlice<T>` 是非拥有访问值，不能作为结构体字段，也不能通过 `Array<ArraySlice<T>>`、`Vector<ArraySlice<T>>` 等形式间接保存。结构体应保存拥有者：
 
@@ -216,7 +251,7 @@ fn body(bytes: ArraySlice<U8>) -> ArraySlice<U8> {
 
 ```zn
 fn bad(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let bytes = try Array<U8>.filled(64, 0, mut allocator);
+    let bytes = Array<U8>.filledIn(64, 0, mut allocator);
     return Ok(bytes.asSlice()); // expected-error: view outlives local storage
 }
 ```
@@ -235,45 +270,140 @@ impl<T> ArraySlice<T> {
 
 ## 5. 字符串
 
-`String` 是 UTF-8 文本类型。字符串 literal 的类型是 `String`。
+Zeno 区分文本拥有者和文本访问值：
+
+```zn
+String        // 拥有、UTF-8、可增长
+StringSlice   // 不拥有、UTF-8、长度稳定
+```
+
+字符串 literal 的类型是 `StringSlice`。它指向静态只读 UTF-8 数据，不分配。
+
+```zn
+let view = "hello";                  // StringSlice
+let owned = String.from("hello"); // String
+```
+
+`String` 语义上等价于带 UTF-8 不变量的可增长字节缓冲区。它不是 `Copy`，move 是 O(1)，clone 必须显式。实现可以使用小字符串优化或静态字面量优化，但这些优化不能改变可观察语义。
+
+必要 API：
+
+```zn
+impl String {
+    fn from(text: StringSlice) -> String;
+    fn fromIn<A: Allocator>(text: StringSlice, mut allocator: A) -> String;
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn asSlice(self) -> StringSlice;
+    fn asBytes(self) -> ArraySlice<U8>;
+    fn reserve(mut self, additionalBytes: USize);
+    fn reserveExact(mut self, additionalBytes: USize);
+    fn tryReserve(mut self, additionalBytes: USize) -> Result<Unit, AllocError>;
+    fn tryReserveExact(mut self, additionalBytes: USize) -> Result<Unit, AllocError>;
+    fn push(mut self, text: StringSlice);
+    fn clone(self) -> String;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> String;
+}
+
+impl StringSlice {
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn asBytes(self) -> ArraySlice<U8>;
+    fn dropPrefix(self, byteCount: USize) -> StringSlice;
+    fn chars(self) -> Utf8Chars;
+}
+
+struct Utf8Chars { ... }
+
+impl Iterator<Char> for Utf8Chars {
+    fn next(mut self) -> Option<Char>;
+}
+```
 
 规则：
 
-- 普通参数 `text: String` 是只读访问，不复制文本。
-- 需要接收字符串所有权时必须写 `move text: String`。
-- 从字节转换到 `String` 必须验证 UTF-8；跳过验证只能出现在 `trust` 边界中。
-- 会分配的字符串拼接必须返回 `String`，并要求分配器上下文。
-- 会分配的格式化 API 必须在返回类型或调用形式中体现。
+- `let text = "hello";` 推断为 `StringSlice`，不分配。
+- `let text: String = "hello";` 不允许；拥有字符串必须显式写 `String.from("hello")`。
+- `String.from(text)` 是普通用户的拥有字符串构造入口，使用 profile 默认 allocator，并直接返回 `String`。
+- `String.fromIn(text, mut allocator)` 指定 allocator，并直接返回 `String`。
+- `String.reserve(additionalBytes)` 和 `reserveExact(additionalBytes)` 用于提前预留字节容量，失败时调用当前 profile 的 `oom(layout) -> Never`。
+- `String.tryReserve(additionalBytes)` 和 `tryReserveExact(additionalBytes)` 返回 `Result<Unit, AllocError>`，失败时保留原字符串内容不变；这是需要可恢复 OOM 的文本构建代码应使用的入口。
+- `String.push(text)` 可能分配，失败时调用当前 profile 的 `oom(layout) -> Never`。
+- 会分配的格式化 API 默认直接返回 `String`。
+- `@noAlloc` 中调用这些会分配的 API 必须被拒绝。
+- `StringSlice` 是访问值，不能作为结构体字段、集合元素、`static`、逃逸闭包捕获、线程任务捕获或 async future 状态保存。字符串 literal 可以作为 `const StringSlice` 使用；需要长期运行期保存时使用 `String`。
+- 从字节转换到 `String` 或 `StringSlice` 必须验证 UTF-8；跳过验证只能出现在 `trust` 边界中。
+- `String.len` 和 `StringSlice.len` 返回字节长度，不是 Unicode scalar 数量。
+- 文本不能用随机整数索引直接返回 `Char`，因为 UTF-8 字符访问不是 O(1)。需要字符遍历时使用 `chars()`。
+- 原始二进制数据使用 `Array<U8>` / `ArraySlice<U8>`，不要使用 `String`。
 
 ## 6. 分配
 
 分配器接口：
 
 ```zn
+struct Layout {
+    size: USize,
+    align: USize,
+}
+
+enum AllocError {
+    OutOfMemory,
+    InvalidLayout,
+    TooLarge,
+}
+
+struct Allocation {
+    // 只允许 trust 封装解释的不透明分配句柄
+}
+
 interface Allocator {
     fn allocate(mut self, layout: Layout) -> Result<Allocation, AllocError>;
     fn deallocate(mut self, allocation: Allocation, layout: Layout);
 }
 ```
 
+`Layout` 描述分配大小和对齐；非法对齐或大小溢出必须在构造 `Layout` 时被拒绝，或由低层 allocator 返回 `AllocError.InvalidLayout` / `AllocError.TooLarge`。`Allocation` 不暴露普通用户可做算术的裸地址；把它转换成可读写内存对象只能发生在 `trust` 封装内部。
+
+分配 API 分为两层：
+
+- 无 `In` 后缀的 API 使用 profile 默认 allocator，例如 `String.from`、`Vector.withCapacity`、`Array.filled`、`Box.new` 和 `Shared.new`。
+- 带 `In` 后缀的 API 显式接收 allocator，例如 `String.fromIn`、`Vector.withCapacityIn`、`Array.filledIn`、`Box.newIn` 和 `Shared.newIn`。
+- 默认分配 API 和 `In` 后缀分配 API 不返回 `Result`。分配失败时调用当前 profile 的 `oom(layout) -> Never` 策略，不返回到调用点。
+- v1 标准集合只在容量预留上提供可恢复 OOM：`Vector.tryReserve`、`Vector.tryReserveExact`、`String.tryReserve` 和 `String.tryReserveExact`。构造、`push`、`clone`、`Box.new` 和 `Shared.new` 不提供 `Result` 版本。
+- Freestanding profile 默认没有全局 allocator；除非目标 profile 明确配置默认 allocator，否则只能使用 `In` 后缀 API。
+- Hosted profile 可以提供默认 allocator，让普通应用代码避免到处传 allocator。
+- 拥有者必须记录释放和后续增长所需的 allocator 信息。实现可以对零大小 allocator、默认 allocator 或可静态证明的 allocator 做专用化和字段消除。
+- `@noAlloc` 中禁止调用无 `In` 和带 `In` 的分配 API。
+- 低层 `Allocator.allocate` 保留 `Result`，因为它是实现集合、arena、内核页分配器和平台绑定的底层入口；普通用户构造集合和值拥有者时不直接暴露这个错误流。
+
 拥有式 box：
 
 ```zn
-struct Box<T, A: Allocator> {
+struct Box<T> {
     // 内部表示
+}
+
+impl<T> Box<T> {
+    fn new(move value: T) -> Box<T>;
+    fn newIn<A: Allocator>(move value: T, mut allocator: A) -> Box<T>;
 }
 ```
 
-`Box.new(move value, allocator)` 是显式分配并接收 `value` 所有权。Hosted profile 可以提供 `GlobalAllocator`，但核心语言语义不能假设它存在。
+`Box.new(move value)` 是显式分配并接收 `value` 所有权。`Box.newIn(move value, mut allocator)` 用于 arena、页分配器、固定池等场景。
 
-`Box<Interface, A>` 表示拥有式异构接口值。若 `T: Interface`，从 `T` 构造 `Box<Interface, A>` 只分配一次具体 `T`；从 `Box<T, A>` 移动转换到 `Box<Interface, A>` 不重新分配、不复制值，只携带接口表元数据。`Box<Interface, A>` 销毁时通过接口表销毁具体值，再用 allocator `A` 释放内存。
+`Box<Interface>` 表示拥有式异构接口值。若 `T: Interface`，从 `T` 构造 `Box<Interface>` 只分配一次具体 `T`；从 `Box<T>` 移动转换到 `Box<Interface>` 不重新分配、不复制值，只携带接口表元数据。`Box<Interface>` 销毁时通过接口表销毁具体值，再用创建时绑定的 allocator 释放内存。
 
 ```zn
-fn boxWriter<A: Allocator>(move file: File, mut allocator: A) -> Result<Box<Writer, A>, AllocError> {
-    return Box.new(move file, mut allocator);
+fn boxWriter(move file: File) -> Box<Writer> {
+    return Box.new(move file);
 }
 
-fn eraseWriter<A: Allocator>(move file: Box<File, A>) -> Box<Writer, A> {
+fn boxWriterIn<A: Allocator>(move file: File, mut allocator: A) -> Box<Writer> {
+    return Box.newIn(move file, mut allocator);
+}
+
+fn eraseWriter(move file: Box<File>) -> Box<Writer> {
     return move file;
 }
 ```
@@ -281,20 +411,21 @@ fn eraseWriter<A: Allocator>(move file: Box<File, A>) -> Box<Writer, A> {
 共享拥有：
 
 ```zn
-struct Shared<T, A: Allocator> {
+struct Shared<T> {
     // 内部表示
 }
 
-impl<T, A: Allocator> Shared<T, A> {
-    fn new(move value: T, mut allocator: A) -> Result<Shared<T, A>, AllocError>;
-    fn clone(self) -> Shared<T, A>;
+impl<T> Shared<T> {
+    fn new(move value: T) -> Shared<T>;
+    fn newIn<A: Allocator>(move value: T, mut allocator: A) -> Shared<T>;
+    fn clone(self) -> Shared<T>;
     fn strongCount(self) -> USize;
 }
 ```
 
-`Shared<T>` 表示引用计数共享所有权。引用计数成本必须在类型名里可见。`Shared<T>.clone` 只增加引用计数，不深拷贝底层值；这个成本通过 `Shared` 类型名显式暴露。`Shared<T>` 默认只提供不可变共享；共享可变状态需要 `Mutex<T>`、原子类型或其他同步容器。`Shared<T, A>` 只有在 `T: Send, Sync` 且 `A: Send, Sync` 时才是 `Send` 和 `Sync`。
+`Shared<T>` 表示引用计数共享所有权。引用计数成本必须在类型名里可见。`Shared<T>.clone` 只增加引用计数，不深拷贝底层值；这个成本通过 `Shared` 类型名显式暴露。`Shared<T>` 默认只提供不可变共享；共享可变状态需要 `Mutex<T>`、原子类型或其他同步容器。`Shared<T>` 只有在 `T: Send, Sync` 且创建时绑定的 allocator 可跨线程释放时才是 `Send` 和 `Sync`。
 
-`Shared<Interface, A>` 表示共享拥有式异构接口值。若 `T: Interface`，`Shared<T, A>` 可以移动转换成 `Shared<Interface, A>`，不增加引用计数、不重新分配、不复制具体值。`Shared<Interface, A>.clone()` 仍然只增加引用计数。`Shared<Interface, A>` 只能提供只读接口访问；如果接口方法需要 `mut self`，调用方必须使用 `Box<Interface, A>`、具体唯一拥有者，或显式同步容器。需要跨线程共享接口对象时，应定义包含 `Send` 和 `Sync` 的命名接口，例如 `interface SharedWriter: Writer, Send, Sync {}`，然后使用 `Shared<SharedWriter, A>`。
+`Shared<Interface>` 表示共享拥有式异构接口值。若 `T: Interface`，`Shared<T>` 可以移动转换成 `Shared<Interface>`，不增加引用计数、不重新分配、不复制具体值。`Shared<Interface>.clone()` 仍然只增加引用计数。`Shared<Interface>` 只能提供只读接口访问；如果接口方法需要 `mut self`，调用方必须使用 `Box<Interface>`、具体唯一拥有者，或显式同步容器。需要跨线程共享接口对象时，应定义包含 `Send` 和 `Sync` 的命名接口，例如 `interface SharedWriter: Writer, Send, Sync {}`，然后使用 `Shared<SharedWriter>`。
 
 ## 7. 接口
 
@@ -308,6 +439,26 @@ interface Send {}
 interface Sync {}
 ```
 
+Callable 能力由编译器内建识别，不作为普通用户可实现接口开放：
+
+```zn
+Fn<A..., R>       // 只读调用，可调用多次
+MutFn<A..., R>    // 可变调用，可调用多次
+OnceFn<A..., R>   // 消费调用，最多调用一次
+```
+
+`Fn` 可用于要求 `MutFn` 或 `OnceFn` 的位置；`MutFn` 可用于要求 `OnceFn` 的位置；反向不允许。
+
+通用拥有式迭代接口：
+
+```zn
+interface Iterator<T> {
+    fn next(mut self) -> Option<T>;
+}
+```
+
+`Iterator<T>` 是普通接口，可以由用户类型实现。为了保持成本可见，`for move item in move iterator` 对具体迭代器默认静态派发；只有把迭代器显式写成接口访问或接口拥有者时，才会出现接口派发。
+
 `Send` 和 `Sync` 是编译器认识的标记接口。
 
 - `Send`：值的所有权可以跨线程、任务或可跨线程 future 边界移动。
@@ -320,8 +471,8 @@ interface Sync {}
 - 标量基础类型、`String`、`Unit`、`Never` 自动是 `Send` 和 `Sync`。
 - `Array<T>`、`Vector<T>`、`Option<T>`、`Result<T, E>`、元组和普通 enum 按元素或载荷推导。
 - 普通结构体在没有自定义 `destroy` 块且所有字段满足对应条件时自动推导。
-- `Box<T, A>`：`Send` 需要 `T: Send` 和 `A: Send`；`Sync` 需要 `T: Sync` 和 `A: Sync`。
-- `Shared<T, A>`：`Send` 和 `Sync` 都需要 `T: Send, Sync` 和 `A: Send, Sync`。
+- `Box<T>`：`Send` 需要 `T: Send` 且创建时绑定的 allocator 可跨线程释放；`Sync` 需要 `T: Sync` 且 allocator 可跨线程共享释放元数据。
+- `Shared<T>`：`Send` 和 `Sync` 都需要 `T: Send, Sync` 且创建时绑定的 allocator 可跨线程释放。
 - `Mutex<T>`：`Send` 和 `Sync` 都需要 `T: Send`。
 - `Atomic<T>` 对受支持载荷自动是 `Send` 和 `Sync`。
 - `ArraySlice<T>`、裸接口访问和其他非拥有访问值不能跨非 scoped 并发边界。
@@ -374,7 +525,7 @@ struct File {
 }
 
 impl File {
-    fn open(path: String) -> Result<File, IoError>;
+    fn open(path: StringSlice) -> Result<File, IoError>;
     fn read(mut self, mut out: ArraySlice<U8>) -> Result<USize, IoError>;
     fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, IoError>;
     fn close(move self) -> Result<Unit, IoError>;
@@ -419,12 +570,74 @@ fn closeBestEffort(rawFd: I32) {
 
 标准库应把 `trust` 边界保持得很小，并在公开 API 中使用 `Result`、`Handle<T>`、`ArraySlice<T>`、`Mmio<T>`、`Port<T>` 等有语义的类型。
 
-## 10. Panic
+## 10. Panic 与 OOM
 
-`panic` 由 profile 提供：
+`core.panic` 提供 profile 绑定的失败入口：
 
-- Freestanding profile：abort 或目标 trap。
-- Hosted profile：可配置 abort 或 unwind。
+```zn
+fn panic(message: StringSlice) -> Never;
+fn oom(layout: Layout) -> Never;
+
+interface PanicInfo {
+    fn message(self) -> StringSlice;
+    fn location(self) -> SourceLocation;
+    fn stack(self) -> StackFrames;
+}
+
+struct SourceLocation { ... }
+
+impl SourceLocation {
+    fn file(self) -> StringSlice;
+    fn function(self) -> StringSlice;
+    fn line(self) -> U32;
+    fn column(self) -> U32;
+}
+
+struct StackFrame { ... }
+
+impl StackFrame {
+    fn instructionPointer(self) -> USize;
+    fn returnAddress(self) -> USize;
+    fn symbol(self) -> Option<StringSlice>;
+}
+
+struct StackFrames { ... }
+
+impl Iterator<StackFrame> for StackFrames {
+    fn next(mut self) -> Option<StackFrame>;
+}
+
+fn panicHandler(info: PanicInfo) -> Never;
+```
+
+语义：
+
+- `panic(message)` 表示程序不变量被破坏，不用于业务错误。
+- `oom(layout)` 表示默认分配 API 或 `In` 后缀分配 API 遇到内存耗尽。
+- 二者都返回 `Never`，调用后不会正常回到调用点。
+- `panic` 和 `oom` 的具体行为由 profile 选择；库代码只依赖它们不返回。
+- `panic(message)` 会被编译器补充调用点 `SourceLocation`，并交给 profile 的 `panicHandler(info)`。
+- `PanicInfo`、`StackFrames` 和相关诊断访问值只能在 panic handler 的调用链中使用，不能保存或逃逸。
+- `PanicInfo.stack()` 返回惰性 `StackFrames`，用于在 handler 中无分配遍历调用栈。
+- `StackFrame.symbol()` 是 best-effort；没有符号表或禁用符号化时返回 `None`，handler 仍可输出 `instructionPointer()`。
+
+默认 profile 行为：
+
+- Hosted profile：`panic` 默认 abort，可配置 unwind；debug 配置默认启用调用栈；`oom` 默认 abort，可配置为调用 `panic` 或目标 handler。
+- Freestanding profile：`panic` 和 `oom` 默认目标 trap 或 abort；不要求 unwind、调用栈符号化，也不要求默认 allocator。
+- Kernel / embedded profile：必须显式提供 `panicHandler` 和 `oomHandler`，二者都返回 `Never`。
+
+清理规则：
+
+- panic-unwind profile 必须在展开经过的作用域执行 `defer` 和 RAII 销毁。
+- abort / trap / halt / reset profile 不展开栈，也不保证执行普通析构。
+- OOM 默认不 unwind；只有目标明确把 OOM 映射到 panic-unwind 时，才执行 panic-unwind 清理。
+
+属性关系：
+
+- `@noPanic` 拒绝直接或间接 `panic`，以及当前 profile 中会降低成 `panic` 的运行时检查。
+- 当前 profile 若把 OOM 配置成 `panic`，`@noPanic` 中可能分配的 API 也必须被拒绝，除非编译器能证明不会失败。
+- `@noAlloc` 拒绝堆分配，是排除分配触发 OOM 的主要工具。
 
 可恢复错误必须使用 `Result`。
 
@@ -432,9 +645,11 @@ fn closeBestEffort(rawFd: I32) {
 
 标准 API 应该暴露成本：
 
-- 除非返回类型显示分配，否则 `new` 应只用于低成本构造。
-- 分配应使用 `Box.new`、`Array.filled`、`Vector.withCapacity` 或 allocator 参数。
-- `clone` 用于显式复制；`Array<T>` / `Vector<T>` 的 `clone` 是深拷贝并显式接收 allocator。
+- `new` 不是语言级通用构造关键字。它只作为少数类型方法出现：显式拥有资源构造如 `Box.new` / `Shared.new`，或低成本常量初始化如 `Atomic.new`。
+- 字符串不使用 `new String(...)`；拥有字符串统一使用 `String.from(text)` 或 `String.fromIn(text, mut allocator)`。
+- 默认分配应使用 `Box.new`、`Shared.new`、`Array.filled`、`Vector.withCapacity`、`String.from`、`String.push` 等直接返回值的 API。
+- 指定 allocator 时使用 `In` 后缀：`Box.newIn`、`Shared.newIn`、`Array.filledIn`、`Vector.withCapacityIn`、`String.fromIn`、`cloneIn`。
+- `clone` 用于显式复制；指定 allocator 的深拷贝使用 `cloneIn`。
 - 引用计数共享使用 `Shared.new`；引用计数增加使用 `Shared.clone`，成本由 `Shared` 类型名显式暴露。
 - 静态接口约束写成泛型边界，例如 `W: Writer`；需要动态接口派发的短期访问 API 直接使用接口名，例如 `Writer`。
 - 需要长期保存具体实现时优先使用泛型字段，例如 `writer: W` 且 `W: Writer`。

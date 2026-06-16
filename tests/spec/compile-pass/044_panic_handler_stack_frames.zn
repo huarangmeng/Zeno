@@ -1,0 +1,37 @@
+// category: compile-pass
+// profile: hosted
+// purpose: panic handlers can inspect source location and lazily iterate stack frames
+
+module tests.pass.panicHandlerStackFrames;
+
+import core.panic.PanicInfo;
+
+fn countFrames(info: PanicInfo) -> USize {
+    let message = info.message();
+    let location = info.location();
+    let file = location.file();
+    let function = location.function();
+    let line = location.line();
+    let column = location.column();
+
+    let ignoredMessage = message;
+    let ignoredFile = file;
+    let ignoredFunction = function;
+    let ignoredLine = line;
+    let ignoredColumn = column;
+
+    var frames = info.stack();
+    var count: USize = 0;
+
+    for move frame in move frames {
+        let ip = frame.instructionPointer();
+        let ra = frame.returnAddress();
+        let symbol = frame.symbol();
+        let ignoredIp = ip;
+        let ignoredRa = ra;
+        let ignoredSymbol = symbol;
+        count = count + 1;
+    }
+
+    return count;
+}

@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: hosted
+// oom: panic
+// purpose: noPanic rejects allocation APIs when the active profile maps OOM to panic
+
+module tests.fail.noPanicRejectsOomAsPanic;
+
+import alloc.string.String;
+
+@noPanic
+fn bad() -> String {
+    return String.from("hello"); // expected-error: allocation failure would call panic in this profile
+}

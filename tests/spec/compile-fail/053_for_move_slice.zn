@@ -1,0 +1,25 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: ArraySlice cannot be consumed by move iteration because it does not own elements
+
+module tests.fail.forMoveSlice;
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn consume(move packet: Packet) -> U32 {
+    return packet.value;
+}
+
+fn bad(slice: ArraySlice<Packet>) -> U32 {
+    var sum: U32 = 0;
+    for move packet in move slice {
+        sum = sum + consume(move packet); // expected-error: move iteration requires an owning Array or Vector source
+    }
+    return sum;
+}

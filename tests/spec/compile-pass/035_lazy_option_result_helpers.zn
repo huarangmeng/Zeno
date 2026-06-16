@@ -1,0 +1,41 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: lazy Option and Result helpers keep fallback work on cold paths
+
+module tests.pass.lazyOptionResultHelpers;
+
+import core.option.{Option, Some, None};
+import core.result.{Result, Ok};
+
+enum LookupError {
+    Missing(U64),
+}
+
+enum ConfigError {
+    Lookup(LookupError),
+}
+
+struct User: Copy {
+    id: U64,
+}
+
+fn findUser(id: U64) -> Option<User> {
+    if id == 0 {
+        return None;
+    }
+    return Some(User { id: id });
+}
+
+fn getUser(id: U64) -> Result<User, LookupError> {
+    let user = try findUser(id).okOrElse(() => LookupError.Missing(id));
+    return Ok(user);
+}
+
+fn userOrDefault(id: U64) -> User {
+    return findUser(id).unwrapOrElse(() => User { id: 1 });
+}
+
+fn readUser(id: U64) -> Result<User, ConfigError> {
+    let user = try getUser(id).mapErr((error: LookupError) => ConfigError.Lookup(error));
+    return Ok(user);
+}

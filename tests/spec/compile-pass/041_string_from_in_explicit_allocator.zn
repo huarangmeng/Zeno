@@ -1,0 +1,11 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: freestanding code can build owned String with an explicit allocator
+
+module tests.pass.stringFromInExplicitAllocator;
+
+import core.alloc.GlobalAllocator;
+
+fn make(mut allocator: GlobalAllocator) -> String {
+    return String.fromIn("hello", mut allocator);
+}

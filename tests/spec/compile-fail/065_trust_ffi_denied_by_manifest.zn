@@ -1,0 +1,8 @@
+// category: compile-fail
+// profile: hosted
+// trust.ffi: false
+// purpose: manifest trust capabilities must allow FFI even when source uses trust extern
+
+module tests.fail.trustFfiDeniedByManifest;
+
+trust extern "C" fn getpid() -> I32; // expected-error: manifest does not allow FFI trust capability

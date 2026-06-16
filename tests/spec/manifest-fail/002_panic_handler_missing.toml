@@ -1,0 +1,20 @@
+# category: manifest-fail
+# purpose: panic.strategy handler requires panic.handler
+
+[package]
+name = "missingPanicHandler"
+
+[target]
+triple = "x86_64-unknown-none"
+profile = "kernel"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "handler" # expected-error: panic.handler is required when strategy is handler
+stack = "addresses"
+
+[oom]
+strategy = "handler"
+handler = "kernel.oomHandler"

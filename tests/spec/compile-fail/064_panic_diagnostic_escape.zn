@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: panic diagnostic access values cannot be stored or escape the handler path
+
+module tests.fail.panicDiagnosticEscape;
+
+import core.panic.{PanicInfo, StackFrames};
+
+struct SavedInfo {
+    info: PanicInfo, // expected-error: PanicInfo is a diagnostic access value and cannot be stored
+}
+
+struct SavedFrames {
+    frames: StackFrames, // expected-error: StackFrames is valid only inside the panic handler path
+}

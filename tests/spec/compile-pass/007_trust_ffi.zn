@@ -1,5 +1,6 @@
 // category: compile-pass
 // profile: hosted
+// trust.ffi: true
 // purpose: trust extern allows explicit low-level FFI boundary
 
 module tests.pass.trustFfi;

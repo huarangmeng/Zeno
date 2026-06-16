@@ -1,0 +1,9 @@
+// category: compile-pass
+// profile: hosted
+// purpose: Array clone can use the profile default allocator and returns an owned Array
+
+module tests.pass.arrayCloneDefaultAllocator;
+
+fn cloneBytes(bytes: Array<U8>) -> Array<U8> {
+    return bytes.clone();
+}
