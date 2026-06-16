@@ -1,0 +1,26 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: move self methods consume their receiver
+
+module tests.fail.useAfterMoveSelf;
+
+struct Counter {
+    value: U32,
+}
+
+impl Counter {
+    fn get(self) -> U32 {
+        return self.value;
+    }
+
+    fn finish(move self) -> U32 {
+        return self.value;
+    }
+}
+
+fn main() {
+    var counter = Counter { value: 1 };
+    let done = counter.finish();
+    let late = counter.get(); // expected-error: receiver used after move self call
+    let ignored = done + late;
+}

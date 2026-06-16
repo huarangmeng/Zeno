@@ -1,0 +1,30 @@
+module examples.resultAndClosure;
+
+import core.result.{Result, Ok, Err};
+
+enum MapError {
+    OutputTooSmall,
+}
+
+fn mapCopy<T: Copy, U: Copy>(
+    input: ArraySlice<T>,
+    mut output: ArraySlice<U>,
+    f: Fn<T, U>,
+) -> Result<Unit, MapError> {
+    if output.len < input.len {
+        return Err(MapError.OutputTooSmall);
+    }
+
+    for i in 0..input.len {
+        output[i] = f(input[i]);
+    }
+
+    return Ok(());
+}
+
+pub fn demo(input: ArraySlice<I32>, mut output: ArraySlice<I32>) -> Result<Unit, MapError> {
+    let bias = 7;
+    let addBias = (x: I32) => x + bias;
+    try mapCopy(input, mut output, addBias);
+    return Ok(());
+}

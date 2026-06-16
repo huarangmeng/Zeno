@@ -1,0 +1,29 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Self-returning interface requirements are callable through static constraints
+
+module tests.pass.staticSelfInterfaceRequirement;
+
+interface Duplicable {
+    fn duplicate(self) -> Self;
+}
+
+struct Token: Copy {
+    id: U32,
+}
+
+impl Duplicable for Token {
+    fn duplicate(self) -> Self {
+        return self;
+    }
+}
+
+fn duplicateStatic<T: Duplicable>(value: T) -> T {
+    return value.duplicate();
+}
+
+fn main() -> U32 {
+    let token = Token { id: 7 };
+    let copied = duplicateStatic(token);
+    return copied.id;
+}

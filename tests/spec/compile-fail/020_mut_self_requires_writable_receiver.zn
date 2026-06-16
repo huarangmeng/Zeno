@@ -1,0 +1,20 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: mut self methods require writable receivers
+
+module tests.fail.mutSelfRequiresWritableReceiver;
+
+struct Counter {
+    value: U32,
+}
+
+impl Counter {
+    fn bump(mut self) {
+        self.value = self.value + 1;
+    }
+}
+
+fn main() {
+    let counter = Counter { value: 1 };
+    counter.bump(); // expected-error: mut self method requires writable receiver
+}

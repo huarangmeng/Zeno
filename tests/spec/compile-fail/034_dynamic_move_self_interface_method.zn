@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: move self interface methods require a known owned concrete type
+
+module tests.fail.dynamicMoveSelfInterfaceMethod;
+
+interface Consumable {
+    fn finish(move self) -> U32;
+}
+
+fn bad(item: Consumable) -> U32 {
+    return item.finish(); // expected-error: move self interface method cannot be dynamically dispatched
+}

@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: writable access cannot escape to unscoped threads
+
+module tests.fail.writableAccessThreadEscape;
+
+import std.thread.Thread;
+
+fn main() {
+    var value = 0;
+    let access = mut value;
+    Thread.spawn(move () {
+        access = access + 1;
+    }); // expected-error: writable access cannot escape to unscoped thread
+}

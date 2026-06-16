@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: allocation must be explicit in no-allocation contexts
+
+module tests.fail.hiddenAllocation;
+
+import alloc.string.{String, format};
+
+fn consume(text: String) {}
+
+@noAlloc
+fn tick(value: I32) {
+    let text = format("value={}", value); // expected-error: hidden heap allocation
+    consume(text);
+}

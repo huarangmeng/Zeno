@@ -1,0 +1,30 @@
+// category: compile-pass
+// profile: hosted
+// purpose: owned data moves into a spawned thread
+
+module tests.pass.threadMove;
+
+import core.result.{Result, Ok};
+import std.thread.Thread;
+
+enum Error {
+    Failed,
+}
+
+struct Job {
+    id: U64,
+}
+
+fn run(move job: Job) -> Result<Unit, Error> {
+    let ignoredId = job.id;
+    return Ok(());
+}
+
+fn main() -> Result<Unit, Error> {
+    let job = Job { id: 42 };
+    let handle = try Thread.spawn(move () -> Result<Unit, Error> {
+        return run(move job);
+    });
+    try handle.join();
+    return Ok(());
+}

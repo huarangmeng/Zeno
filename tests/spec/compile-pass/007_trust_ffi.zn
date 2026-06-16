@@ -1,0 +1,22 @@
+// category: compile-pass
+// profile: hosted
+// purpose: trust extern allows explicit low-level FFI boundary
+
+module tests.pass.trustFfi;
+
+trust extern "C" fn getpid() -> I32;
+
+enum IoError {
+    Failed,
+}
+
+fn currentPid() -> Result<I32, IoError> {
+    let pid = trust {
+        getpid()
+    };
+
+    if pid < 0 {
+        return Err(IoError.Failed);
+    }
+    return Ok(pid);
+}

@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Vector can be structurally modified after a dependent ArraySlice ends
+
+module tests.pass.vectorPushAfterSliceScope;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+fn readLen(bytes: ArraySlice<U8>) -> USize {
+    return bytes.len;
+}
+
+fn main(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
+    var bytes = try Vector<U8>.withCapacity(4, mut allocator);
+    var before: USize = 0;
+
+    {
+        let slice = bytes.asSlice();
+        before = readLen(slice);
+    }
+
+    try bytes.push(1);
+    return Ok(before + bytes.len);
+}

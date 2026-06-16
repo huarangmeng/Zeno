@@ -1,0 +1,20 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: move parameters require explicit move at the call site
+
+module tests.fail.moveParameterRequiresMove;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn consume(move handle: Handle) {}
+
+fn main() {
+    let handle = Handle { id: 1 };
+    consume(handle); // expected-error: move parameter requires explicit move
+}

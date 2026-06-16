@@ -1,0 +1,16 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: default read parameters cannot be moved into owning containers
+
+module tests.fail.boxReadParameter;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.Result;
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+fn bad(packet: Packet, mut allocator: GlobalAllocator) -> Result<Box<Packet>, AllocError> {
+    return Box.new(move packet, mut allocator); // expected-error: read parameter cannot be moved into Box
+}

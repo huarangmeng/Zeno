@@ -1,0 +1,42 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: destroy can call best-effort cleanup while explicit close reports errors
+
+module tests.pass.destroyBestEffort;
+
+import core.result.{Result, Ok, Err};
+
+enum IoError {
+    CloseFailed,
+}
+
+struct Handle {
+    fd: I32,
+}
+
+struct File {
+    handle: Handle,
+    closed: Bool,
+}
+
+impl File {
+    fn close(move self) -> Result<Unit, IoError> {
+        if closeChecked(self.handle) {
+            self.closed = true;
+            return Ok(());
+        }
+        return Err(IoError.CloseFailed);
+    }
+
+    destroy {
+        if !self.closed {
+            closeBestEffort(self.handle);
+        }
+    }
+}
+
+fn closeChecked(handle: Handle) -> Bool {
+    return handle.fd >= 0;
+}
+
+fn closeBestEffort(handle: Handle) {}

@@ -1,0 +1,22 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: partially moved objects cannot be used as complete values
+
+module tests.fail.useObjectAfterFieldMove;
+
+struct Packet {
+    bytes: Array<U8>,
+    checksum: U32,
+}
+
+fn consume(move packet: Packet) -> U32 {
+    return packet.checksum;
+}
+
+impl Packet {
+    fn bad(move self) -> U32 {
+        let bytes = move self.bytes;
+        let ignoredBytes = move bytes;
+        return consume(move self); // expected-error: partially moved object cannot be used as complete value
+    }
+}

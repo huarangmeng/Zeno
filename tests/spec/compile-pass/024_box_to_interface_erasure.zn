@@ -1,0 +1,30 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Box<T> moves to Box<Interface> without reallocating or moving the heap value
+
+module tests.pass.boxToInterfaceErasure;
+
+import core.result.{Result, Ok};
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct Counter {
+    total: USize,
+}
+
+impl Writer for Counter {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+        self.total = self.total + bytes.len;
+        return Ok(bytes.len);
+    }
+}
+
+fn eraseWriter(move writer: Box<Counter>) -> Box<Writer> {
+    return move writer;
+}

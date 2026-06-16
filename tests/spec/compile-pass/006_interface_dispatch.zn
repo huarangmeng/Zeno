@@ -1,0 +1,19 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: interface-typed parameter dispatches through interface table
+
+module tests.pass.interfaceDispatch;
+
+import core.result.Result;
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+fn writeInterface(mut writer: Writer, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+    return writer.write(bytes);
+}

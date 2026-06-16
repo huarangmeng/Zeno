@@ -7,14 +7,14 @@ Zeno 的核心目标：
 - 可自举：最终用 Zeno 实现 Zeno 编译器前端。
 - 高性能：默认无隐藏成本，泛型默认单态化，抽象应接近 C/C++ 生成代码。
 - 系统级：支持 freestanding 目标，核心语言不要求 GC、异常或强制运行时。
-- 安全默认：普通用户代码没有 `unsafe` 关键字，也不暴露裸指针和裸 FFI。
-- 非 Rust 式体验：使用所有权、RAII、访问模式和逃逸分析获得内存安全，但不把显式生命周期和借用标注作为日常写法。
+- 安全默认：底层 FFI、裸指针和硬件访问必须写在显式 `trust` 边界中。
+- 非 Rust 式体验：使用所有权、RAII、访问模式和逃逸分析获得内存安全，但不把显式生命周期标注作为日常写法。
 
 ## 仓库结构
 
 - [docs/SPEC.md](docs/SPEC.md)：主语言规范。
 - [docs/GRAMMAR.md](docs/GRAMMAR.md)：词法与语法草案。
-- [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和可信核心模型。
+- [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
 - [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。
 - [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md)：C++20 + LLVM stage0 与自举路线。

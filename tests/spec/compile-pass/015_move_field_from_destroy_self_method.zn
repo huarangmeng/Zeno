@@ -1,0 +1,29 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: types with destroy blocks can expose explicit move self destructuring APIs
+
+module tests.pass.moveFieldFromDestroySelfMethod;
+
+struct Packet {
+    bytes: Array<U8>,
+    cleanupNeeded: Bool,
+}
+
+impl Packet {
+    destroy {
+        if self.cleanupNeeded {
+            cleanupPacket(self);
+        }
+    }
+
+    fn intoBytes(move self) -> Array<U8> {
+        if self.cleanupNeeded {
+            cleanupPacket(self);
+            self.cleanupNeeded = false;
+        }
+
+        return move self.bytes;
+    }
+}
+
+fn cleanupPacket(packet: Packet) {}

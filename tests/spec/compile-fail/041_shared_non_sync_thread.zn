@@ -1,0 +1,27 @@
+// category: compile-fail
+// profile: hosted
+// purpose: Shared<T> cannot cross threads unless T is both Send and Sync
+
+module tests.fail.sharedNonSyncThread;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+import std.thread.Thread;
+
+struct LocalHandle {
+    raw: I32,
+}
+
+impl LocalHandle {
+    destroy {}
+}
+
+fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
+    let handle = LocalHandle { raw: 1 };
+    let shared = try Shared.new(move handle, mut allocator);
+    let thread = try Thread.spawn(move () -> USize {
+        return shared.strongCount(); // expected-error: Shared<LocalHandle> requires LocalHandle: Send, Sync
+    });
+    let ignored = move thread;
+    return Ok(());
+}

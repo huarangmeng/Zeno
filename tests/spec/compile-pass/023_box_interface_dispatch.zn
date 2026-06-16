@@ -1,0 +1,36 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Box<Interface> owns a concrete value and dispatches through the interface table
+
+module tests.pass.boxInterfaceDispatch;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct Counter {
+    total: USize,
+}
+
+impl Writer for Counter {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+        self.total = self.total + bytes.len;
+        return Ok(bytes.len);
+    }
+}
+
+fn makeWriter(mut allocator: GlobalAllocator) -> Result<Box<Writer>, AllocError> {
+    let counter = Counter { total: 0 };
+    return Box.new(move counter, mut allocator);
+}
+
+fn writeBox(mut writer: Box<Writer>, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+    return writer.write(bytes);
+}

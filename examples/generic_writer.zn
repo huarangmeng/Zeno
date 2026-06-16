@@ -1,0 +1,36 @@
+module examples.genericWriter;
+
+import core.result.{Result, Ok, Err};
+
+enum IoError {
+    Closed,
+    Interrupted,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, IoError>;
+}
+
+struct CountingWriter {
+    count: USize,
+}
+
+impl Writer for CountingWriter {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, IoError> {
+        self.count = self.count + bytes.len;
+        return Ok(bytes.len);
+    }
+}
+
+fn writeTwice<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, IoError> {
+    let first = try writer.write(bytes);
+    let second = try writer.write(bytes);
+    if first != second {
+        return Err(IoError.Interrupted);
+    }
+    return Ok(());
+}
+
+fn writeOnceInterface(mut writer: Writer, bytes: ArraySlice<U8>) -> Result<USize, IoError> {
+    return writer.write(bytes);
+}

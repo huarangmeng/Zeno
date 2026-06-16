@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: non-Copy owners cannot be implicitly copied by assignment
+
+module tests.fail.nonCopyAssignmentWithoutMove;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn bad() -> U32 {
+    let handle = Handle { id: 1 };
+    let copied = handle; // expected-error: non-Copy value requires move or clone
+    return copied.id;
+}

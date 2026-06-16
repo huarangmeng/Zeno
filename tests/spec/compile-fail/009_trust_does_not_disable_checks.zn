@@ -1,0 +1,24 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: trust does not disable ordinary ownership checks
+
+module tests.fail.trustDoesNotDisableChecks;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn consume(move handle: Handle) {}
+
+fn main() {
+    let handle = Handle { id: 1 };
+    consume(move handle);
+
+    trust {
+        consume(move handle); // expected-error: use of moved value
+    };
+}

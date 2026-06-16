@@ -1,0 +1,24 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: try does not implicitly convert Result error types
+
+module tests.fail.tryErrorTypeMismatch;
+
+import core.result.{Result, Ok, Err};
+
+enum IoError {
+    Missing,
+}
+
+enum ParseError {
+    Io(IoError),
+}
+
+fn readRaw() -> Result<U8, IoError> {
+    return Err(IoError.Missing);
+}
+
+fn bad() -> Result<U8, ParseError> {
+    let byte = try readRaw(); // expected-error: try does not implicitly convert IoError to ParseError; use mapErr
+    return Ok(byte);
+}

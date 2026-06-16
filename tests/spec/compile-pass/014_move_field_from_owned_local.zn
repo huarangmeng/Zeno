@@ -1,0 +1,14 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: fields can be moved out of owned local values without custom destroy blocks
+
+module tests.pass.moveFieldFromOwnedLocal;
+
+struct Packet {
+    bytes: Array<U8>,
+    checksum: U32,
+}
+
+fn intoBytes(move packet: Packet) -> Array<U8> {
+    return move packet.bytes;
+}

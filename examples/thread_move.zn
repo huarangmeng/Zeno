@@ -1,0 +1,32 @@
+module examples.threadMove;
+
+import core.result.{Result, Ok};
+import std.thread.Thread;
+
+enum WorkError {
+    Failed,
+}
+
+struct WorkItem {
+    id: U64,
+}
+
+fn buildWork() -> WorkItem {
+    return WorkItem { id: 1 };
+}
+
+fn process(move work: WorkItem) -> Result<Unit, WorkError> {
+    let ignoredId = work.id;
+    return Ok(());
+}
+
+pub fn demo() -> Result<Unit, WorkError> {
+    let work = buildWork();
+
+    let handle = try Thread.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    try handle.join();
+    return Ok(());
+}

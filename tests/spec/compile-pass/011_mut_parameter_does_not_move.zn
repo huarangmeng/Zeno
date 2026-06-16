@@ -1,0 +1,28 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: mut parameters allow unique writable access without moving ownership
+
+module tests.pass.mutParameterDoesNotMove;
+
+struct Counter {
+    value: U32,
+}
+
+impl Counter {
+    destroy {}
+}
+
+fn bump(mut counter: Counter) {
+    counter.value = counter.value + 1;
+}
+
+fn consume(move counter: Counter) -> U32 {
+    return counter.value;
+}
+
+fn main() {
+    var counter = Counter { value: 1 };
+    bump(mut counter);
+    let value = consume(move counter);
+    let ignoredValue = value;
+}

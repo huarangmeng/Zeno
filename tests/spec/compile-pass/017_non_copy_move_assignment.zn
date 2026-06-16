@@ -1,0 +1,24 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: non-Copy owners can be assigned by explicit move
+
+module tests.pass.nonCopyMoveAssignment;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn consume(move handle: Handle) -> U32 {
+    return handle.id;
+}
+
+fn main() {
+    let handle = Handle { id: 1 };
+    let moved = move handle;
+    let id = consume(move moved);
+    let ignored = id;
+}

@@ -1,0 +1,7 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: ArraySlice cannot be stored in static storage
+
+module tests.fail.staticArraySlice;
+
+static cached: ArraySlice<U8>; // expected-error: ArraySlice cannot be static storage

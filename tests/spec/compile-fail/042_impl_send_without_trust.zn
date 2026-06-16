@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: manual Send implementations require an explicit trust boundary
+
+module tests.fail.implSendWithoutTrust;
+
+struct LocalHandle {
+    raw: I32,
+}
+
+impl LocalHandle {
+    destroy {}
+}
+
+impl Send for LocalHandle {} // expected-error: manual Send implementation requires trust impl

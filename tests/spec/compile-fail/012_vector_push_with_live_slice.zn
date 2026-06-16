@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: Vector structural mutation is rejected while a dependent ArraySlice is live
+
+module tests.fail.vectorPushWithLiveSlice;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+fn bad(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
+    var bytes = try Vector<U8>.withCapacity(4, mut allocator);
+    let slice = bytes.asSlice();
+    try bytes.push(1); // expected-error: vector structural mutation while slice is live
+    return Ok(slice.len);
+}

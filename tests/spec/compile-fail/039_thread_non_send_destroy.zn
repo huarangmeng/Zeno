@@ -1,0 +1,22 @@
+// category: compile-fail
+// profile: hosted
+// purpose: types with destroy are not automatically Send
+
+module tests.fail.threadNonSendDestroy;
+
+import std.thread.Thread;
+
+struct LocalHandle {
+    raw: I32,
+}
+
+impl LocalHandle {
+    destroy {}
+}
+
+fn bad() {
+    let handle = LocalHandle { raw: 1 };
+    Thread.spawn(move () {
+        let ignored = handle.raw; // expected-error: LocalHandle is not Send
+    });
+}

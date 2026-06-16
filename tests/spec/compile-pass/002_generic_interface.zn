@@ -1,0 +1,34 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: generic interface calls use static dispatch
+
+module tests.pass.genericInterface;
+
+import core.result.{Result, Ok, Err};
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct Counter {
+    total: USize,
+}
+
+impl Writer for Counter {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+        self.total = self.total + bytes.len;
+        return Ok(bytes.len);
+    }
+}
+
+fn writeAll<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, WriteError> {
+    let n = try writer.write(bytes);
+    if n == bytes.len {
+        return Ok(());
+    }
+    return Err(WriteError.Failed);
+}

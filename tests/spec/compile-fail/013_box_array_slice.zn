@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: ArraySlice cannot be stored in Box
+
+module tests.fail.boxArraySlice;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+fn bad(bytes: ArraySlice<U8>, mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
+    let boxed = try Box.new(move bytes, mut allocator); // expected-error: ArraySlice cannot be stored in Box
+    let ignoredBox = move boxed;
+    return Ok(());
+}

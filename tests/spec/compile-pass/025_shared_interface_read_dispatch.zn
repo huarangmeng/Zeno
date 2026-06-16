@@ -1,0 +1,35 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Shared<Interface> supports read-only interface dispatch and visible refcount clone
+
+module tests.pass.sharedInterfaceReadDispatch;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+interface Identified {
+    fn id(self) -> U32;
+}
+
+struct Service: Copy {
+    idValue: U32,
+}
+
+impl Identified for Service {
+    fn id(self) -> U32 {
+        return self.idValue;
+    }
+}
+
+fn share(move service: Service, mut allocator: GlobalAllocator) -> Result<Shared<Identified>, AllocError> {
+    let concrete = try Shared.new(move service, mut allocator);
+    return Ok(move concrete);
+}
+
+fn readId(service: Shared<Identified>) -> U32 {
+    return service.id();
+}
+
+fn cloneShared(service: Shared<Identified>) -> Shared<Identified> {
+    return service.clone();
+}

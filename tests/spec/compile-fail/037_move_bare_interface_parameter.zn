@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: bare interface access values do not own concrete objects
+
+module tests.fail.moveBareInterfaceParameter;
+
+interface Writer {
+    fn bytesWritten(self) -> USize;
+}
+
+fn bad(move writer: Writer) -> USize { // expected-error: bare interface access cannot be a move parameter
+    return writer.bytesWritten();
+}

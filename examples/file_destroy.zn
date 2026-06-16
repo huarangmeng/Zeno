@@ -1,0 +1,34 @@
+module examples.fileDestroy;
+
+import core.result.{Result, Ok};
+import std.os;
+
+enum IoError {
+    CloseFailed,
+}
+
+struct File {
+    handle: os.Handle,
+    closed: Bool,
+}
+
+impl File {
+    fn fromHandle(move handle: os.Handle) -> File {
+        return File {
+            handle: move handle,
+            closed: false,
+        };
+    }
+
+    fn close(move self) -> Result<Unit, IoError> {
+        try os.closeChecked(self.handle);
+        self.closed = true;
+        return Ok(());
+    }
+
+    destroy {
+        if !self.closed {
+            os.closeBestEffort(self.handle);
+        }
+    }
+}

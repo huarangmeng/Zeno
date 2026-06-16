@@ -1,0 +1,32 @@
+// category: compile-pass
+// profile: hosted
+// purpose: thread-safe resource handles with destroy can explicitly declare Send through trust impl
+
+module tests.pass.trustImplSendHandle;
+
+import core.result.{Result, Ok};
+import std.thread.Thread;
+
+enum Error {
+    Failed,
+}
+
+struct OsHandle {
+    raw: I32,
+}
+
+impl OsHandle {
+    destroy {}
+}
+
+trust impl Send for OsHandle {}
+
+fn main() -> Result<Unit, Error> {
+    let handle = OsHandle { raw: 3 };
+    let thread = try Thread.spawn(move () -> Result<Unit, Error> {
+        let ignored = handle.raw;
+        return Ok(());
+    });
+    try thread.join();
+    return Ok(());
+}

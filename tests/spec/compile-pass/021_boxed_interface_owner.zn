@@ -1,0 +1,23 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: owned heterogeneous interface values are explicit through Box
+
+module tests.pass.boxedInterfaceOwner;
+
+import core.result.Result;
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct WriterSlot {
+    writer: Box<Writer>,
+}
+
+fn intoWriter(move slot: WriterSlot) -> Box<Writer> {
+    return move slot.writer;
+}

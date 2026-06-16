@@ -1,0 +1,9 @@
+module examples.hello;
+
+import core.result.{Result, Ok};
+import std.io;
+
+pub fn main() -> Result<Unit, io.Error> {
+    try io.println("hello, zeno");
+    return Ok(());
+}

@@ -1,0 +1,25 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: destroy blocks cannot use try
+
+module tests.fail.destroyTry;
+
+import core.result.{Result, Ok};
+
+enum IoError {
+    CloseFailed,
+}
+
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        try closeChecked(self.fd); // expected-error: destroy cannot use try
+    }
+}
+
+fn closeChecked(fd: I32) -> Result<Unit, IoError> {
+    return Ok(());
+}

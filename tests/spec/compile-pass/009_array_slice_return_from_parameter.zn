@@ -1,0 +1,14 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: ArraySlice can be returned when derived from an input ArraySlice
+
+module tests.pass.arraySliceReturnFromParameter;
+
+fn withoutHeader(bytes: ArraySlice<U8>) -> ArraySlice<U8> {
+    return bytes.dropPrefix(4);
+}
+
+fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
+    let body = withoutHeader(bytes);
+    return body.get(0);
+}

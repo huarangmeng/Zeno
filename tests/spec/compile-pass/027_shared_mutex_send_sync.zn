@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: hosted
+// purpose: Shared<Mutex<T>> can cross threads when T is Send
+
+module tests.pass.sharedMutexSendSync;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+import std.sync.Mutex;
+import std.thread.Thread;
+
+struct Counter {
+    value: U64,
+}
+
+fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
+    let mutex = Mutex.new(Counter { value: 0 });
+    let shared = try Shared.new(move mutex, mut allocator);
+    let forThread = shared.clone();
+    let handle = try Thread.spawn(move () -> USize {
+        return forThread.strongCount();
+    });
+    let ignored = try handle.join();
+    return Ok(());
+}

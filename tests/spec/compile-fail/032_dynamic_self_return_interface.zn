@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: Self-returning interface methods are static-only requirements
+
+module tests.fail.dynamicSelfReturnInterface;
+
+interface Duplicable {
+    fn duplicate(self) -> Self;
+}
+
+fn duplicateAny(value: Duplicable) -> Duplicable {
+    return value.duplicate(); // expected-error: method returning Self cannot be dynamically dispatched
+}

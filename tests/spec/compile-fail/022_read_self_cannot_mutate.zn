@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: read-only self methods cannot mutate the receiver
+
+module tests.fail.readSelfCannotMutate;
+
+struct Counter {
+    value: U32,
+}
+
+impl Counter {
+    fn bad(self) {
+        self.value = self.value + 1; // expected-error: self is read-only
+    }
+}

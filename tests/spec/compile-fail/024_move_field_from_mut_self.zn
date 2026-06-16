@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: fields cannot be moved out of mut self because mut self does not own the receiver
+
+module tests.fail.moveFieldFromMutSelf;
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+impl Packet {
+    fn bad(mut self) -> Array<U8> {
+        return move self.bytes; // expected-error: cannot move field from mut self
+    }
+}

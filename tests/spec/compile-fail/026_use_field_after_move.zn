@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: moved-out fields cannot be read again
+
+module tests.fail.useFieldAfterMove;
+
+struct Packet {
+    bytes: Array<U8>,
+    checksum: U32,
+}
+
+impl Packet {
+    fn bad(move self) -> U32 {
+        let bytes = move self.bytes;
+        let len = self.bytes.len; // expected-error: field used after move
+        let ignoredBytes = move bytes;
+        return len + self.checksum;
+    }
+}

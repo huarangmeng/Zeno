@@ -1,0 +1,19 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Shared clone makes reference-counted sharing visible in the type
+
+module tests.pass.sharedCloneVisibleCost;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+fn share(move packet: Packet, mut allocator: GlobalAllocator) -> Result<Shared<Packet>, AllocError> {
+    let first = try Shared.new(move packet, mut allocator);
+    let second = first.clone();
+    let ignored = move second;
+    return Ok(move first);
+}

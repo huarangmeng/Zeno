@@ -1,0 +1,18 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: non-escaping closure captures Copy value without allocation
+
+module tests.pass.closureNoEscape;
+
+fn apply(value: I32, f: Fn<I32, I32>) -> I32 {
+    return f(value);
+}
+
+fn main() {
+    let bias = 10;
+    let shortResult = apply(5, (x: I32) => x + bias);
+    let blockResult = apply(5, (x: I32) -> I32 {
+        return x * 2;
+    });
+    let ignoredCopy = shortResult + blockResult;
+}

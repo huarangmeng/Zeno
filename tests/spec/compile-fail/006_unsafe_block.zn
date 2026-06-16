@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: user-visible unsafe mode does not exist
+
+module tests.fail.unsafeBlock;
+
+fn main() {
+    unsafe {
+        doRawMemory();
+    } // expected-error: unsafe blocks are not part of Zeno user syntax
+}

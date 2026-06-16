@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: structs store concrete interface implementations through generic fields
+
+module tests.pass.genericInterfaceField;
+
+import core.result.Result;
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct StaticSink<W: Writer> {
+    writer: W,
+}
+
+impl<W: Writer> StaticSink<W> {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+        return self.writer.write(bytes);
+    }
+}

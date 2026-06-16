@@ -1,0 +1,47 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: try supports Option propagation and explicit Result error mapping
+
+module tests.pass.tryOptionAndErrorMapping;
+
+import core.option.{Option, Some, None};
+import core.result.{Result, Ok, Err};
+
+enum IoError {
+    Missing,
+}
+
+enum ParseError {
+    Empty,
+    OutOfRange,
+    Io(IoError),
+}
+
+fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
+    if bytes.len == 0 {
+        return None;
+    }
+    return Some(bytes[0]);
+}
+
+fn secondByte(bytes: ArraySlice<U8>) -> Option<U8> {
+    let first = try firstByte(bytes);
+    if bytes.len < 2 {
+        return None;
+    }
+    return Some(first + bytes[1]);
+}
+
+fn parseByte(value: U32) -> Result<U8, ParseError> {
+    let byte = try U8.fromChecked(value).okOr(ParseError.OutOfRange);
+    return Ok(byte);
+}
+
+fn readRaw() -> Result<U8, IoError> {
+    return Err(IoError.Missing);
+}
+
+fn readMapped() -> Result<U8, ParseError> {
+    let byte = try readRaw().mapErr(ParseError.Io);
+    return Ok(byte);
+}

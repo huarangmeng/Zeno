@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: fields cannot be moved out of read-only self
+
+module tests.fail.moveFieldFromReadSelf;
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+impl Packet {
+    fn bad(self) -> Array<U8> {
+        return move self.bytes; // expected-error: cannot move field from read-only self
+    }
+}

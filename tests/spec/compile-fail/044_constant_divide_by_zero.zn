@@ -1,0 +1,9 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: constant division by zero is rejected at compile time
+
+module tests.fail.constantDivideByZero;
+
+fn bad() -> U32 {
+    return 1 / 0; // expected-error: constant division by zero
+}

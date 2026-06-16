@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: ArraySlice cannot be stored in struct fields
+
+module tests.fail.arraySliceField;
+
+struct Packet {
+    bytes: ArraySlice<U8>, // expected-error: ArraySlice fields are not allowed
+}
+
+struct PacketList {
+    packets: Array<ArraySlice<U8>>, // expected-error: ArraySlice cannot be stored inside Array fields
+}

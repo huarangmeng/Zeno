@@ -1,0 +1,12 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: Array clone is explicit, allocator-backed, and returns Result
+
+module tests.pass.arrayCloneExplicitAllocator;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.Result;
+
+fn cloneBytes(bytes: Array<U8>, mut allocator: GlobalAllocator) -> Result<Array<U8>, AllocError> {
+    return bytes.clone(mut allocator);
+}

@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: default read parameters cannot be returned as owned values
+
+module tests.fail.returnReadParameterAsOwner;
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+fn bad(packet: Packet) -> Packet {
+    return packet; // expected-error: read parameter is not owned
+}

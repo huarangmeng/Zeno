@@ -1,0 +1,26 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: non-Copy resource moves once and drops once
+
+module tests.pass.moveRaii;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn makeHandle() -> Handle {
+    return Handle { id: 7 };
+}
+
+fn consume(move handle: Handle) {
+    let ignoredId = handle.id;
+}
+
+fn main() {
+    let handle = makeHandle();
+    consume(move handle);
+}

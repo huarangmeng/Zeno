@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: Shared<Interface> only provides read-only interface access
+
+module tests.fail.sharedInterfaceMutMethod;
+
+import core.result.Result;
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+fn bad(writer: Shared<Writer>, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+    return writer.write(bytes); // expected-error: Shared<Interface> cannot call mut self interface methods
+}

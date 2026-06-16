@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: access to local storage cannot escape
+
+module tests.fail.returnLocalAccess;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+fn bad(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
+    let local = try Array<U8>.filled(4, 0, mut allocator);
+    return Ok(local); // expected-error: returns slice to local storage
+}

@@ -1,0 +1,24 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: fields can be moved out of move self when the type has no destroy block
+
+module tests.pass.moveFieldFromMoveSelf;
+
+struct Header {
+    version: U32,
+}
+
+struct Packet {
+    bytes: Array<U8>,
+    header: Header,
+}
+
+impl Packet {
+    fn intoBytes(move self) -> Array<U8> {
+        return move self.bytes;
+    }
+}
+
+fn takeBytes(move packet: Packet) -> Array<U8> {
+    return packet.intoBytes();
+}

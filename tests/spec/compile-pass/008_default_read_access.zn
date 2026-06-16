@@ -1,0 +1,25 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: default non-Copy parameter access does not move ownership
+
+module tests.pass.defaultReadAccess;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn inspect(handle: Handle) -> U32 {
+    return handle.id;
+}
+
+fn consume(move handle: Handle) {}
+
+fn main() {
+    let handle = Handle { id: 7 };
+    let id = inspect(handle);
+    consume(move handle);
+}

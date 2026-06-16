@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: bare interface access types cannot be stored as struct fields
+
+module tests.fail.interfaceAccessField;
+
+import core.result.Result;
+
+enum WriteError {
+    Failed,
+}
+
+interface Writer {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+struct BadSink {
+    writer: Writer, // expected-error: bare interface access cannot be stored as a field
+}

@@ -1,0 +1,45 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: generic and interface constraints use commas instead of plus
+
+module tests.pass.commaConstraints;
+
+interface Eq {
+    fn eq(self, other: Self) -> Bool;
+}
+
+interface Ord: Eq {
+    fn lessThan(self, other: Self) -> Bool;
+}
+
+interface SortKey: Ord, Copy {}
+
+struct Key: Copy {
+    value: U32,
+}
+
+impl Eq for Key {
+    fn eq(self, other: Self) -> Bool {
+        return self.value == other.value;
+    }
+}
+
+impl Ord for Key {
+    fn lessThan(self, other: Self) -> Bool {
+        return self.value < other.value;
+    }
+}
+
+impl SortKey for Key {}
+
+fn min<T: Ord, Copy>(a: T, b: T) -> T {
+    if a.lessThan(b) {
+        return a;
+    }
+    return b;
+}
+
+fn select<K: SortKey, V>(key: K, value: V) -> V {
+    let ignored = key;
+    return value;
+}
