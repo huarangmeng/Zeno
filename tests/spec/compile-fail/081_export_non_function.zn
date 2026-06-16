@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: export attributes apply only to top-level functions
+
+module tests.fail.exportNonFunction;
+
+@export("bad_type", abi: C)
+pub struct Bad { // expected-error: @export can only be applied to top-level functions
+    value: I32,
+}

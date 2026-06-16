@@ -145,6 +145,7 @@ v0.1 用户级属性：
 - `@noAlloc`：被标注函数及其可达调用图不得执行堆分配，除非编译器能证明该路径不可达。
 - `@noPanic`：被标注函数不得触发 `panic` 路径；若当前 profile 把 OOM 配置成 `panic`，会分配的 API 也算 panic 路径。它不等价于“不可能终止”，需要禁止堆分配时应使用 `@noAlloc`。
 - `@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`：声明结构体内存布局策略。普通结构体默认使用 Auto layout。
+- `@export("symbol", abi: C)`：把非泛型顶层 `pub fn` 作为外部 C ABI 符号导出。
 
 编译器发行包专用属性：
 
@@ -269,7 +270,7 @@ pub struct CPoint {
 @layout(Packed(1))
 struct Header {
     tag: U8,
-    len: BigEndian<U16>,
+    len: U16,
 }
 ```
 
@@ -281,7 +282,7 @@ struct FileDescriptor {
 }
 ```
 
-默认 enum layout 可以做 niche optimization。编译器必须保证 `Option<Box<T>>` 与 `Box<T>` 同大小，`Option<Shared<T>>` 与 `Shared<T>` 同大小；类似 `Option<NonZeroU32>` 也应使用无额外 tag 的表示。
+默认 enum layout 可以做 niche optimization。编译器必须保证 `Option<Box<T>>` 与 `Box<T>` 同大小，`Option<Shared<T>>` 与 `Shared<T>` 同大小；core/std 中声明了无效句柄值的句柄类型也应使用无额外 tag 的表示。
 
 `pub` 只表示源码 API 对外部 package 可见，不表示布局或 ABI 稳定。完整布局规则见 [LAYOUT.md](LAYOUT.md)。
 
@@ -1403,6 +1404,17 @@ Zeno 不使用 `unsafe`。当代码需要执行编译器无法独立证明的底
 ```zn
 trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 ```
+
+普通 `pub fn` 不是外部 ABI 承诺。导出给 C 或动态库必须显式写 `@export`：
+
+```zn
+@export("zeno_add", abi: C)
+pub fn add(a: I32, b: I32) -> I32 {
+    return a + b;
+}
+```
+
+`@export` 函数必须使用 C-compatible 参数和返回类型，不能是泛型函数，不能让 panic unwind 穿过外部 ABI。完整规则见 [FFI.md](FFI.md)。
 
 底层操作必须放在 `trust` 块里：
 

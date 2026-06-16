@@ -1,0 +1,16 @@
+// category: compile-pass
+// profile: hosted
+// panic.strategy: abort
+// purpose: overloaded functions can be exported only through distinct explicit symbols
+
+module tests.pass.exportOverloadSymbols;
+
+@export("read_u8", abi: C)
+pub fn read(value: U8) -> U8 {
+    return value;
+}
+
+@export("read_u16", abi: C)
+pub fn read(value: U16) -> U16 {
+    return value;
+}

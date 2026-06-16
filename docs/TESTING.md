@@ -65,9 +65,10 @@
 - 普通 `struct` 使用默认 Auto layout，`sizeOf`、`alignOf` 和 `offsetOf` 可在编译期求值。
 - `@layout(Source)` 保留源码字段顺序和自然对齐。
 - `@layout(C)` 接受 C-compatible 字段，并与目标 C ABI 对齐。
-- `@layout(Packed(N))` 接受 Copy 字段，并通过 unaligned load/store 访问字段。
+- `@layout(Packed(N))` 接受 `U16`、`U32` 等普通 Copy 字段，并通过 unaligned load/store 访问字段。
 - 单真实存储字段结构体是零成本包装。
-- `Option<Box<T>>`、`Option<Shared<T>>` 和 `Option<NonZeroU32>` 使用 niche 优化，不增加大小。
+- `Option<Box<T>>`、`Option<Shared<T>>` 和 core/std 句柄类型使用 niche 优化，不增加大小。
+- 协议类型通过安全 API 暴露普通整数，端序转换不泄露为用户字段类型。
 - `Copy` 值正常复制。
 - 普通整数 `+`、`-`、`*` 使用 wrapping 语义。
 - `checked*` 整数方法返回 `Option<T>`。
@@ -138,6 +139,10 @@
 - `Shared<SharedInterface>` 可以跨线程共享只读接口，其中 `SharedInterface` 继承目标接口、`Send` 和 `Sync`。
 - 带 `destroy` 的线程安全资源可以通过 `trust impl Send` 显式声明。
 - `trust extern` 和 `trust` 块可以表达显式底层边界。
+- `@export("symbol", abi: C)` 可以把非泛型顶层 `pub fn` 导出为 C ABI 符号。
+- 重载函数可以通过不同 `@export` 符号分别导出。
+- C ABI 导入和导出的签名只接受 C-compatible 类型。
+- 导出函数在 abort / trap profile 下不会让 panic unwind 穿过 C ABI。
 - 可选任务运行时的所有权转移。
 - async future 状态所有权。
 - 共享可变状态只能通过同步类型访问。
@@ -221,6 +226,10 @@
 - 通过接口访问动态调用 `move self` 方法。
 - 没有 `trust` 的裸 FFI 声明或底层操作。
 - manifest 未允许对应能力时使用 `trust extern`、硬件访问、inline asm 或中断入口。
+- `@export` 标在非 `pub` 函数、泛型函数、方法或非函数声明上。
+- 两个导出使用同一个外部符号名。
+- `@export(..., abi: C)` 签名包含非 C-compatible 类型，例如 `String`、`Vector<T>`、`ArraySlice<T>`、接口或闭包。
+- unwind profile 下导出函数可能 panic 且没有 `@noPanic` 或等价边界策略。
 - `unsafe` 语法。
 - no-allocation 上下文中的隐藏堆分配。
 - 常量越界索引。
@@ -256,7 +265,8 @@ help: 在移动前读取该值，或只移动一次
 - Auto layout 应减少典型结构体 padding；布局结果应可在编译期报告 size、align 和 offset。
 - `@layout(Source)` 不应重排字段。
 - 单字段包装在 Zeno 内部 ABI 中不应增加传参、返回或存储成本。
-- `Option<Box<T>>`、`Option<Shared<T>>` 和 `Option<NonZeroU32>` 不应额外存储 tag。
+- `Option<Box<T>>`、`Option<Shared<T>>` 和 core/std 句柄类型不应额外存储 tag。
+- 协议 API 的端序转换应降低为目标端序相关的 bswap 或 no-op，不分配。
 - packed 字段读取应降低为目标支持的 unaligned load 或等价字节 load 序列，不产生未定义行为。
 - 普通整数 `+`、`-`、`*` 不应生成隐藏溢出检查。
 - `checkedAdd` 应降低为目标支持的 overflow intrinsic 或等价高效指令序列。
@@ -283,6 +293,7 @@ help: 在移动前读取该值，或只移动一次
 - `Shared<Interface>.clone` 应为一次引用计数增加，不深拷贝具体值。
 - `Send` / `Sync` 推导应在类型检查期完成，不需要运行时标记或查询。
 - `Box<ThreadWriter>` 与 `Box<Writer>` 的运行时布局成本相同，只是类型系统保留了额外能力证明。
+- `@export(..., abi: C)` 应按目标 C ABI 生成外部符号，不使用 Zeno 内部 mangling。
 - `Array<T>.clone` / `Vector<T>.clone` 的分配在源码中可见。
 - 普通赋值非 `Copy` 拥有者不应生成深拷贝。
 

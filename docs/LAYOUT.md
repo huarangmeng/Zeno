@@ -96,10 +96,10 @@ C-compatible 字段类型包括基础整数、浮点、`Bool` 的目标 C 布局
 
 ```zn
 @layout(Packed(1))
-struct IPv4Header {
+private struct Ipv4HeaderRaw {
     versionAndIhl: U8,
     dscpAndEcn: U8,
-    totalLength: BigEndian<U16>,
+    totalLength: U16,
 }
 ```
 
@@ -117,25 +117,51 @@ struct IPv4Header {
 允许：
 
 ```zn
-let total = header.totalLength; // unaligned load into a value
-inspect(header.totalLength);    // ok: unaligned load into a temporary value
-header.totalLength = BigEndian<U16>.fromHost(20); // unaligned store
+@layout(Packed(1))
+struct NativeRecord {
+    tag: U8,
+    count: U16,
+}
+
+let count = native.count; // unaligned load into a value
+inspect(native.count);    // ok: unaligned load into a temporary value
+native.count = 20;        // unaligned store for a native integer field
 ```
 
 拒绝：
 
 ```zn
-normalize(mut header.totalLength); // error: packed field cannot escape as mut access
+normalize(mut native.count); // error: packed field cannot escape as mut access
 ```
 
 如果函数签名或上下文需要长期访问，先显式加载到局部值：
 
 ```zn
-let total = header.totalLength;
-inspect(total);
+let count = native.count;
+inspect(count);
 ```
 
-Packed layout 只解决字节位置，不解决端序。网络和磁盘格式必须用 `BigEndian<T>`、`LittleEndian<T>` 或等价显式包装表达端序。
+Packed layout 只解决字节位置和未对齐访问。packed 字段可以直接使用 `U16`、`U32`、`U64` 等普通整数类型；读写这些字段时，编译器生成安全的 unaligned load/store。
+
+端序不进入语言核心，不提供语言级 `endian` 属性，也不要求用户写端序包装类型。跨平台网络 / 磁盘格式应通过标准库或协议类型的安全 API 暴露普通整数：
+
+```zn
+pub struct Ipv4Header {
+    raw: Ipv4HeaderRaw,
+}
+
+impl Ipv4Header {
+    fn totalLength(self) -> U16 {
+        return ipv4.readTotalLength(self.raw);
+    }
+
+    fn setTotalLength(mut self, value: U16) {
+        ipv4.writeTotalLength(mut self.raw, value);
+    }
+}
+```
+
+端序转换、校验和未对齐 load/store 是这些封装的实现细节。普通用户不需要在字段类型或调用点写端序包装类型或端序属性。
 
 不要用 packed 结构体表达 MMIO 寄存器语义。MMIO 需要 `trust` 边界和 volatile API，例如 `Mmio<T>.loadVolatile()` / `storeVolatile()`。
 
@@ -167,14 +193,14 @@ struct FileDescriptor {
 ```zn
 Option<Box<T>>         // 与 Box<T> 同大小
 Option<Shared<T>>      // 与 Shared<T> 同大小
-Option<NonZeroU32>     // 与 U32 同大小
-Option<FileDescriptor> // 若 FileDescriptor 包装 NonZeroI32，则同大小
+Option<CoreHandle>     // 对 core/std 中声明了无效句柄值的类型，同句柄大小
 ```
 
 规则：
 
 - 默认 enum layout 不承诺 C ABI 或跨编译器稳定二进制格式。
 - `Result<T, E>` 等普通 enum 可以使用 tag + payload，也可以使用 payload niche 消除显式 tag。
+- niche 信息来自编译器和核心库的可信声明，不要求普通用户写特殊非零标记类型。
 - enum 的语义匹配、穷尽性和析构顺序不依赖具体 tag 表示。
 - C enum 和固定整数 enum layout 留到 ABI 设计阶段细化。
 

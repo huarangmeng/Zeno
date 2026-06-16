@@ -17,6 +17,7 @@ Zeno 的核心目标：
 - [docs/MANIFEST.md](docs/MANIFEST.md)：`Zeno.toml` 项目 manifest、profile 和 target 策略。
 - [docs/MODULES.md](docs/MODULES.md)：模块、包、依赖和导入解析规则。
 - [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。
+- [docs/FFI.md](docs/FFI.md)：外部 ABI、符号导出、C 互操作和 panic 边界。
 - [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
 - [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。

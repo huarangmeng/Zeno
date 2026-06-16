@@ -168,6 +168,8 @@ pub struct Client {
 }
 ```
 
+`pub` 只是源码 API 可见性，不表示外部 ABI 稳定，也不导出链接符号。需要导出 C ABI 符号时必须使用 `@export("symbol", abi: C)`。
+
 `private` 表示只在当前文件可见：
 
 ```zn

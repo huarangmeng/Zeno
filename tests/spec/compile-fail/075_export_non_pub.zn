@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: exported functions must be pub
+
+module tests.fail.exportNonPub;
+
+@export("hidden_add", abi: C)
+fn add(a: I32, b: I32) -> I32 { // expected-error: @export requires a pub top-level function
+    return a + b;
+}

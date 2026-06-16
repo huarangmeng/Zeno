@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: exported symbols must be unique
+
+module tests.fail.exportSymbolConflict;
+
+@export("same_symbol", abi: C)
+pub fn first() -> I32 {
+    return 1;
+}
+
+@export("same_symbol", abi: C)
+pub fn second() -> I32 { // expected-error: duplicate exported symbol same_symbol
+    return 2;
+}

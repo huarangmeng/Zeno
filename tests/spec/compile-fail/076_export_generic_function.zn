@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: generic functions cannot be exported directly as C ABI symbols
+
+module tests.fail.exportGenericFunction;
+
+@export("identity", abi: C)
+pub fn identity<T: Copy>(value: T) -> T { // expected-error: @export cannot be applied to generic functions
+    return value;
+}

@@ -331,6 +331,8 @@ try t.join();
 trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 ```
 
+导出给外部 ABI 必须显式写 `@export("symbol", abi: C)`。导出函数只能使用 C-compatible 签名，不能让 panic unwind 穿过 ABI 边界，也不能把 Zeno 资源拥有者布局暴露给 C 侧猜测。
+
 裸 FFI 调用、地址构造和指针操作必须出现在 `trust` 块中：
 
 ```zn

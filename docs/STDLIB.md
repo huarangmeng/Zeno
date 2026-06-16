@@ -118,6 +118,8 @@ impl T {
 }
 ```
 
+布局优化和协议端序所需的底层事实由编译器与 core/std 的可信实现表达，不暴露成普通用户必须书写的特殊非零类型或端序包装类型。用户面对的 API 应该使用自然类型，例如 `U16`、`U32`、`FileDescriptor` 或 `Ipv4Header.totalLength()`。
+
 `fromChecked` 表示检查转换；`truncate` 表示明确截断到目标类型的低位位模式；`saturate` 表示把数学值钳制到目标整数类型的最小值和最大值之间。普通 `as` 只用于无损转换。
 
 ```zn

@@ -1,0 +1,22 @@
+// category: compile-pass
+// profile: hosted
+// panic.strategy: abort
+// purpose: pub functions can be explicitly exported with C ABI symbols
+
+module tests.pass.exportCAbi;
+
+@layout(C)
+pub struct CPoint {
+    pub x: F32,
+    pub y: F32,
+}
+
+@export("zeno_add", abi: C)
+pub fn add(a: I32, b: I32) -> I32 {
+    return a + b;
+}
+
+@export("point_sum", abi: C)
+pub fn pointSum(point: CPoint) -> F32 {
+    return point.x + point.y;
+}

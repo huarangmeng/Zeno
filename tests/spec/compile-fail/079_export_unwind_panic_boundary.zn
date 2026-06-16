@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: hosted
+// panic.strategy: unwind
+// purpose: exported C ABI functions cannot let panic unwind through the ABI boundary
+
+module tests.fail.exportUnwindPanicBoundary;
+
+@export("may_panic", abi: C)
+pub fn mayPanic() -> I32 { // expected-error: exported C ABI function may panic under unwind profile
+    panic("bad");
+}

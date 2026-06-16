@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C ABI exports require C-compatible signatures
+
+module tests.fail.exportNonCType;
+
+@export("take_string", abi: C)
+pub fn takeString(text: String) -> I32 { // expected-error: String is not C-compatible in an exported C ABI signature
+    let ignored = text;
+    return 0;
+}

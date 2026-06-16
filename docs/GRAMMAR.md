@@ -85,7 +85,9 @@ decl            = attribute* visibility? (
 attribute       = "@" ident attribute_args? ;
 attribute_args  = "(" attribute_arg_list? ")" ;
 attribute_arg_list = attribute_arg ("," attribute_arg)* ","? ;
-attribute_arg   = ident attribute_args? | literal ;
+attribute_arg   = ident ":" attribute_value
+                | attribute_value ;
+attribute_value = ident attribute_args? | literal ;
 
 visibility      = "pub" | "private" ;
 
@@ -100,7 +102,7 @@ trust_impl_decl = "trust" impl_decl ;
 
 同一作用域中可以出现多个同名 `fn_decl`，但它们必须形成合法重载集。重载键包含函数名、参数数量、参数类型和参数访问模式；返回类型不参与重载键。同一个重载键重复声明必须在语义阶段报错。
 
-`@layout(Source)`、`@layout(C)` 和 `@layout(Packed(1))` 都按普通属性解析。布局参数不是关键字；语义阶段检查它们只能用于结构体，并且每个结构体最多有一个布局策略。
+`@layout(Source)`、`@layout(C)`、`@layout(Packed(1))` 和 `@export("symbol", abi: C)` 都按普通属性解析。布局参数和 `abi` 值不是关键字；语义阶段检查它们的可用位置和含义。
 
 ## 4. 类型
 
@@ -465,3 +467,4 @@ trust_extern_decl = "trust" "extern" string_literal "fn" ident fn_params return_
 - `trust` 不关闭普通类型检查、move 检查、初始化检查或可证明的访问检查。
 - 编译器必须为 `trust` 边界保留源码 span，用于信任报告和构建策略。
 - `@noAlloc` 是普通用户属性，表示被标注函数不能直接或间接执行堆分配。
+- `@export("symbol", abi: C)` 是普通用户属性，表示把非泛型顶层 `pub fn` 导出为外部 C ABI 符号；语义阶段必须检查 C-compatible 签名和 panic 边界。
