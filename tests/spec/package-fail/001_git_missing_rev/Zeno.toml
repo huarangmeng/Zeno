@@ -1,0 +1,9 @@
+# category: package-fail
+# purpose: git dependencies must be locked to a commit rev
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+hash = { git = "https://example.com/hash.git", branch = "main" } # expected-error: git dependency must specify commit rev, not a floating branch

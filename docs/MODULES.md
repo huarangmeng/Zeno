@@ -244,8 +244,8 @@ std = "builtin"
 
 - dependency key 是当前包中的外部 import 根，必须是合法 Zeno 标识符。
 - dependency key 是本地别名，不要求等于依赖包的 `package.name`。
-- v1 支持 `"builtin"` 和 `{ path = "..." }`。
-- git、registry、版本约束和 lockfile 格式延后设计；manifest 必须保留扩展空间。
+- v1 支持 `"builtin"`、`{ path = "..." }`、`{ git = "...", rev = "..." }` 和 `{ version = "..." }`。
+- git、registry、workspace 和 lockfile 的完整解析规则见 [PACKAGE.md](PACKAGE.md)。
 - 依赖图以包为单位构建，不能出现包依赖环。
 - 同一个 import 根不能同时指向两个包。
 - dependency key 不能和当前包 `src/` 顶层目录、内建包根或其他依赖 key 冲突。

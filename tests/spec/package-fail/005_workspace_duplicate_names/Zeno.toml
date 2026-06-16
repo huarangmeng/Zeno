@@ -1,0 +1,5 @@
+# category: package-fail
+# purpose: workspace members cannot have duplicate package names
+
+[workspace]
+members = ["a", "b"]

@@ -1,0 +1,5 @@
+# category: package-pass
+# purpose: workspace members share one lockfile and local member dependencies resolve first
+
+[workspace]
+members = ["core", "app"]

@@ -15,6 +15,7 @@ Zeno 的核心目标：
 - [docs/SPEC.md](docs/SPEC.md)：主语言规范。
 - [docs/GRAMMAR.md](docs/GRAMMAR.md)：词法与语法草案。
 - [docs/MANIFEST.md](docs/MANIFEST.md)：`Zeno.toml` 项目 manifest、profile 和 target 策略。
+- [docs/PACKAGE.md](docs/PACKAGE.md)：依赖解析、版本、workspace、`Zeno.lock` 和可复现构建。
 - [docs/MODULES.md](docs/MODULES.md)：模块、包、依赖和导入解析规则。
 - [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。
 - [docs/FFI.md](docs/FFI.md)：外部 ABI、符号导出、C 互操作和 panic 边界。

@@ -1,0 +1,23 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:."
+manifestHash = "sha256:app-manifest"
+contentHash = "sha256:app-content"
+trust = []
+dependencies = [
+  { key = "platform", package = "platform" },
+]
+
+[[package]]
+name = "platform"
+version = "0.1.0"
+source = "path:../platform"
+manifestHash = "sha256:platform-manifest"
+contentHash = "sha256:platform-content"
+trust = ["ffi"] # expected-error: dependency trust capability ffi is denied by root manifest
+dependencies = []

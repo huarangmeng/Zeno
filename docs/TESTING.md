@@ -37,6 +37,16 @@
 - 必须在模块路径、依赖、导入或可见性阶段被拒绝的多文件包夹具。
 - 在出错源码行或 manifest 字段附近使用 `expected-error` 注释。
 
+`tests/spec/package-pass`：
+
+- 必须通过依赖解析、workspace 展开和 lockfile 校验的包管理夹具。
+- 每个测试目录可以包含 `Zeno.toml`、`Zeno.lock` 和多个 member 包。
+
+`tests/spec/package-fail`：
+
+- 必须在依赖解析、版本、lockfile 或 trust 审计阶段被拒绝的包管理夹具。
+- 在出错 manifest 或 lockfile 行附近使用 `expected-error` 注释。
+
 未来类别：
 
 - `run-pass`：能编译并产生预期输出的程序。
@@ -61,6 +71,10 @@
 - `import core.result.{Result, Ok}` 可以从模块导入多个公开项。
 - `import std.io` 可以导入模块绑定，并通过 `io.Error` 访问公开项。
 - path dependency 可以提供新的 import 根。
+- git dependency 必须指定 commit `rev`，registry dependency 必须指定精确 `version`。
+- workspace members 可以共享一个 `Zeno.lock`，同 workspace 依赖优先解析到本地 member。
+- `Zeno.lock` 记录 path、git、registry、builtin 依赖的精确解析结果、内容 hash 和 trust 能力摘要。
+- frozen 构建可以校验 lockfile，没有隐式更新依赖解析结果。
 - 同 package 文件可以在签名中互相引用，且不会执行代码。
 - 普通 `struct` 使用默认 Auto layout，`sizeOf`、`alignOf` 和 `offsetOf` 可在编译期求值。
 - `@layout(Source)` 保留源码字段顺序和自然对齐。
@@ -160,6 +174,11 @@
 - `[dependencies]` key 不是合法 Zeno 标识符。
 - dependency key 和当前包 `src/` 顶层目录冲突。
 - 包依赖图成环。
+- git dependency 缺少 commit `rev`，或只写 branch/tag/floating ref。
+- registry dependency 使用开放版本范围而不是精确版本。
+- lockfile 缺失、过期、内容 hash 不匹配或记录了机器绝对路径。
+- lockfile 中依赖 trust 能力扩大但构建策略禁止依赖 trust。
+- workspace 有同名 member。
 - 文件路径和 `module` 声明不匹配。
 - 导入未在 `[dependencies]` 中声明的外部包根。
 - 从外部包导入非 `pub` 项。

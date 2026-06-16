@@ -1,0 +1,9 @@
+# category: package-fail
+# purpose: v1 registry dependencies require exact versions
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+log = { version = "^1.2" } # expected-error: registry dependency version must be exact in v1

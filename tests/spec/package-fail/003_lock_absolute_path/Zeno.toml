@@ -1,0 +1,6 @@
+# category: package-fail
+# purpose: lockfiles must not record machine absolute paths
+
+[package]
+name = "app"
+version = "0.1.0"

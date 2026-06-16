@@ -1,0 +1,12 @@
+# category: package-fail
+# purpose: dependency trust capabilities in lockfile are rejected when dependencyTrust is false
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+platform = { path = "../platform" }
+
+[trust]
+dependencyTrust = false

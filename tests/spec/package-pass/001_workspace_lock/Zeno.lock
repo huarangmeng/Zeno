@@ -1,0 +1,23 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "corelib"
+version = "0.1.0"
+source = "path:core"
+manifestHash = "sha256:core-manifest"
+contentHash = "sha256:core-content"
+trust = []
+dependencies = []
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:app"
+manifestHash = "sha256:app-manifest"
+contentHash = "sha256:app-content"
+trust = []
+dependencies = [
+  { key = "corelib", package = "corelib" },
+]

@@ -1,0 +1,12 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:/Users/example/project" # expected-error: lockfile source path must be relative, not absolute
+manifestHash = "sha256:app-manifest"
+contentHash = "sha256:app-content"
+trust = []
+dependencies = []
