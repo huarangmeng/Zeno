@@ -1,0 +1,29 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: duplicate interface implementation instances are rejected
+
+module tests.fail.duplicateInterfaceImplInstance;
+
+struct Event {
+    id: U64,
+}
+
+interface Consumer<T> {
+    fn count(self) -> U64;
+}
+
+struct Counter {
+    total: U64,
+}
+
+impl Consumer<Event> for Counter {
+    fn count(self) -> U64 {
+        return self.total;
+    }
+}
+
+impl Consumer<Event> for Counter { // expected-error: duplicate interface implementation for Counter and Consumer<Event>
+    fn count(self) -> U64 {
+        return self.total;
+    }
+}

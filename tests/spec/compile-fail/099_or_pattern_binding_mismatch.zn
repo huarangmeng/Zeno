@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: or pattern alternatives must bind the same names with the same types and access modes
+
+module tests.fail.orPatternBindingMismatch;
+
+enum Item {
+    A(U32),
+    B(U32),
+    C,
+}
+
+fn bad(item: Item) -> U32 {
+    return match item {
+        Item.A(left) | Item.B(right) => left, // expected-error: or pattern alternatives must bind the same names
+        Item.C => 0,
+    };
+}

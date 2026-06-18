@@ -1,0 +1,20 @@
+# category: codegen-fail
+# purpose: scoped allocation region must be checked before codegen
+
+[source]
+file = "src/main.zn"
+text = '''
+fn bad(mut arena: ArenaAllocator) -> Vector<U8> {
+    return Vector<U8>.withCapacityIn(128, mut arena);
+}
+'''
+
+[bad_hir]
+forbid = [
+    "allocationRegion arena",
+    "owner return region arena",
+]
+
+[expect]
+error = "scoped allocator owner cannot escape allocator region"
+

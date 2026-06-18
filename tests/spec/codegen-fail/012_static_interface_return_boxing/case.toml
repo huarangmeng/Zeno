@@ -1,0 +1,21 @@
+# category: codegen-fail
+# purpose: static interface returns must not be lowered as boxed or dynamic interface objects
+
+[source]
+file = "src/main.zn"
+text = '''
+fn makeWriter() -> Writer {
+    return FileWriter.openDefault();
+}
+'''
+
+[bad_codegen]
+contains = [
+    "Box<Writer>",
+    "heapAlloc",
+    "interfaceObject Writer",
+    "vtable.load Writer",
+]
+
+[expect]
+error = "static interface return must lower to its concrete return type"

@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: match over enum must be exhaustive unless a wildcard branch exists
+
+module tests.fail.matchNonExhaustive;
+
+enum State {
+    Ready(U32),
+    Waiting,
+    Done,
+}
+
+fn bad(state: State) -> U32 {
+    return match state {
+        Ready(value) => value,
+        Done => 0,
+    }; // expected-error: match is not exhaustive; missing Waiting
+}

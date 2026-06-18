@@ -41,6 +41,18 @@ struct Entry {
 
 Auto layout 是默认选择，因为大多数数据结构更需要紧凑数组、少 padding 和更好的 cache 行利用率，而不是手写字段顺序。
 
+Auto layout 的优化优先级：
+
+1. 保证源码语义、销毁顺序和诊断稳定。
+2. 减少 size 和 padding。
+3. 降低数组元素 stride。
+4. 让热字段更容易落在少量 cache line 中。
+5. 保留 niche 优化和单字段零成本包装机会。
+
+编译器可以使用字段大小、alignment、是否零大小、是否带 `destroy`、字段访问 PGO 热度和目标 cache line 信息辅助布局。没有 PGO 时，默认以 size、alignment 和 padding 为主。
+
+Auto layout 不自动插入大量 padding 来避免 false sharing。跨线程共享且需要隔离 cache line 时，应使用显式类型，例如 `CachePadded<T>`，让空间成本在源码中可见。
+
 ## 3. Source layout
 
 当作者明确需要手动控制字段顺序时使用 `@layout(Source)`：
@@ -88,7 +100,7 @@ pub struct CPoint {
 
 C-compatible 字段类型包括基础整数、浮点、`Bool` 的目标 C 布局形式、`Char` 的明确 ABI 表示、`@layout(C)` 结构体、零成本单字段包装了 C-compatible 类型的结构体，以及编译器或核心库明确标注为 C-compatible 的句柄类型。
 
-普通 `Vector<T>`、`String`、`Array<T>`、`Box<T>`、`Shared<T>`、接口访问类型、闭包和带销毁语义的资源类型默认不是 C-compatible。
+普通 `Vector<T>`、`String`、`Array<T>`、`Box<T>`、`Shared<T>`、接口拥有者、闭包和带销毁语义的资源类型默认不是 C-compatible。
 
 ## 5. Packed layout
 
@@ -109,7 +121,7 @@ private struct Ipv4HeaderRaw {
 - 字段 alignment 被限制到 `N`，`N` 必须是 1、2、4、8 或 16。
 - `Packed(1)` 表示不插入自然 padding。
 - packed 类型只能包含 `Copy` 且无 `destroy` 的字段。
-- packed 类型不能包含拥有资源、接口访问、闭包、`ArraySlice<T>`、`StringSlice` 或同步 guard。
+- packed 类型不能包含拥有资源、接口拥有者、闭包、`ArraySlice<T>`、`StringSlice` 或同步 guard。
 - 读取 packed 字段时，编译器生成安全的 unaligned load；普通只读传参可以先加载到临时值。
 - 写入 packed 字段时，编译器生成安全的 unaligned store。
 - 不能把 packed 字段作为 `mut` 访问、长期访问或要求 aligned field storage 的 API 参数，因为这会伪造对齐字段访问。
@@ -216,11 +228,29 @@ Zeno 默认函数 ABI 服务于优化，不是稳定外部 ABI。
 - `mut` 参数表示唯一可写访问，可在可证明时降低为 `noalias`，帮助向量化和 load/store 消除。
 - `move` 参数表示 callee 取得所有权，可利用唯一所有权做销毁点和别名优化。
 - `ArraySlice<T>` 降低为指针加长度，不分配。
-- 接口访问和接口拥有者只在源码类型显式出现时产生间接派发。
+- 接口拥有者只在源码类型显式出现时产生间接派发；`writer: Writer` 和 `W: Writer` 都是静态接口调用。
 
 外部 ABI 必须显式。`pub` 不是 ABI 稳定承诺，也不是符号导出承诺。
 
-## 9. 诊断
+## 9. Cache padding
+
+标准库提供显式 cache line padding 包装：
+
+```zn
+struct CachePadded<T> {
+    value: T,
+}
+```
+
+规则：
+
+- `CachePadded<T>` 让 `value` 至少按目标 cache line 对齐，并把整体 size 补齐到 cache line 的整数倍。
+- 目标 cache line 大小来自 target 配置；未知目标可以使用保守默认值。
+- 额外空间成本通过类型名可见，编译器不能把普通字段自动变成 cache padded。
+- `CachePadded<T>` 的 `Send` / `Sync` 按 `T` 推导。
+- `CachePadded<T>` 适合跨线程热点计数器、队列头尾和 runtime work-stealing 元数据。
+
+## 10. 诊断
 
 编译器应该提供布局诊断：
 
@@ -228,5 +258,6 @@ Zeno 默认函数 ABI 服务于优化，不是稳定外部 ABI。
 - Source layout 可以提示 padding 浪费，并建议改字段顺序或改回默认 Auto。
 - Packed layout 访问被拒绝时，应提示先加载到局部值。
 - C layout 包含非 C-compatible 字段时，应指出具体字段和原因。
+- 多线程 profile 下，诊断可以提示热点 atomic 字段考虑显式 `CachePadded<T>`。
 
 这些诊断不改变语义，但它们是 Zeno 高性能体验的一部分。

@@ -1,0 +1,44 @@
+# category: codegen-pass
+# purpose: match move clears moved payload drop flags and lowers to a tag switch
+
+[source]
+file = "src/main.zn"
+text = '''
+enum State {
+    Ready(Job),
+    Done,
+}
+
+struct Job {
+    priority: U32,
+}
+
+impl Job {
+    destroy {}
+}
+
+fn consume(move job: Job) -> U32 {
+    return job.priority;
+}
+
+fn finish(move state: State) -> U32 {
+    return match move state {
+        Ready(job) => consume(move job),
+        Done => 0,
+    };
+}
+'''
+
+[expect.mir]
+contains = [
+    "switch enumTag(state)",
+    "Ready -> bind owning payload job",
+    "move job -> clear payload dropFlag",
+    "Done -> no payload drop",
+]
+forbid = [
+    "heapAlloc",
+    "dynamicDispatch",
+    "doubleDrop job",
+    "drop moved payload",
+]

@@ -1,0 +1,25 @@
+# category: codegen-pass
+# purpose: CachePadded makes cache-line padding explicit
+
+[source]
+file = "src/main.zn"
+text = '''
+struct WorkerCounters {
+    local: CachePadded<Atomic<U64>>,
+    stolen: CachePadded<Atomic<U64>>,
+}
+'''
+
+[expect.layout]
+contains = [
+    "CachePadded<Atomic<U64>> align cacheLine",
+    "CachePadded<Atomic<U64>> size multipleOf cacheLine",
+    "WorkerCounters.local offset cacheLineAligned",
+    "WorkerCounters.stolen offset cacheLineAligned",
+]
+
+[expect.mir]
+forbid = [
+    "hiddenPaddingInsertedByAutoLayout",
+]
+

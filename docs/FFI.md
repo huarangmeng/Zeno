@@ -87,7 +87,7 @@ trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 - `String`、`StringSlice`。
 - `Array<T>`、`Vector<T>`、`ArraySlice<T>`。
 - `Box<T>`、`Shared<T>`、`Mutex<T>`、同步 guard。
-- 接口访问类型、`Box<Interface>`、`Shared<Interface>`。
+- 静态接口参数/返回、`Box<Interface>`、`Shared<Interface>`。
 - 闭包 / callable。
 - 带 `destroy` 的资源拥有类型。
 - 泛型类型参数未单态化为明确 C-compatible 类型的签名。

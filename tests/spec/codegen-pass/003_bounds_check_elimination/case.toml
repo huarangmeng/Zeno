@@ -1,0 +1,35 @@
+# category: codegen-pass
+# purpose: canonical 0..len loop eliminates redundant slice bounds checks
+
+[source]
+file = "src/main.zn"
+text = '''
+fn checksum(data: ArraySlice<U8>) -> U64 {
+    var sum: U64 = 0;
+    for i in 0..data.len {
+        sum = sum + U64.from(data[i]);
+    }
+    return sum;
+}
+'''
+
+[expect.mir.before_opt]
+contains = [
+    "boundsCheck(i, data.len)",
+]
+
+[expect.mir.after_opt]
+contains = [
+    "rangeFact 0 <= i < data.len",
+    "load data[i]",
+]
+forbid = [
+    "boundsCheck(i, data.len)",
+]
+
+[expect.llvm]
+forbid = [
+    "panicBounds",
+    "trapBounds",
+]
+

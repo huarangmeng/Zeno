@@ -15,7 +15,7 @@ struct File {
 impl File {
     fn fromHandle(move handle: os.Handle) -> File {
         return File {
-            handle: move handle,
+            handle: handle,
             closed: false,
         };
     }

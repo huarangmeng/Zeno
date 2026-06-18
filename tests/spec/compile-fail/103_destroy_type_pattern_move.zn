@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: pattern destructuring cannot move non-Copy fields out of a type with destroy
+
+module tests.fail.destroyTypePatternMove;
+
+struct Packet {
+    bytes: Array<U8>,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn bad(move packet: Packet) -> Array<U8> {
+    let Packet { bytes } = packet; // expected-error: cannot move field from type with destroy block through pattern
+    return bytes;
+}

@@ -1,0 +1,21 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: overloads cannot differ only by read versus move parameter mode
+
+module tests.fail.readMoveOverloadAmbiguous;
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn inspect(packet: Packet) -> U32 {
+    return packet.value;
+}
+
+fn inspect(move packet: Packet) -> U32 { // expected-error: overload cannot differ only by read versus move parameter mode
+    return packet.value;
+}

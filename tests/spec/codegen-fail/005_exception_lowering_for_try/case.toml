@@ -1,0 +1,21 @@
+# category: codegen-fail
+# purpose: Result/Option try must not use exception lowering
+
+[source]
+file = "src/main.zn"
+text = '''
+fn parse(input: ArraySlice<U8>) -> Result<U32, Error> {
+    let value = try parseNumber(input);
+    return Ok(value);
+}
+'''
+
+[bad_codegen]
+llvm = [
+    "invoke",
+    "landingpad",
+]
+
+[expect]
+error = "try must lower to branch and cleanup, not exception machinery"
+

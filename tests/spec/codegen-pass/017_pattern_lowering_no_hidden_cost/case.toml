@@ -1,0 +1,36 @@
+# category: codegen-pass
+# purpose: pattern matching lowers to tag switches, comparisons, and branches without hidden costs
+
+[source]
+file = "src/main.zn"
+text = '''
+enum Event {
+    Key(U32),
+    Code(U32),
+    Done,
+}
+
+fn classify(event: Event) -> U32 {
+    return match event {
+        Event.Key(code) | Event.Code(code) if code < 10 => code,
+        Event.Key(10..=20) | Event.Code(10..=20) => 20,
+        Event.Key(_) | Event.Code(_) => 99,
+        Event.Done => 0,
+    };
+}
+'''
+
+[expect.mir]
+contains = [
+    "switch enumTag(event)",
+    "orPattern merge bindings code",
+    "rangeCheck 10..=20",
+    "guard code < 10",
+    "guard false -> next pattern",
+]
+forbid = [
+    "heapAlloc",
+    "dynamicDispatch",
+    "call user extractor",
+    "create PatternObject",
+]

@@ -1,0 +1,15 @@
+// category: compile-pass
+// profile: hosted
+// purpose: owners allocated with EscapingAllocator can be returned
+
+module tests.pass.escapingAllocatorReturnOwner;
+
+fn build<A: EscapingAllocator>(mut allocator: A) -> Vector<U8> {
+    return Vector<U8>.withCapacityIn(1024, mut allocator);
+}
+
+fn useGlobal() -> Vector<U8> {
+    var allocator = GlobalAllocator {};
+    return build(mut allocator);
+}
+

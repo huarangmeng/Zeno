@@ -1,0 +1,29 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: read-only match cannot move out non-Copy payloads
+
+module tests.fail.matchReadPayloadMove;
+
+enum State {
+    Ready(Job),
+    Done,
+}
+
+struct Job {
+    priority: U32,
+}
+
+impl Job {
+    destroy {}
+}
+
+fn consume(move job: Job) -> U32 {
+    return job.priority;
+}
+
+fn bad(state: State) -> U32 {
+    return match state {
+        Ready(job) => consume(move job), // expected-error: cannot move payload from read-only match; use match move
+        Done => 0,
+    };
+}

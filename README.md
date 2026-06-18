@@ -17,15 +17,20 @@ Zeno 的核心目标：
 - [docs/MANIFEST.md](docs/MANIFEST.md)：`Zeno.toml` 项目 manifest、profile 和 target 策略。
 - [docs/PACKAGE.md](docs/PACKAGE.md)：依赖解析、版本、workspace、`Zeno.lock` 和可复现构建。
 - [docs/MODULES.md](docs/MODULES.md)：模块、包、依赖和导入解析规则。
+- [docs/COMPILATION.md](docs/COMPILATION.md)：编译模型、并行调度、增量缓存和稳定诊断。
+- [docs/IR.md](docs/IR.md)：HIR、MIR、LLVM 降级、高性能 codegen 和优化不变量。
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md)：别名、布局、泛型、边界检查、分配器和并发的高性能契约。
 - [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。
 - [docs/FFI.md](docs/FFI.md)：外部 ABI、符号导出、C 互操作和 panic 边界。
 - [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
 - [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。
 - [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md)：C++20 + LLVM stage0 与自举路线。
+- [docs/V01_SUBSET.md](docs/V01_SUBSET.md)：v0.1 / stage0 MVP 第一批实现子集。
 - [docs/TESTING.md](docs/TESTING.md)：规格测试、性能验收和诊断约定。
+- [docs/DESIGN_AUDIT.md](docs/DESIGN_AUDIT.md)：v0.1 设计冻结审计和 P1 决策记录。
 - [examples](examples)：规范示例程序。
-- [tests/spec](tests/spec)：compile、manifest 和 module 规格用例草案。
+- [tests/spec](tests/spec)：compile、manifest、module、incremental 和 codegen 规格用例草案。
 
 ## 当前状态
 

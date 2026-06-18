@@ -19,7 +19,7 @@ fn bad(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     var packets = Vector<Packet>.withCapacityIn(1, mut allocator);
     packets.push(Packet { value: 1 });
 
-    for move packet in move packets {
+    for move packet in packets {
         let ignored = packet.value;
     }
 

@@ -1,0 +1,33 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: generic interface parameters are anonymous static generic parameters
+
+module tests.pass.genericInterfaceParameter;
+
+struct Event {
+    id: U64,
+}
+
+interface Consumer<T> {
+    fn consume(mut self, move item: T);
+}
+
+struct Counter {
+    count: U64,
+}
+
+impl Consumer<Event> for Counter {
+    fn consume(mut self, move item: Event) {
+        self.count = self.count + item.id;
+    }
+}
+
+fn feed<T>(mut consumer: Consumer<T>, move item: T) {
+    consumer.consume(move item);
+}
+
+fn main() {
+    var counter = Counter { count: 0 };
+    let event = Event { id: 1 };
+    feed(mut counter, event);
+}

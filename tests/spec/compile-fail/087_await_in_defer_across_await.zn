@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: hosted
+// purpose: defer that survives across await cannot itself await during cleanup
+
+module tests.fail.awaitInDeferAcrossAwait;
+
+async fn bad(move file: File) -> Result<Unit, IoError> {
+    defer {
+        await file.closeAsync(); // expected-error: defer crossing await cannot contain await
+    }
+
+    try await file.readU32();
+    return Ok(());
+}

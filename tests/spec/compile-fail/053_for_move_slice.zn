@@ -18,8 +18,8 @@ fn consume(move packet: Packet) -> U32 {
 
 fn bad(slice: ArraySlice<Packet>) -> U32 {
     var sum: U32 = 0;
-    for move packet in move slice {
-        sum = sum + consume(move packet); // expected-error: move iteration requires an owning Array or Vector source
+    for move packet in slice {
+        sum = sum + consume(move packet); // expected-error: iteration requires an owning Array or Vector source
     }
     return sum;
 }

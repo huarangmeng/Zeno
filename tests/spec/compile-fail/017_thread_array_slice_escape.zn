@@ -18,6 +18,6 @@ fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let handle = try Thread.spawn(move () -> USize {
         return consume(slice); // expected-error: ArraySlice cannot escape to a thread
     });
-    let ignoredHandle = move handle;
+    let ignoredHandle = handle;
     return Ok(());
 }

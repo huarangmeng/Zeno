@@ -21,7 +21,7 @@ impl Identified for Service {
 }
 
 fn share(move service: Service, mut allocator: GlobalAllocator) -> Shared<Identified> {
-    return Shared.newIn(move service, mut allocator);
+    return Shared.newIn(service, mut allocator);
 }
 
 fn readId(service: Shared<Identified>) -> U32 {

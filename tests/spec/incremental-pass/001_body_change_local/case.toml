@@ -1,0 +1,21 @@
+# category: incremental-pass
+# purpose: changing a private function body does not invalidate downstream packages
+
+[before]
+package = "lib"
+file = "src/math.zn"
+item = "helper"
+publicFingerprint = "sha256:pub-unchanged"
+packageFingerprint = "sha256:pkg-unchanged"
+bodyFingerprint = "sha256:body-old"
+
+[after]
+bodyFingerprint = "sha256:body-new"
+publicFingerprint = "sha256:pub-unchanged"
+packageFingerprint = "sha256:pkg-unchanged"
+
+[expect]
+recheck = ["lib::helper.body"]
+recodegen = ["lib::helper"]
+invalidateDownstream = []
+diagnosticOrderStable = true

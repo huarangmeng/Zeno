@@ -1,0 +1,37 @@
+# category: codegen-pass
+# purpose: tryReserve proves capacity for following push loop
+
+[source]
+file = "src/main.zn"
+text = '''
+fn copyInto(mut out: Vector<U8>, input: ArraySlice<U8>) -> Result<Unit, AllocError> {
+    try out.tryReserve(input.len);
+    for item in input {
+        out.push(item);
+    }
+    return Ok(());
+}
+'''
+
+[expect.mir.before_opt]
+contains = [
+    "capacityCheck out",
+    "pushSlowPath out",
+]
+
+[expect.mir.after_opt]
+contains = [
+    "capacityFact out.free >= input.len",
+    "pushUncheckedWithinReservedCapacity",
+]
+forbid = [
+    "pushSlowPath inside loop",
+    "oom inside loop",
+]
+
+[expect.llvm]
+forbid = [
+    "call zeno_vector_grow in loop",
+    "call oom in loop",
+]
+

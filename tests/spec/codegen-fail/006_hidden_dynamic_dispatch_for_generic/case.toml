@@ -1,0 +1,20 @@
+# category: codegen-fail
+# purpose: static interface parameters must not become hidden dynamic dispatch
+
+[source]
+file = "src/main.zn"
+text = '''
+fn writeAll(mut writer: Writer, data: ArraySlice<U8>) -> Result<Unit, IoError> {
+    try writer.write(data);
+    return Ok(());
+}
+'''
+
+[bad_codegen]
+contains = [
+    "interfaceCall Writer.write",
+    "vtable.load Writer",
+]
+
+[expect]
+error = "interface parameter must lower to static dispatch"

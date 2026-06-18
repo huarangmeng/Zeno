@@ -47,16 +47,56 @@
 - 必须在依赖解析、版本、lockfile 或 trust 审计阶段被拒绝的包管理夹具。
 - 在出错 manifest 或 lockfile 行附近使用 `expected-error` 注释。
 
+`tests/spec/incremental-pass`：
+
+- 必须通过增量失效、缓存 key 和诊断重放规则的场景夹具。
+- v1 使用 `case.toml` 描述 before/after fingerprint 和期望失效范围。
+
+`tests/spec/incremental-fail`：
+
+- 必须被增量缓存或诊断稳定性规则拒绝的场景夹具。
+- 在出错字段附近使用 `expected-error` 注释。
+
+`tests/spec/codegen-pass`：
+
+- 必须满足 HIR、MIR、LLVM 或汇编级降级不变量的场景。
+- v1 使用 `case.toml` 描述源码片段、期望 MIR 事实、期望 LLVM 属性和禁止出现的隐藏成本。
+- 编译器实现后可以升级为文本 MIR 断言、LLVM FileCheck 风格断言或目标汇编断言。
+
+`tests/spec/codegen-fail`：
+
+- 必须被 codegen verifier 或 IR verifier 拒绝的场景。
+- 用于防止错误优化，例如不合法 `noalias`、缺失 cleanup edge、隐藏闭包分配、把 `try` 降低成异常。
+
 未来类别：
 
 - `run-pass`：能编译并产生预期输出的程序。
-- `codegen`：检查生成 IR 或汇编的测试。
 - `perf`：微基准和 codegen 不变量。
 - `stdlib`：core 和 std API 一致性测试。
 
-## 2. 必要 compile-pass 覆盖
+## 2. MVP 与完整规格门禁
 
-第一版编译器测试套件必须包含：
+测试分两层：
+
+- MVP 门禁：stage0 第一批必须通过的测试，范围见 [V01_SUBSET.md](V01_SUBSET.md)。
+- 完整规格门禁：完整 v0.1 设计最终必须通过的测试。
+
+覆盖延后能力的测试仍然保留，例如完整 `Shared<T>` runtime、`Shared<Interface>`、async lowering、scoped 并发、跨 package opaque return metadata、registry/git package manager。这些测试不应删除，只是不进入 stage0 MVP 发布门禁。
+
+测试 runner 出现后，测试可以用头部注释或 `case.toml` 标记：
+
+```text
+stage = "mvp"
+stage = "full-spec"
+feature = "async"
+feature = "shared"
+```
+
+没有显式标记时，默认按完整规格测试处理。进入 stage0 发布门禁前，再把第一批必须通过的测试补充为 `stage = "mvp"`。
+
+## 3. 必要 compile-pass 覆盖
+
+完整 v0.1 规格测试套件必须包含：
 
 - hosted `Zeno.toml` manifest 可以启用默认 allocator、abort panic 和符号化调用栈。
 - freestanding `Zeno.toml` manifest 可以禁用默认 allocator，并把 panic/OOM 降低为 trap。
@@ -66,7 +106,7 @@
 - 同 package 内同名声明需要用 `net.http.Client` 这类模块限定名消歧。
 - `private` 顶层项和字段只在当前文件可见。
 - 默认顶层项、类型和字段是 package-visible，外部 package 只能访问 `pub` 项。
-- 函数和方法可以按参数数量、参数类型、`mut` / `move` 访问模式形成重载集。
+- 函数和方法可以按参数数量、参数类型和 `mut` 访问模式形成重载集；只读 / `move` 参数不能单独区分同名重载。
 - 重载解析优先选择唯一精确匹配，泛型重载按使用到的具体类型单态化。
 - `import core.result.{Result, Ok}` 可以从模块导入多个公开项。
 - `import std.io` 可以导入模块绑定，并通过 `io.Error` 访问公开项。
@@ -75,6 +115,9 @@
 - workspace members 可以共享一个 `Zeno.lock`，同 workspace 依赖优先解析到本地 member。
 - `Zeno.lock` 记录 path、git、registry、builtin 依赖的精确解析结果、内容 hash 和 trust 能力摘要。
 - frozen 构建可以校验 lockfile，没有隐式更新依赖解析结果。
+- 修改非 `pub` 函数体不会使下游 package 失效。
+- 修改 `pub` 签名、`@layout(C)` 或 `@export` ABI 会使依赖方失效。
+- 并行编译和缓存命中不会改变诊断顺序或错误码。
 - 同 package 文件可以在签名中互相引用，且不会执行代码。
 - 普通 `struct` 使用默认 Auto layout，`sizeOf`、`alignOf` 和 `offsetOf` 可在编译期求值。
 - `@layout(Source)` 保留源码字段顺序和自然对齐。
@@ -90,26 +133,47 @@
 - 无损整数转换可以使用 `as`。
 - 检查窄化使用 `T.fromChecked(value)`，明确截断使用 `T.truncate(value)`，钳制转换使用 `T.saturate(value)`。
 - 非 `Copy` 资源 move 后源绑定失效。
-- 非 `Copy` 拥有者普通赋值必须被拒绝，除非显式 `move`。
+- 非 `Copy` 拥有者普通赋值会移动右侧值；移动后继续使用源绑定必须被拒绝。
+- 对已初始化位置重新赋值会销毁旧值；右侧先求值，失败时左侧保持不变。
+- `replaceAt` 返回旧值所有权，不销毁旧值；普通索引赋值销毁旧元素并写入新元素。
 - `Array<T>` / `Vector<T>` 的 `clone` 显式表达深拷贝；指定 allocator 时使用 `cloneIn`。
+- `Array<T>` / `Vector<T>` / `ArraySlice<T>` 的 `collection[index]` 是元素访问；`Copy` 元素可复制，非 `Copy` 元素可短期读取字段或通过 `mut collection[index]` 修改。
+- `Vector<T>.removeAt` 保持顺序并返回被移除元素，`Vector<T>.swapRemove` 不保持顺序但可 O(1) 移除，`replaceAt` 替换元素并返回旧元素。
+- `Map<K, V>` 可以用 `HashKey` key 插入、查找、替换和移除 value。
+- `Set<T>` 可以用 `HashKey` value 插入、查找、移除和 `take`。
+- `Map.tryReserve` 和 `Set.tryReserve` 是可恢复 OOM 的容量预留入口；成功后批量 `insert` 不应重复触发 rehash 慢路径。
+- `Map.get(key)` 只为 `V: Copy` 返回 `Option<V>`；非 `Copy` value 使用 checked index 或 `entry` API 做短期访问 / 更新。
+- `Map.entry(move key)` 可以单次探测后插入、替换或移除，`MapEntry<K, V>` 不能逃逸；`Copy` key 调用点可以省略 `move`。
+- `match value` 只读匹配 enum payload，不移动非 `Copy` payload。
+- `match move value` 消耗 enum 并允许移动出被选中 payload。
+- `match mut value` 原地可写匹配 enum payload，不取得 payload 所有权。
+- `if let` / `while let` 支持只读、`move` 和 `mut` pattern 模式。
+- `let` 支持不可失败 tuple / struct 解构。
+- pattern 支持 enum、struct、tuple、literal、range、or、guard 和 nested pattern。
+- guard 分支不参与穷尽证明。
 - `String.clone()` 显式复制拥有文本；`@noAlloc` 中必须被拒绝。
 - `Shared<T>.clone` 只表达引用计数复制，成本通过类型名可见。
 - 默认参数只读访问非 `Copy` 资源后，调用方仍然拥有该资源。
 - `mut` 参数唯一可写访问后，调用方仍然拥有该资源。
-- `move` 参数必须由调用点显式 `move` 传入。
+- `move` 参数在声明处接收所有权；从已有命名位置传入时调用点必须写 `move`，调用后源绑定不可再用。
 - `self`、`mut self` 和 `move self` 方法接收者语义。
 - 从 `move self` 中移出字段后只销毁剩余字段。
-- 带 `destroy` 的类型可以在自己的 `move self` 方法中提供官方拆解 API。
+- 带 `destroy` 的类型可以用 `close`、`flush` 或 `finish` 这类 `move self` 方法显式完成资源，并通过状态让后续 `destroy` no-op。
+- `destroy` 不是 `move self` 方法，不能由用户直接调用。
 - 从参数派生的 `ArraySlice<T>` 可以返回。
-- 活跃视图结束后，`Vector<T>` 可以继续结构性修改。
+- 活跃视图结束后，`Vector<T>` 可以继续结构性修改或元素替换。
 - RAII 在所有正常退出路径上销毁。
 - 资源类型通过显式 `close`、`flush` 或 `finish` 返回清理错误。
 - 部分初始化和清理。
 - 通过接口约束静态泛型派发。
-- 泛型和接口继承的多约束使用逗号，例如 `T: Ord, Copy` 和 `interface Worker: Send, Sync`。
+- 泛型参数只允许一个直接接口约束；多能力约束必须先定义命名组合接口，例如 `interface SortKey: Ord, Copy {}` 后写 `T: SortKey`。
 - 结构体通过泛型字段保存具体接口实现，保持静态派发。
 - `Self` 返回或参数形式的接口要求可以通过静态泛型约束调用。
-- 通过接口类型参数进行接口派发。
+- 接口类型参数例如 `writer: Writer` 是匿名静态接口参数，不生成接口表派发。
+- 泛型接口参数例如 `consumer: Consumer<T>` 可以从普通参数和接口实现共同推断 `T`。
+- 同一具体类型可以实现同一泛型接口的不同类型实参，例如 `Consumer<Event>` 和 `Consumer<Message>`。
+- 多个裸接口参数默认是独立隐藏具体类型；需要同一个具体类型时使用显式 `W: Interface`。
+- 接口返回类型例如 `-> Writer` 是静态接口返回，所有返回路径必须统一到同一个具体实现类型。
 - 拥有异构接口值必须通过 `Box<Interface>` 或 `Shared<Interface>` 显式表达。
 - `Box<T>` 可以移动转换成 `Box<Interface>`，不重新分配。
 - `Shared<T>` 可以移动转换成 `Shared<Interface>`，不增加引用计数。
@@ -132,21 +196,24 @@
 - `try` 提前返回会执行离开作用域的 `defer` 和 RAII 销毁。
 - `panic(message) -> Never` 和 `oom(layout) -> Never` 可以出现在任意返回类型位置。
 - profile `panicHandler(info: PanicInfo) -> Never` 可以读取 panic 消息、调用点位置和惰性调用栈。
-- `PanicInfo.stack()` 可以通过 `for move frame in move frames` 无分配遍历 `StackFrame`。
+- `PanicInfo.stack()` 可以通过 `for move frame in frames` 无分配遍历 `StackFrame`。
 - 默认分配 API 和 `In` 后缀 API 失败时调用 profile 的 `oom(layout)`，普通调用点不写 `try`。
 - `for item in data` 只读遍历连续集合，不移动非 `Copy` 元素。
 - `for mut item in mut data` 可写遍历连续集合。
-- `for move item in move data` 消耗遍历拥有集合。
+- `for move item in data` 消耗遍历拥有集合。
 - `for i in 0..data.len` 整数半开区间遍历。
-- `Iterator<T>` 可以通过 `for move item in move iterator` 做拥有式遍历。
+- `Iterator<T>` 可以通过 `for move item in iterator` 做拥有式遍历。
 - 字符串 literal 的类型是 `StringSlice`，不分配。
 - 拥有字符串必须显式使用 `String.from(text)` 或 `String.fromIn(text, mut allocator)`。
 - 默认分配 API 使用 profile 默认 allocator；显式 allocator API 使用 `In` 后缀。
-- `Vector.tryReserve` 和 `String.tryReserve` 是可恢复 OOM 的容量预留入口；成功后普通 `push` 不返回 `Result`。
+- `Vector.tryReserve`、`Map.tryReserve`、`Set.tryReserve` 和 `String.tryReserve` 是可恢复 OOM 的容量预留入口；成功后普通 `push` / `insert` 不返回 `Result`。
 - `tryReserve` 返回 `Result<Unit, AllocError>`，失败时不调用 `oom`，集合内容保持不变。
+- scoped allocator 创建的拥有者可以在 allocator 活跃期间局部使用。
+- `EscapingAllocator` 创建的拥有者可以按普通所有权规则返回。
 - `String.asBytes()` 和 `StringSlice.asBytes()` 可得到只读 `ArraySlice<U8>`。
 - `StringSlice.chars()` 返回具体 `Iterator<Char>`。
 - 线程所有权转移。
+- scoped 线程可以接收来自 `splitDisjoint` 的短期不重叠 `mut` 访问。
 - 普通纯数据结构自动满足 `Send`，可以 move 进线程。
 - `Mutex<T>` 和 `Shared<Mutex<T>>` 允许跨线程共享可变状态，前提是 `T: Send`。
 - `Box<ThreadInterface>` 可以跨线程移动，其中 `ThreadInterface` 继承目标接口和 `Send`。
@@ -159,11 +226,12 @@
 - 导出函数在 abort / trap profile 下不会让 panic unwind 穿过 C ABI。
 - 可选任务运行时的所有权转移。
 - async future 状态所有权。
+- future drop 会清理当前状态中已初始化字段和跨 `await` 的 `defer`。
 - 共享可变状态只能通过同步类型访问。
 
-## 3. 必要 compile-fail 覆盖
+## 4. 必要 compile-fail 覆盖
 
-第一版编译器测试套件必须拒绝：
+完整 v0.1 规格测试套件必须拒绝：
 
 - 未知 manifest 字段。
 - 缺少 `target.profile` 或未知 profile。
@@ -179,6 +247,7 @@
 - lockfile 缺失、过期、内容 hash 不匹配或记录了机器绝对路径。
 - lockfile 中依赖 trust 能力扩大但构建策略禁止依赖 trust。
 - workspace 有同名 member。
+- 缓存 key 缺少 manifest、lockfile、target、profile、panic/OOM、trust 或 compiler identity 这类安全输入。
 - 文件路径和 `module` 声明不匹配。
 - 导入未在 `[dependencies]` 中声明的外部包根。
 - 从外部包导入非 `pub` 项。
@@ -189,10 +258,11 @@
 - 两个导入在同一作用域引入不同定义的同名项。
 - 两个函数只靠返回类型不同形成重载。
 - 两个函数或方法拥有相同重载键。
+- 两个重载只靠同一位置的只读参数和 `move` 参数区分。
 - 重载调用没有唯一最佳候选，例如整数字面量同时匹配多个数值类型候选。
 - 同一个结构体声明多个 layout 策略。
 - `@layout(...)` 标在非结构体声明上。
-- `@layout(C)` 结构体包含非 C-compatible 字段，例如 `Vector<T>`、`String`、接口访问或闭包。
+- `@layout(C)` 结构体包含非 C-compatible 字段，例如 `Vector<T>`、`String`、接口拥有者或闭包。
 - `@layout(Packed(N))` 的 `N` 不是 1、2、4、8 或 16。
 - `@layout(Packed(N))` 结构体包含非 `Copy` 字段、拥有资源字段或带 `destroy` 的字段。
 - packed 字段作为 `mut` 访问或长期访问逃逸。
@@ -200,26 +270,47 @@
 - double move。
 - 非 `Copy` 拥有者普通赋值造成隐式复制。
 - Freestanding profile 没有默认 allocator 时调用无 `In` 后缀的分配 API。
+- scoped allocator 创建的拥有者从函数返回。
+- scoped allocator 创建的拥有者保存到长期结构体字段、`static`、`Box`、`Shared`、逃逸闭包、非 scoped 线程、任务或 async future 状态。
+- 泛型函数返回 allocator 创建的拥有者但只约束 `A: Allocator`，没有要求 `A: EscapingAllocator`。
 - 把默认只读参数当成拥有值返回或保存。
 - 在不可写接收者上调用 `mut self` 方法。
+- 存在活动只读访问或可写访问时覆盖对应局部变量、字段或容器元素。
 - 调用 `move self` 方法后继续使用接收者。
 - 从 `self` 或 `mut self` 中移出字段。
-- 从带 `destroy` 块的类型外部移出字段。
+- 从带 `destroy` 块的类型中移出非 `Copy` 字段，包括外部函数和类型自己的 `move self` 方法。
 - 移出字段后继续读取该字段或把原对象当作完整值使用。
+- 直接调用 `destroy`。
 - `destroy` 中使用 `try`。
 - `destroy` 调用返回 `Result` 的失败 API。
+- 命名非 `Copy` owner 传给 `move` 参数时漏写调用点 `move`。
 - 读取未初始化值。
 - 返回局部存储的访问值。
 - `ArraySlice<T>` 作为结构体字段。
 - `ArraySlice<T>` 进入 `Box<T>`、`Shared<T>`、`Array<T>`、`Vector<T>`、`static`、逃逸闭包、线程、任务或 async future。
-- 活跃 `ArraySlice<T>` 存在时，对底层 `Vector<T>` 做结构性修改。
+- 活跃 `ArraySlice<T>` 存在时，对底层 `Vector<T>` 做结构性修改或元素替换。
 - 活跃 `ArraySlice<T>` 存在时，对底层 `Vector<T>` 调用 `reserve`、`reserveExact`、`tryReserve` 或 `tryReserveExact`。
+- 把非 `Copy` 的 `collection[index]` 放进拥有位置，试图通过索引移出元素。
+- 对非 `Copy` 集合调用 `get(index) -> Option<T>`。
+- 对 `Map<K, V>` 在 `V` 不是 `Copy` 时调用 `get(key) -> Option<V>`。
+- `MapEntry<K, V>` 保存到结构体、集合、`static`、`Box`、`Shared`、逃逸闭包、线程、任务或 async future。
+- 作为 `Map` key 或 `Set` value 的类型没有实现 `HashKey`。
+- 非 `Copy` payload 在只读 `match` 中被移动、返回或逃逸。
+- `match move` 后继续使用原 enum。
+- `match mut` 作用于不可写 enum。
+- `match` 非穷尽且没有 `_` 分支。
+- `let` 使用可失败 pattern，例如多 variant enum 的 `Some(x)`。
+- or pattern 两侧绑定名字、类型或访问模式不同。
+- 带 guard 的分支被当成穷尽覆盖。
+- 明显不可达的无 guard pattern 分支。
+- 字符串、regex、downcast、extractor 或 collection tail pattern。
+- 带 `destroy` 的类型通过 pattern 解构移动出非 `Copy` 字段或 payload。
 - `for mut item in data` 缺少右侧 `mut` 可写访问。
 - `for item in mut data` 中修改只读循环元素。
-- `for move item in move slice` 试图消耗遍历非拥有 `ArraySlice<T>`。
+- `for move item in slice` 试图消耗遍历非拥有 `ArraySlice<T>`。
 - 消耗遍历后继续使用被 `move` 的集合。
 - 对 `Iterator<T>` 使用非消耗 `for item in iterator` 遍历。
-- 命名非 `Copy` 迭代器作为 `for move` 源时缺少右侧 `move`。
+- 命名非 `Copy` 迭代器作为 `for move` 源后继续使用原迭代器。
 - `let text: String = "literal"` 这类通过类型标注隐式构造拥有字符串。
 - `StringSlice` 作为结构体字段、集合元素、`static`、逃逸闭包捕获、线程任务捕获或 async future 状态。
 - `@noAlloc` 中调用 `String.from`、`String.fromIn`、`String.push`、`String.reserve`、`String.tryReserve`、`String.clone`、`cloneIn`、集合/Box/Shared 分配 API 或会分配的格式化 API。
@@ -228,21 +319,25 @@
 - 把 `PanicInfo`、`StackFrames` 或其他 panic 诊断访问值保存到结构体、集合、`static`、逃逸闭包、线程、任务或 async future 中。
 - 可写访问与只读访问重叠。
 - 可写访问逃逸到非 scoped 线程。
-- 裸接口访问类型作为结构体字段、枚举载荷、元组字段、`static` 或集合元素长期保存。
-- 裸接口访问类型被逃逸闭包、线程、任务或 async future 捕获。
+- scoped 线程中通过普通运行期索引产生多个可写访问，且没有 disjoint API 证明不重叠。
+- 裸接口类型作为结构体字段、枚举载荷、元组字段、`static` 或集合元素使用。
+- 裸接口类型被逃逸闭包、线程、任务或 async future 捕获。
+- 泛型接口参数只靠接口实现无法唯一推断类型参数。
+- 重复或重叠的接口实现实例。
+- 要求同一个显式泛型实现类型的位置传入了不同具体类型。
+- `-> Interface` 静态接口返回的不同 `return` 路径产生不同具体实现类型。
 - 把 `OnceFn` 传给要求 `Fn` 或 `MutFn` 的 API。
 - 把 `MutFn` 传给要求 `Fn` 的 API。
 - 通过只读访问调用 `MutFn`。
 - 调用 `OnceFn` 后继续使用该闭包。
-- `move writer: Interface` 这类接收裸接口访问所有权的参数。
 - 通过 `Shared<Interface>` 调用 `mut self` 接口方法。
 - 把非 `Send` 类型移动进 `Thread.spawn`、多线程任务或可跨线程 future。
 - `Box<Interface>` 在缺少 `Send` 能力时跨线程移动。
 - `Shared<T>` 在 `T` 不是 `Send, Sync` 时跨线程移动或共享。
 - 普通 `impl Send for T {}` 或 `impl Sync for T {}`，没有 `trust` 边界。
-- 通过接口访问动态调用返回 `Self` 或接收 `Self` 普通参数的方法。
-- 通过接口访问动态调用带方法级泛型参数的方法。
-- 通过接口访问动态调用 `move self` 方法。
+- 通过 `Box<Interface>` / `Shared<Interface>` 动态调用返回 `Self` 或接收 `Self` 普通参数的方法。
+- 通过 `Box<Interface>` / `Shared<Interface>` 动态调用带方法级泛型参数的方法。
+- 通过 `Box<Interface>` / `Shared<Interface>` 动态调用 `move self` 方法。
 - 没有 `trust` 的裸 FFI 声明或底层操作。
 - manifest 未允许对应能力时使用 `trust extern`、硬件访问、inline asm 或中断入口。
 - `@export` 标在非 `pub` 函数、泛型函数、方法或非函数声明上。
@@ -257,8 +352,10 @@
 - 在返回 `Result` 的函数中直接 `try Option<T>`。
 - 对错误类型不同的 `Result<T, E>` 直接使用 `try`。
 - `trust` 边界中违反普通所有权、初始化或类型规则。
+- 非拥有访问值跨 `await` 进入 future 状态。
+- 跨 `await` 存活的 `defer` 中使用 `await`。
 
-## 4. 诊断格式
+## 5. 诊断格式
 
 推荐诊断形状：
 
@@ -266,8 +363,8 @@
 error[E0201]: 使用了已移动的值 `file`
   --> tests/spec/compile-fail/001_use_after_move.zn:8:5
    |
- 7 |     let owner = move file;
-   |                 --------- 值在这里被移动
+ 7 |     let owner = file;
+   |                 ---- 值在这里被移动
  8 |     file.write("late");
    |     ^^^^ 移动后继续使用
 help: 在移动前读取该值，或只移动一次
@@ -275,11 +372,11 @@ help: 在移动前读取该值，或只移动一次
 
 编译器出现后，诊断应使用稳定错误码。
 
-## 5. 性能测试
+## 6. 性能测试
 
 性能验收应包含源码级和 codegen 级检查：
 
-- 泛型 `max<T: Ord, Copy>` 应为使用到的具体类型生成专门函数。
+- 泛型 `max<T: SortKey>` 应为使用到的具体类型生成专门函数。
 - 函数重载应在类型检查期解析为直接调用，不生成重载表、名字查找或动态派发。
 - Auto layout 应减少典型结构体 padding；布局结果应可在编译期报告 size、align 和 offset。
 - `@layout(Source)` 不应重排字段。
@@ -292,19 +389,43 @@ help: 在移动前读取该值，或只移动一次
 - `U8.truncate(value)` 应降低为截断，不生成范围检查。
 - `U8.saturate(value)` 应降低为比较/选择或目标饱和指令，不分配、不 trap。
 - `try` 应降低为普通分支和清理边，不生成异常或堆分配。
+- `try` 的提前返回边必须执行离开作用域的 `defer` 和 RAII cleanup。
 - `panic` / `oom` 应降低为 `noreturn` 控制流终点；abort / trap profile 不应生成 unwind 清理路径。
 - `panic` 调用点位置应由编译器注入；调用栈采集应只出现在 panic 冷路径，正常路径不分配、不登记栈帧对象。
 - `StackFrames` 遍历应支持只输出 instruction pointer；符号化是 profile 诊断能力，不是语言运行时必需成本。
 - panic-unwind profile 只在显式启用时生成栈展开和 RAII 清理路径。
 - `tryReserve` 应降低为普通 `Result` 分支；普通 `push` 在容量已证明足够时不应重复生成分配慢路径。
+- `tryReserve` 成功后，在已证明容量范围内的循环 `push` 不应生成 per-iteration reserve / grow 慢路径。
+- `Map` / `Set` 默认实现不应为每个元素生成单独 allocator call。
+- `Map.tryReserve` / `Set.tryReserve` 成功后，在已证明容量范围内的循环 `insert` 不应生成 per-iteration rehash 慢路径。
+- `Map.entry` 更新应只做一次查找 / 探测，不应降低为 `containsKey` 加 `insert` 的双重哈希。
+- `Map` / `Set` 遍历不应分配 iterator 对象，也不应承诺稳定顺序。
+- 已初始化非 `Copy` place 的赋值应先完成 RHS，再在成功边 drop 旧值并写入新值；RHS 失败边不能 drop 左侧旧值。
+- `replaceAt` 应移动出旧元素并返回，不能生成旧元素 drop。
+- `match` 应降低为 tag switch 或等价分支，不分配、不动态派发。
+- `match move` 中已移动 payload 的 drop flag 必须清除，未移动 payload 必须在分支 cleanup 中销毁。
+- `if let` / `while let` pattern 应降低为普通分支 / 循环头，不分配。
+- literal、range 和 or pattern 应降低为比较、tag switch 或分支合并，不创建 pattern 对象。
+- guard 应降低为 pattern 成功后的条件分支，guard 失败继续尝试后续分支。
 - `okOrElse`、`unwrapOrElse` 和 `mapErr` 的 `OnceFn` 非逃逸闭包应内联成条件分支；成功路径不得构造失败路径值。
-- `for item in data`、`for mut item in mut data` 和 `for move item in move data` 应对核心连续集合降低为直接循环，不分配 iterator、不做接口派发。
-- 具体 `Iterator<T>` 的 `for move` 遍历应静态派发并可内联 `next`；只有显式接口访问或接口拥有者才允许动态派发。
+- `for item in data`、`for mut item in mut data` 和 `for move item in data` 应对核心连续集合降低为直接循环，不分配 iterator、不做接口派发。
+- 具体 `Iterator<T>` 的 `for move` 遍历应静态派发并可内联 `next`；只有显式接口拥有者才允许动态派发。
 - 字符串 literal 和 `StringSlice` 传参不应分配。
 - `for i in 0..data.len` 形式的 `ArraySlice<T>` / `Array<T>` / `Vector<T>` 循环优化后不应包含冗余边界检查。
 - 传给泛型函数的非逃逸闭包不应分配。
-- `Writer` 接口类型参数调用应包含一次类似 vtable 的间接调用。
-- 静态 `W: Writer` 调用不应包含接口表派发。
+- 非逃逸闭包环境应栈上分配或被标量替换，不应生成 `Box`、`Shared` 或 allocator call。
+- `mut` 参数只有在唯一且不逃逸时才可以生成 LLVM `noalias`；可逃逸或可能重叠时不能生成 `noalias`。
+- 只读访问只有在不写且不逃逸时才可以生成 `readonly` / `nocapture`。
+- 不同 `MemoryObject`、独立字段或可证明不重叠 range 应生成 alias scope 或等价后端信息。
+- allocator 泛型调用应默认静态派发；零大小 allocator 不应增加拥有者大小。
+- 非逃逸 future 不应分配；逃逸 future 的分配必须由 `Box`、task handle 或 runtime spawn 显式表达。
+- future drop 应按状态销毁已初始化字段，不能遗漏 cleanup，也不能 drop 未初始化字段。
+- scoped allocator owner 的 allocation region 应进入 HIR/MIR 逃逸检查，不能只靠 codegen 假设。
+- `CachePadded<T>` 应增加显式 cache line padding；普通 Auto layout 不应隐藏插入同级 padding。
+- `Writer` 接口类型参数调用不应包含接口表派发；它应像匿名 `W: Writer` 一样单态化。
+- 显式 `W: Writer` 调用不应包含接口表派发。
+- 泛型接口参数推断后应按具体实现单态化，不生成接口表或运行时类型查询。
+- 静态接口返回应按具体返回类型直接返回，不生成 `Box`、allocator call 或接口表构造。
 - 移动 `Box<T>` 应降低为指针转移，而不是深拷贝或引用计数。
 - `Box<T>` 到 `Box<Interface>` 的移动转换不应重新分配，也不应移动堆内值。
 - `Shared<T>` 到 `Shared<Interface>` 的移动转换不应增加引用计数。
@@ -313,17 +434,20 @@ help: 在移动前读取该值，或只移动一次
 - `Send` / `Sync` 推导应在类型检查期完成，不需要运行时标记或查询。
 - `Box<ThreadWriter>` 与 `Box<Writer>` 的运行时布局成本相同，只是类型系统保留了额外能力证明。
 - `@export(..., abi: C)` 应按目标 C ABI 生成外部符号，不使用 Zeno 内部 mangling。
+- `@layout(Packed(N))` 字段读取应在 MIR/LLVM 中标记为 unaligned load，不能伪造成自然对齐字段访问。
+- 修改函数体的增量构建不应重新检查无关 package；修改 `pub` API 应只失效实际依赖该 API 的下游。
+- 并行 parse、body check、monomorphization 和 codegen 不应改变最终诊断顺序。
 - `Array<T>.clone` / `Vector<T>.clone` 的分配在源码中可见。
 - 普通赋值非 `Copy` 拥有者不应生成深拷贝。
 
-## 6. 测试文件约定
+## 7. 测试文件约定
 
 顶部注释：
 
 ```zn
 // category: compile-pass
 // profile: freestanding
-// purpose: verifies non-Copy move is explicit
+// purpose: verifies non-Copy ownership transfer is diagnosed after move
 ```
 
 测试注释可以模拟 manifest 字段：
@@ -355,3 +479,22 @@ let client: Client = net.http.connect(); // expected-error: unqualified name Cli
 ```
 
 测试 harness 应把这些注释当作断言。
+
+codegen-pass 主断言：
+
+```toml
+[expect.mir]
+contains = ["boundsCheck", "cleanup"]
+forbid = ["heapAlloc"]
+
+[expect.llvm]
+paramAttrs = ["noalias", "nocapture"]
+forbid = ["invoke"]
+```
+
+codegen-fail 主错误：
+
+```toml
+[expect]
+error = "noalias requires proven unique non-escaping access"
+```

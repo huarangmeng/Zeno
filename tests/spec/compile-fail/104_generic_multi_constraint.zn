@@ -1,0 +1,20 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: generic parameters cannot use ad-hoc comma-separated constraints
+
+module tests.fail.genericMultiConstraint;
+
+interface Eq {
+    fn eq(self, other: Self) -> Bool;
+}
+
+interface Ord: Eq {
+    fn lessThan(self, other: Self) -> Bool;
+}
+
+fn bad<T: Ord, Copy>(a: T, b: T) -> T {
+    if a.lessThan(b) {
+        return a;
+    }
+    return b; // expected-error: generic parameter can have only one direct constraint; define a named interface
+}

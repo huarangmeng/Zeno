@@ -1,0 +1,37 @@
+# category: codegen-pass
+# purpose: non-escaping closures are stack/scalar values and allocate nothing
+
+[source]
+file = "src/main.zn"
+text = '''
+fn mapAdd(data: ArraySlice<U32>, add: U32) -> U32 {
+    return data.fold(0, (sum: U32, item: U32) => sum + item + add);
+}
+'''
+
+[expect.hir]
+contains = [
+    "closure capability Fn",
+    "capture add readonly",
+    "closure mayEscape false",
+]
+
+[expect.mir.after_opt]
+contains = [
+    "closure.inline",
+    "capture.add scalar",
+]
+forbid = [
+    "Box<Fn>",
+    "Shared<Fn>",
+    "heapAlloc",
+    "interfaceCall Fn",
+]
+
+[expect.llvm]
+forbid = [
+    "malloc",
+    "zeno_alloc",
+    "vtable.call",
+]
+

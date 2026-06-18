@@ -1,6 +1,6 @@
 // category: compile-fail
 // profile: freestanding
-// purpose: bare interface access types cannot be stored in collections
+// purpose: bare interface names cannot be used as collection element types
 
 module tests.fail.vectorOfInterfaceAccess;
 
@@ -15,5 +15,5 @@ interface Writer {
 }
 
 struct WriterList {
-    writers: Vector<Writer>, // expected-error: bare interface access cannot be stored in Vector
+    writers: Vector<Writer>, // expected-error: interface name cannot be used as a collection element type; use Box<Writer>
 }

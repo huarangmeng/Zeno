@@ -10,5 +10,5 @@ struct Packet {
 }
 
 fn intoBytes(move packet: Packet) -> Array<U8> {
-    return move packet.bytes;
+    return packet.bytes;
 }

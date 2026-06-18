@@ -1,0 +1,34 @@
+# category: codegen-pass
+# purpose: disjoint field provenance can be used for alias scopes
+
+[source]
+file = "src/main.zn"
+text = '''
+struct Counters {
+    read: U64,
+    written: U64,
+}
+
+fn bump(mut counters: Counters) {
+    addOne(mut counters.read);
+    addOne(mut counters.written);
+}
+'''
+
+[expect.mir]
+contains = [
+    "MemoryObject counters",
+    "AccessPath counters.read",
+    "AccessPath counters.written",
+    "DisjointProof counters.read counters.written",
+]
+
+[expect.llvm]
+contains = [
+    "alias.scope counters.read",
+    "alias.scope counters.written",
+]
+forbid = [
+    "singleUnknownAliasSet counters",
+]
+

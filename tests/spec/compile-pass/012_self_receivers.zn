@@ -26,6 +26,6 @@ fn main() {
     var counter = Counter { value: 1 };
     let before = counter.get();
     counter.bump();
-    let after = counter.finish();
+    let after = move counter.finish();
     let ignored = before + after;
 }

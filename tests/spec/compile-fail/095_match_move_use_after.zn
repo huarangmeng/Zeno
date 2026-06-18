@@ -1,0 +1,34 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: match move consumes the enum owner
+
+module tests.fail.matchMoveUseAfter;
+
+enum State {
+    Ready(Job),
+    Done,
+}
+
+struct Job {
+    priority: U32,
+}
+
+impl Job {
+    destroy {}
+}
+
+fn consume(move job: Job) -> U32 {
+    return job.priority;
+}
+
+fn bad() -> U32 {
+    let state = State.Ready(Job { priority: 1 });
+    let value = match move state {
+        Ready(job) => consume(move job),
+        Done => 0,
+    };
+    return value + match state { // expected-error: use of moved enum after match move
+        Ready(job) => job.priority,
+        Done => 0,
+    };
+}

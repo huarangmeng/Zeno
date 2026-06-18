@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: hosted
+// purpose: Map.get(key) returns Option<V> only for Copy values
+
+module tests.fail.mapGetNonCopyValue;
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn bad(map: Map<U64, Packet>) -> Option<Packet> {
+    return map.get(1); // expected-error: Map.get(key) -> Option<V> requires V: Copy
+}

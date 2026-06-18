@@ -26,5 +26,5 @@ impl Writer for Counter {
 }
 
 fn eraseWriter(move writer: Box<Counter>) -> Box<Writer> {
-    return move writer;
+    return writer;
 }

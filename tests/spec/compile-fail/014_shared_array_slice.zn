@@ -8,7 +8,7 @@ import core.alloc.{AllocError, GlobalAllocator};
 import core.result.{Result, Ok};
 
 fn bad(bytes: ArraySlice<U8>, mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let shared = Shared.newIn(move bytes, mut allocator); // expected-error: ArraySlice cannot be stored in Shared
-    let ignoredShared = move shared;
+    let shared = Shared.newIn(bytes, mut allocator); // expected-error: ArraySlice cannot be stored in Shared
+    let ignoredShared = shared;
     return Ok(());
 }

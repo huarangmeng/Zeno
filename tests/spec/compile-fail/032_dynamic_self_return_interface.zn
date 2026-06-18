@@ -8,6 +8,6 @@ interface Duplicable {
     fn duplicate(self) -> Self;
 }
 
-fn duplicateAny(value: Duplicable) -> Duplicable {
-    return value.duplicate(); // expected-error: method returning Self cannot be dynamically dispatched
+fn duplicateAny(value: Box<Duplicable>) {
+    let copy = value.duplicate(); // expected-error: method returning Self cannot be dynamically dispatched
 }

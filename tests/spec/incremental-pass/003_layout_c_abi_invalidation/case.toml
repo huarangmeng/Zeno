@@ -1,0 +1,18 @@
+# category: incremental-pass
+# purpose: changing @layout(C) field layout invalidates ABI and codegen users
+
+[before]
+package = "ffi"
+type = "CPoint"
+layoutFingerprint = "sha256:cpoint-xy"
+publicFingerprint = "sha256:ffi-pub-old"
+
+[after]
+layoutFingerprint = "sha256:cpoint-xyz"
+publicFingerprint = "sha256:ffi-pub-new"
+
+[expect]
+recheck = ["ffi::CPoint.layout"]
+recodegen = ["ffi::*", "consumer::*"]
+invalidateDownstream = ["consumer"]
+reason = "@layout(C) size/field layout changed"

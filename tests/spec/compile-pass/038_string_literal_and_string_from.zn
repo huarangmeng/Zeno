@@ -16,19 +16,19 @@ fn byteLen(text: StringSlice) -> USize {
 
 fn owned() -> String {
     let text = String.from("hello");
-    return move text;
+    return text;
 }
 
 fn append() -> String {
     var text = String.from("zeno");
     text.push(" language");
-    return move text;
+    return text;
 }
 
 fn countChars(text: StringSlice) -> USize {
     var count: USize = 0;
     let chars = text.chars();
-    for move ch in move chars {
+    for move ch in chars {
         let ignored = ch;
         count = count + 1;
     }
@@ -43,6 +43,6 @@ fn main() {
     let ownedText = owned();
     let appendedText = append();
     let ignored = a + b + c;
-    let ignoredOwned = move ownedText;
-    let ignoredAppended = move appendedText;
+    let ignoredOwned = ownedText;
+    let ignoredAppended = appendedText;
 }

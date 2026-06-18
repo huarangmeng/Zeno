@@ -19,5 +19,5 @@ struct WriterSlot {
 }
 
 fn intoWriter(move slot: WriterSlot) -> Box<Writer> {
-    return move slot.writer;
+    return slot.writer;
 }

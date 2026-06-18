@@ -28,7 +28,7 @@ impl Iterator<U32> for Counter {
 
 fn sum(move counter: Counter) -> U32 {
     var total: U32 = 0;
-    for move value in move counter {
+    for move value in counter {
         total = total + value;
     }
     return total;

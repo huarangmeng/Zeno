@@ -1,6 +1,6 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: overloads resolve by arity, parameter type, access mode, and generic specificity
+// purpose: overloads resolve by arity, parameter type, mut access mode, and generic specificity
 
 module tests.pass.functionOverloading;
 
@@ -33,7 +33,7 @@ fn inspect(mut packet: Packet) -> I32 {
     return packet.value;
 }
 
-fn inspect(move packet: Packet) -> I32 {
+fn archive(move packet: Packet) -> I32 {
     return packet.value;
 }
 
@@ -55,7 +55,7 @@ fn main() -> I32 {
     let arity = code(1, 2);
     let read = inspect(packet);
     let written = inspect(mut packet);
-    let owned = inspect(move packet);
+    let owned = archive(move packet);
     let specific = identity(small);
     let generic = identity(true);
 

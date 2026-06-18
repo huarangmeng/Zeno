@@ -1,8 +1,8 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: interface-typed parameter dispatches through interface table
+// purpose: interface-typed parameters are anonymous static generic parameters
 
-module tests.pass.interfaceDispatch;
+module tests.pass.staticInterfaceParameter;
 
 import core.result.Result;
 

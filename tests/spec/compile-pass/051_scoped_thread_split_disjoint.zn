@@ -1,0 +1,21 @@
+// category: compile-pass
+// profile: hosted
+// purpose: scoped threads can receive disjoint mutable slices from splitDisjoint
+
+module tests.pass.scopedThreadSplitDisjoint;
+
+fn processAll(mut shards: Vector<U8>, workerCount: USize) {
+    Thread.scope((mut scope) {
+        for mut shard in mut shards.splitDisjoint(workerCount) {
+            scope.spawn(move () {
+                processShard(mut shard);
+            });
+        }
+    });
+}
+
+fn processShard(mut shard: ArraySlice<U8>) {
+    if shard.len > 0 {
+        shard[0] = shard[0] + 1;
+    }
+}

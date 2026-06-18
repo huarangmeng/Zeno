@@ -9,6 +9,6 @@ import core.result.{Result, Ok};
 
 fn bad(bytes: ArraySlice<U8>, mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let boxed = Box.newIn(move bytes, mut allocator); // expected-error: ArraySlice cannot be stored in Box
-    let ignoredBox = move boxed;
+    let ignoredBox = boxed;
     return Ok(());
 }

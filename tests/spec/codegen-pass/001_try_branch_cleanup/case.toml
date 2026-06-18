@@ -1,0 +1,45 @@
+# category: codegen-pass
+# purpose: try lowers to ordinary branch plus RAII/defer cleanup, not exceptions
+
+[source]
+file = "src/main.zn"
+text = '''
+struct Buffer {
+    bytes: Vector<U8>,
+}
+
+impl Buffer {
+    destroy {
+    }
+}
+
+fn parse(input: ArraySlice<U8>) -> Result<U32, ParseError> {
+    let buffer = Buffer { bytes: Vector<U8>.withCapacity(16) };
+    defer metrics.recordParseAttempt();
+
+    let value = try parseHeader(input);
+    return Ok(value);
+}
+'''
+
+[expect.mir]
+contains = [
+    "switch discriminant(parseHeader.result)",
+    "cleanup.defer metrics.recordParseAttempt",
+    "cleanup.drop buffer",
+    "return Err",
+]
+forbid = [
+    "exception",
+    "heapAllocForTry",
+]
+
+[expect.llvm]
+contains = [
+    "branch",
+]
+forbid = [
+    "invoke",
+    "landingpad",
+    "__cxa_throw",
+]

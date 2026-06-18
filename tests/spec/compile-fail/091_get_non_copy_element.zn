@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: get(index) returning Option<T> is only available for Copy elements
+
+module tests.fail.getNonCopyElement;
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn bad(packets: ArraySlice<Packet>) -> Option<Packet> {
+    return packets.get(0); // expected-error: get(index) -> Option<T> requires T: Copy
+}

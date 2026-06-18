@@ -10,6 +10,6 @@ struct Packet {
 
 impl Packet {
     fn bad(self) -> Array<U8> {
-        return move self.bytes; // expected-error: cannot move field from read-only self
+        return self.bytes; // expected-error: cannot move field from read-only self
     }
 }

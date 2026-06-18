@@ -106,6 +106,8 @@ fn parse(text: StringSlice) -> I32 { ... }
 fn parse(text: StringSlice) -> U32 { ... } // error: overload cannot differ only by return type
 ```
 
+虽然调用点有 `move value` 标记，同一个重载集合仍不能只靠只读参数和 `move` 参数区分。若两个候选的名字、参数数量和参数类型列表相同，只是某个普通参数访问模式在只读和 `move` 之间变化，声明会被判为可读性歧义，必须改名或改变参数类型。`mut` 参数仍可通过调用点的 `mut` 访问形式区分。
+
 允许：
 
 ```zn
@@ -117,7 +119,7 @@ fn size(value: StringSlice, radix: U8) -> USize { ... }
 调用解析是纯编译期规则：
 
 1. 先按可见性收集同名候选。
-2. 过滤参数数量和 `mut` / `move` 调用形式不匹配的候选。
+2. 过滤参数数量和 `mut` 调用形式不匹配的候选；调用点没有 `move` 形式。
 3. 用参数类型和泛型约束检查候选是否可用。
 4. 选择唯一最佳候选；如果没有候选或有多个同等最佳候选，报错。
 

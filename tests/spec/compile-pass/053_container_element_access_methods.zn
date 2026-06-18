@@ -1,0 +1,41 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: indexed element access stays simple while ownership extraction uses container methods
+
+module tests.pass.containerElementAccessMethods;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+struct Packet {
+    value: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+fn normalize(mut packet: Packet) {
+    packet.value = packet.value + 1;
+}
+
+fn usePacket(move packet: Packet) -> U32 {
+    return packet.value;
+}
+
+fn demo(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
+    var packets = Vector<Packet>.withCapacityIn(4, mut allocator);
+    packets.push(Packet { value: 1 });
+    packets.push(Packet { value: 2 });
+
+    let firstValue = packets[0].value;
+    normalize(mut packets[0]);
+
+    let old = packets.replaceAt(1, Packet { value: 10 });
+    let removed = packets.removeAt(0);
+
+    packets.push(Packet { value: 20 });
+    let fast = packets.swapRemove(0);
+
+    return Ok(firstValue + usePacket(move old) + usePacket(move removed) + usePacket(move fast));
+}

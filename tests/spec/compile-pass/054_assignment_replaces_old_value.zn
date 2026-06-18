@@ -1,0 +1,51 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: assignment overwrites by dropping the old value while replaceAt returns old ownership
+
+module tests.pass.assignmentReplacesOldValue;
+
+import core.alloc.{AllocError, GlobalAllocator};
+import core.result.{Result, Ok};
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+struct Slot {
+    handle: Handle,
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn consume(move handle: Handle) -> U32 {
+    return handle.id;
+}
+
+fn replaceLocal() -> U32 {
+    var handle = makeHandle(1);
+    handle = makeHandle(2);
+    return consume(move handle);
+}
+
+fn replaceField() -> U32 {
+    var slot = Slot { handle: makeHandle(3) };
+    slot.handle = makeHandle(4);
+    return consume(move slot.handle);
+}
+
+fn replaceElement(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
+    var handles = Vector<Handle>.withCapacityIn(2, mut allocator);
+    handles.push(makeHandle(5));
+    handles[0] = makeHandle(6);
+
+    let old = handles.replaceAt(0, makeHandle(7));
+    let removed = handles.removeAt(0);
+
+    return Ok(consume(move old) + consume(move removed));
+}

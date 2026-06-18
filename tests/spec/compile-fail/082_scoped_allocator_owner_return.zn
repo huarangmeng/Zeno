@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: owners allocated from scoped allocators cannot outlive the allocator
+
+module tests.fail.scopedAllocatorOwnerReturn;
+
+fn bad(mut arena: ArenaAllocator) -> Vector<U8> {
+    return Vector<U8>.withCapacityIn(1024, mut arena); // expected-error: scoped allocation escapes allocator
+}
+

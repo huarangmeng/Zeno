@@ -1,0 +1,37 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: static interface returns must resolve to one concrete implementation type
+
+module tests.fail.staticInterfaceReturnMismatch;
+
+interface Writer {
+    fn bytesWritten(self) -> USize;
+}
+
+struct FileWriter {
+    total: USize,
+}
+
+struct MemoryWriter {
+    total: USize,
+}
+
+impl Writer for FileWriter {
+    fn bytesWritten(self) -> USize {
+        return self.total;
+    }
+}
+
+impl Writer for MemoryWriter {
+    fn bytesWritten(self) -> USize {
+        return self.total;
+    }
+}
+
+fn makeWriter(flag: Bool) -> Writer {
+    if flag {
+        return FileWriter { total: 1 };
+    }
+
+    return MemoryWriter { total: 2 }; // expected-error: static interface return must use one concrete type; use Box<Writer> for heterogeneous returns
+}

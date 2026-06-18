@@ -9,6 +9,6 @@ import core.result.{Result, Ok};
 
 fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let slices = Vector<ArraySlice<U8>>.withCapacityIn(4, mut allocator); // expected-error: ArraySlice cannot be stored in Vector
-    let ignoredSlices = move slices;
+    let ignoredSlices = slices;
     return Ok(());
 }

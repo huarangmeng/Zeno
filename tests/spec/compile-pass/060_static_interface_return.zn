@@ -1,0 +1,28 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: interface return types are static opaque returns with one concrete implementation
+
+module tests.pass.staticInterfaceReturn;
+
+interface Writer {
+    fn bytesWritten(self) -> USize;
+}
+
+struct Counter {
+    total: USize,
+}
+
+impl Writer for Counter {
+    fn bytesWritten(self) -> USize {
+        return self.total;
+    }
+}
+
+fn makeWriter() -> Writer {
+    return Counter { total: 9 };
+}
+
+fn read() -> USize {
+    let writer = makeWriter();
+    return writer.bytesWritten();
+}

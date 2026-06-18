@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: let destructuring only accepts irrefutable patterns
+
+module tests.fail.refutableLetPattern;
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+fn bad(maybe: Maybe<U32>) -> U32 {
+    let Maybe.Some(value) = maybe; // expected-error: refutable pattern is not allowed in let; use match or if let
+    return value;
+}

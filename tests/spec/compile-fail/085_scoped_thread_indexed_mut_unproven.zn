@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: hosted
+// purpose: scoped threads need a disjoint API proof for parallel mutable access
+
+module tests.fail.scopedThreadIndexedMutUnproven;
+
+fn bad(mut shards: Vector<U8>) {
+    Thread.scope((mut scope) {
+        scope.spawn((workerId: USize) {
+            processShard(mut shards[workerId]); // expected-error: disjoint mutable access across scoped tasks is not proven
+        });
+    });
+}
+
+fn processShard(mut byte: U8) {
+    byte = byte + 1;
+}
+

@@ -1,0 +1,35 @@
+# category: codegen-pass
+# purpose: generic hot path remains specialized while cold panic/error paths are outlined
+
+[source]
+file = "src/main.zn"
+text = '''
+fn unwrapOrPanic<T>(value: Option<T>, message: StringSlice) -> T {
+    match value {
+        Some(v) => return v,
+        None => panic(message),
+    }
+}
+
+fn useIt(a: Option<U32>, b: Option<U64>) -> U64 {
+    let x = unwrapOrPanic<U32>(a, "missing");
+    let y = unwrapOrPanic<U64>(b, "missing");
+    return (x as U64) + y;
+}
+'''
+
+[expect.mir.after_opt]
+contains = [
+    "mono unwrapOrPanic<U32>",
+    "mono unwrapOrPanic<U64>",
+    "coldOutline panic path",
+]
+forbid = [
+    "interfaceDispatch Option",
+    "heapAlloc panic message",
+]
+
+[expect.llvm]
+contains = [
+    "cold panic block",
+]

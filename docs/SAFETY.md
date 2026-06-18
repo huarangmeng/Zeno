@@ -35,18 +35,18 @@ Zeno 不暴露用户 `unsafe` 模式。和原始地址、C ABI、硬件交互相
 
 - 任意时刻只有一个拥有者。
 - 不能隐式复制。
-- 所有权转移必须用 `move` 可见地表达；普通函数调用点写 `move value`，消费方法在签名中写 `move self`。
+- 所有权转移由拥有位置表达：赋值、绑定、返回和字段初始化可以自动移动；函数 / 方法 `move` 参数从已有命名位置接收所有权时必须在调用点写 `move value`；`move self` 方法从已有命名接收者接收所有权时必须写 `move receiver.method()`；`match move`、`for move` 和 `move` 闭包捕获也会触发所有权转移。
 - 被移动后的绑定不可再用。
 - 活跃拥有者会被销毁一次。
 - 部分初始化状态会记录哪些字段需要销毁。
 
-深拷贝必须通过显式 `clone` API 表达。`Array<T>` / `Vector<T>` / `String` 这类可能分配的 clone 失败时调用当前 profile 的 `oom(layout) -> Never`；指定 allocator 时使用 `cloneIn`。引用计数增加只能通过 `Shared<T>.clone` 等类型名显式暴露共享成本的 API 表达。
+深拷贝必须通过显式 `clone` API 表达。`Array<T>` / `Vector<T>` / `Map<K, V>` / `Set<T>` / `String` 这类可能分配的 clone 失败时调用当前 profile 的 `oom(layout) -> Never`；指定 allocator 时使用 `cloneIn`。引用计数增加只能通过 `Shared<T>.clone` 等类型名显式暴露共享成本的 API 表达。
 
 compile-fail 示例：
 
 ```zn
 let a = File.open("log.txt")?;
-let b = move a;
+let b = a;
 a.write("bad"); // expected-error: use of moved value
 ```
 
@@ -70,7 +70,16 @@ header.version = 1;
 - 销毁部分初始化聚合值时，只销毁已初始化字段。
 - 从拥有的结构体中移动字段会把该字段标记为未初始化，除非类型禁止字段移动。
 - 从只读访问或唯一可写访问中不能移动字段；只有拥有整个对象时才能移出字段。
-- 有自定义 `destroy` 块的类型默认禁止从外部移出字段；类型自己的 `move self` 方法可以作为显式拆解 API 移出 `self` 字段。
+- 有自定义 `destroy` 块的类型在安全代码中禁止移出非 `Copy` 字段；类型自己的 `move self` 方法也只能完成资源状态，不能拆字段。
+- 对已初始化位置赋值会先求右侧，再销毁旧值，再写入新值；右侧失败时旧值保持不变。
+- 赋值不能覆盖当前存在活动访问的位置；需要取回旧值时使用 `replaceAt` 或类型提供的显式替换 API。
+- 只读 `match` 不移动 enum payload；`match move` 消耗整个 enum 并允许移动出被选中 payload；`match mut` 只给 payload 唯一可写访问，不给所有权。
+- `if let` 和 `while let` 遵守同样的只读 / `move` / `mut` pattern 规则。
+- `let` 解构只允许不可失败 pattern，避免在初始化语义中引入隐式失败路径。
+- or pattern 两侧必须绑定相同名字、类型和访问模式，防止某条分支中绑定不存在或所有权不同。
+- 带 guard 的 pattern 不参与穷尽证明，guard 中不能移动出只读绑定。
+- pattern 不能调用用户代码，不能隐藏分配、动态派发、反射、regex 或临时 collection slice。
+- 带自定义 `destroy` 的类型不能在安全 pattern 中移动出非 `Copy` 字段或 payload。
 
 ## 4. 访问模式
 
@@ -87,7 +96,7 @@ header.version = 1;
 - 对非 `Copy` 资源不移动、不复制。
 - 不能被当成拥有值返回、保存到拥有容器，或移动进 `Box<T>`、`Shared<T>`、线程、任务、future。
 
-接口访问类型例如 `Writer` 也是非拥有访问值。它可以作为短期参数参与动态派发，但不能写成 `move writer: Writer`，也不能保存到字段或集合中。需要拥有异构实现时使用 `Box<Writer>`；需要共享拥有时使用 `Shared<Writer>`，但 `Shared<Writer>` 只提供只读接口访问。
+函数参数中的接口名表示匿名静态接口参数。例如 `writer: Writer` 在语义上等价于隐藏的 `W: Writer`，调用点按具体类型单态化，不生成接口表。函数返回中的接口名表示静态接口返回，所有返回路径必须产生同一个具体实现类型。接口名不能作为字段、集合元素、`static` 或其他长期存储类型；需要保存具体实现时使用显式泛型字段 `W: Writer`，需要拥有异构实现时使用 `Box<Writer>`，需要共享拥有时使用 `Shared<Writer>`。
 
 唯一可写访问：
 
@@ -100,7 +109,7 @@ header.version = 1;
 所有权接收：
 
 - 用 `move` 参数表达。
-- 普通函数调用点必须写 `move`。
+- 从已有命名位置传入普通函数或方法的 `move` 参数时，调用点必须写 `move`；调用后源绑定不可再用。
 - 被移动后的源绑定不可再用。
 - 函数负责销毁该值，或继续把它移动给新的拥有者。
 
@@ -108,15 +117,15 @@ header.version = 1;
 
 - `self` 方法只读访问接收者。
 - `mut self` 方法唯一可写访问接收者，不取得所有权；接收者必须是可写位置。
-- `move self` 方法取得接收者所有权；方法调用后原接收者不可再用。
+- `move self` 方法取得接收者所有权；已有命名接收者调用时写成 `move receiver.method(...)`，方法调用后原接收者不可再用。
 - `mut self` 方法调用点不写 `mut`，普通函数 `mut` 参数调用点仍然必须写 `mut`。
 
 拒绝示例：
 
 ```zn
 let s = String.from("abc");
-let v = move s;
-drop(move v);
+let v = s;
+drop(v);
 use(s); // expected-error: use after move
 ```
 
@@ -212,7 +221,7 @@ fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError>
 
 - 拥有者不能被移动或销毁。
 - 对 `Array<T>`，元素修改仍按普通只读/可写访问冲突检查处理。
-- 对 `Vector<T>`，改变长度或容量的结构性修改必须被拒绝。
+- 对 `Vector<T>`，改变长度或容量的结构性修改必须被拒绝；元素替换也必须遵守普通只读 / 可写访问冲突规则。
 - 只读查询可以继续执行。
 
 拒绝：
@@ -246,9 +255,13 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
 
 ## 7. 边界与集合
 
-`Array<T>` 是拥有、连续、长度固定的数组。`Vector<T>` 是拥有、连续、可增长的数组。`ArraySlice<T>` 是不拥有的连续数组片段，低层表示是基础能力加长度。
+`Array<T>` 是拥有、连续、长度固定的数组。`Vector<T>` 是拥有、连续、可增长的数组。`ArraySlice<T>` 是不拥有的连续数组片段，低层表示是基础能力加长度。`Map<K, V>` 和 `Set<T>` 是拥有哈希集合，不是视图，也不保证遍历顺序。
 
 `Array<T>` 和 `Vector<T>` 可以被只读地看成 `ArraySlice<T>`，也可以作为 `mut ArraySlice<T>` 传入以修改元素。改变长度需要 `mut Vector<T>`。
+
+索引访问不表示所有权转移。`collection[index]` 是检查元素访问；`T: Copy` 时可以复制元素值，非 `Copy` 时只能形成短期只读元素访问。`mut collection[index]` 可以形成短期唯一可写元素访问。普通代码不能把 `collection[index]` 放进拥有位置，因为这会在容器里留下未初始化洞；从 `Vector<T>` 中取走元素必须通过 `pop`、`removeAt` 或 `swapRemove`，替换并取回旧值使用 `replaceAt`。
+
+`Map.get(key)` 只为 `V: Copy` 提供。非 `Copy` value 的短期读取或可写更新使用 `map[key]` / `mut map[key]` 的检查访问，或使用 `Map.entry(mut self, move key)`。`MapEntry<K, V>` 是短期 view-like 值，不能保存到结构体、集合、`static`、`Box`、`Shared`、逃逸闭包、线程、任务或 async future。
 
 索引必须保证边界安全：
 
@@ -258,7 +271,7 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
 - 拆分 API 必须证明可写访问不重叠。
 - `for item in data` 不移动非 `Copy` 元素，只创建只读元素访问。
 - `for mut item in mut data` 在循环体内持有当前元素的唯一可写访问；循环期间不能结构性修改同一个 `Vector<T>`。
-- `for move item in move data` 只能用于拥有集合，提前退出时必须销毁尚未迭代的元素。
+- `for move item in data` 只能用于拥有集合，提前退出时必须销毁尚未迭代的元素。
 
 示例：
 
@@ -268,25 +281,45 @@ for i in 0..data.len {
 }
 ```
 
-## 8. 销毁安全
+## 8. 分配区域安全
+
+`In` 后缀分配 API 可能使用 scoped allocator。编译器必须跟踪 allocation region，防止拥有者比 allocator 活得更久。
+
+规则：
+
+- `EscapingAllocator` 创建的拥有者可以按普通所有权规则逃逸。
+- `ArenaAllocator`、`BumpAllocator` 和 `FixedBufferAllocator` 这类 scoped allocator 创建的拥有者只能在 allocator 活跃期间使用。
+- scoped allocator owner 不能返回、保存到长期结构体字段、`static`、`Box`、`Shared`、逃逸闭包、非 scoped 线程、任务或 async future 状态。
+- 泛型函数如果返回 allocator 创建的 owner，必须要求 `A: EscapingAllocator`。
+
+拒绝：
+
+```zn
+fn bad(mut arena: ArenaAllocator) -> Vector<U8> {
+    return Vector<U8>.withCapacityIn(1024, mut arena);
+} // expected-error: scoped allocation escapes allocator
+```
+
+## 9. 销毁安全
 
 销毁逻辑不能复活已移动值，也不能创建比对象活得更久的访问值。
 
 规则：
 
 - `destroy` 不返回值，不能使用 `try`，不能参与常规错误流。
+- `destroy` 不是 `move self` 方法，用户不能直接调用。
 - `destroy` 调用的清理 API 必须不可失败或 best-effort，返回 `Unit`。
 - 需要报告清理错误时，资源类型必须提供显式 `close`、`flush`、`finish` 等 `move self` 方法返回 `Result<T, E>`。
 - `destroy` 块以隐式 `self` 接收最终拥有者。
-- `destroy` 块运行时可以访问字段。
+- `destroy` 块运行时可以访问字段和更新本对象内部状态，但不能移动字段、返回字段或创建逃逸访问。
 - `destroy` 块之后，字段按源码声明顺序的逆序销毁；这属于语义顺序，不受 Auto layout 的内存字段重排影响。
 - 如果对象被部分移动，只有仍初始化的字段会被销毁。
-- 如果带 `destroy` 的类型在自己的 `move self` 方法中移出了字段，该对象的 `destroy` 块不会再自动运行；方法体必须先完成必要清理。
+- 带 `destroy` 的类型即使进入 `move self` 方法，方法体中的 `self` 在退出时仍然按普通 RAII 规则销毁；显式完成方法应通过状态位让 `destroy` no-op。
 - 析构逻辑不能移动出另一个字段析构所依赖的字段，除非类型显式建模该依赖。
 
-stage0 可以采用保守规则：`destroy` 块可以读取字段和调用方法，但不能移出字段。
+stage0 可以采用保守规则：`destroy` 块可以读取字段和调用方法，但不能移出字段；带 `destroy` 的类型在安全代码中也不能从 `move self` 方法移出非 `Copy` 字段。
 
-## 9. 数据竞争自由
+## 10. 数据竞争自由
 
 数据竞争指并发访问同一存储，至少一个访问是写入，并且缺少同步。普通 Zeno 代码不应能表达这种状态。
 
@@ -298,10 +331,11 @@ stage0 可以采用保守规则：`destroy` 块可以读取字段和调用方法
 - 共享不可变访问要求类型是 `Sync`。
 - 共享可变访问必须经过同步类型。
 - 可写访问不能跨越非 scoped 线程边界。
+- scoped 线程可以携带短期可写访问，但并行切分必须来自 `splitDisjoint`、`splitAt` 或其他被编译器认可的不重叠 API。
 
 `Send` / `Sync` 是结构化自动推导的标记接口。普通纯数据类型在字段满足条件时自动获得；带自定义 `destroy` 的资源类型不会自动获得，因为析构可能要求特定线程或特定平台上下文。作者可以用 `trust impl Send for T {}` 或 `trust impl Sync for T {}` 声明这些额外不变量，编译器必须把它们记录到信任报告。
 
-接口拥有者也必须保留线程安全能力。`Box<Writer>` 不能跨线程移动；需要定义 `interface ThreadWriter: Writer, Send {}` 并使用 `Box<ThreadWriter>`。`Shared<Writer>` 不能跨线程共享；需要定义 `interface SharedWriter: Writer, Send, Sync {}` 并使用 `Shared<SharedWriter>`。
+接口约束的线程安全由具体类型推导，和普通泛型参数一样。接口拥有者也必须保留线程安全能力。`Box<Writer>` 不能跨线程移动；需要定义 `interface ThreadWriter: Writer, Send {}` 并使用 `Box<ThreadWriter>`。`Shared<Writer>` 不能跨线程共享；需要定义 `interface SharedWriter: Writer, Send, Sync {}` 并使用 `Shared<SharedWriter>`。
 
 拒绝：
 
@@ -312,18 +346,40 @@ Thread.spawn(move () {
 }); // expected-error: writable access cannot escape to unscoped thread
 ```
 
+拒绝未证明的不重叠访问：
+
+```zn
+Thread.scope((mut scope) {
+    scope.spawn((workerId: USize) {
+        process(mut shards[workerId]);
+    });
+}); // expected-error: disjoint mutable access is not proven
+```
+
 允许：
 
 ```zn
 let count = Atomic<U64>.new(0);
-let shared = Shared.new(move count);
+let shared = Shared.new(count);
 let t = Thread.spawn(move () {
     shared.fetchAdd(1, Ordering.Relaxed);
 });
 try t.join();
 ```
 
-## 10. FFI 与底层安全
+## 11. Future 取消安全
+
+`async fn` 生成拥有状态机。future 被 drop 时表示取消。
+
+规则：
+
+- future drop 必须根据当前状态销毁已经初始化且仍拥有的字段。
+- 跨 `await` 存活的 `defer` 必须进入 future 状态，并在完成、错误提前返回、panic-unwind 或取消 drop 时执行。
+- future drop 不能 `await`；跨 `await` 的 `defer` 不能包含 `await`。
+- 短期访问、`ArraySlice<T>`、`StringSlice` 和 scoped allocator owner 不能跨 `await` 进入 future 状态。接口约束按具体类型处理；若具体类型需要跨 `await`，它必须由 future 拥有并满足对应所有权规则。
+- v1 通过禁止访问值跨 `await` 避免用户可见 `Pin`。
+
+## 12. FFI 与底层安全
 
 裸 FFI 声明必须写成 `trust extern`：
 
@@ -375,7 +431,7 @@ let bytes = try fs.readFile("config.zn");
 - 是否从公开 API 泄露裸能力。
 - 调用链中哪些公开函数依赖该 `trust`。
 
-## 11. 诊断要求
+## 13. 诊断要求
 
 安全诊断应该说明失败规则和相关所有权路径。
 

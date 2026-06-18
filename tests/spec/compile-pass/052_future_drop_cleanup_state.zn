@@ -1,0 +1,17 @@
+// category: compile-pass
+// profile: hosted
+// purpose: async future state owns resources and can be dropped before completion
+
+module tests.pass.futureDropCleanupState;
+
+async fn readHeader(move file: File) -> Result<U32, IoError> {
+    defer file.closeBestEffort();
+    let value = try await file.readU32();
+    return Ok(value);
+}
+
+fn createFuture(move file: File) {
+    {
+        let future = readHeader(move file);
+    } // future is dropped before completion
+}

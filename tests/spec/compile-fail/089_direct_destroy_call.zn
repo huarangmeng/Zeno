@@ -1,0 +1,21 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: destroy blocks are compiler-invoked final cleanup and cannot be called directly
+
+module tests.fail.directDestroyCall;
+
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        closeBestEffort(self.fd);
+    }
+}
+
+fn bad(move file: File) {
+    file.destroy(); // expected-error: destroy cannot be called directly
+}
+
+fn closeBestEffort(fd: I32) {}

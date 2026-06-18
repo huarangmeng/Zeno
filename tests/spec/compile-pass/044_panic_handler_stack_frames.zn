@@ -23,7 +23,7 @@ fn countFrames(info: PanicInfo) -> USize {
     var frames = info.stack();
     var count: USize = 0;
 
-    for move frame in move frames {
+    for move frame in frames {
         let ip = frame.instructionPointer();
         let ra = frame.returnAddress();
         let symbol = frame.symbol();

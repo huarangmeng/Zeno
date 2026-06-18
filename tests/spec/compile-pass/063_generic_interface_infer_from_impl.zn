@@ -1,0 +1,31 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: generic interface parameters can infer type arguments from a unique implementation
+
+module tests.pass.genericInterfaceInferFromImpl;
+
+struct Event {
+    id: U64,
+}
+
+interface Consumer<T> {
+    fn count(self) -> U64;
+}
+
+struct Counter {
+    total: U64,
+}
+
+impl Consumer<Event> for Counter {
+    fn count(self) -> U64 {
+        return self.total;
+    }
+}
+
+fn inspect<T>(consumer: Consumer<T>) -> U64 {
+    return consumer.count();
+}
+
+fn main() -> U64 {
+    return inspect(Counter { total: 3 });
+}

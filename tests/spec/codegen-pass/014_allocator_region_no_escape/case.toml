@@ -1,0 +1,28 @@
+# category: codegen-pass
+# purpose: scoped allocator owner carries allocation region and is proven local
+
+[source]
+file = "src/main.zn"
+text = '''
+fn local(mut arena: ArenaAllocator) {
+    let out = Vector<U8>.withCapacityIn(128, mut arena);
+    use(out.asSlice());
+}
+'''
+
+[expect.hir]
+contains = [
+    "allocationRegion arena",
+    "owner out region arena",
+    "owner out mayEscape false",
+]
+
+[expect.mir]
+contains = [
+    "storageDead out before arena",
+]
+forbid = [
+    "owner out returned",
+    "owner out stored",
+]
+

@@ -28,6 +28,6 @@ fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let handle = try Thread.spawn(move () -> U32 {
         return boxed.id(); // expected-error: Box<Identified> is not Send; use a named interface that includes Send
     });
-    let ignored = move handle;
+    let ignored = handle;
     return Ok(());
 }

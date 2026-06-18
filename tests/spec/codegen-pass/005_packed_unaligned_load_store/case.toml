@@ -1,0 +1,37 @@
+# category: codegen-pass
+# purpose: packed fields use unaligned load/store for ordinary integer fields
+
+[source]
+file = "src/main.zn"
+text = '''
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    length: U16,
+}
+
+fn read(header: Header) -> U16 {
+    return header.length;
+}
+
+fn write(mut header: Header, value: U16) {
+    header.length = value;
+}
+'''
+
+[expect.mir]
+contains = [
+    "field Header.length offset 1 align 1 packed",
+    "unalignedLoad U16",
+    "unalignedStore U16",
+]
+forbid = [
+    "borrowPackedFieldAsMut",
+]
+
+[expect.llvm]
+contains = [
+    "load i16, align 1",
+    "store i16, align 1",
+]
+

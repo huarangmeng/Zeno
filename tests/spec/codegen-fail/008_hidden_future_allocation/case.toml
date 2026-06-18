@@ -1,0 +1,24 @@
+# category: codegen-fail
+# purpose: creating a non-escaping future must not allocate implicitly
+
+[source]
+file = "src/main.zn"
+text = '''
+async fn compute(value: U32) -> U32 {
+    return value + 1;
+}
+
+fn run(mut executor: InlineExecutor) -> U32 {
+    let future = compute(41);
+    return executor.blockOn(move future);
+}
+'''
+
+[bad_codegen]
+contains = [
+    "zeno_alloc FutureState",
+    "Box<Future>",
+]
+
+[expect]
+error = "non-escaping future cannot introduce hidden allocation"

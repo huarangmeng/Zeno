@@ -1,0 +1,37 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: repeated bare interface parameters are independent static generic parameters
+
+module tests.pass.independentInterfaceParameters;
+
+interface Writer {
+    fn id(self) -> U64;
+}
+
+struct FileWriter {
+    value: U64,
+}
+
+struct MemoryWriter {
+    value: U64,
+}
+
+impl Writer for FileWriter {
+    fn id(self) -> U64 {
+        return self.value;
+    }
+}
+
+impl Writer for MemoryWriter {
+    fn id(self) -> U64 {
+        return self.value;
+    }
+}
+
+fn sum(left: Writer, right: Writer) -> U64 {
+    return left.id() + right.id();
+}
+
+fn main() -> U64 {
+    return sum(FileWriter { value: 1 }, MemoryWriter { value: 2 });
+}

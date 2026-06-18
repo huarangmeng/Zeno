@@ -1,0 +1,20 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: assignment cannot overwrite a value while a dependent access is live
+
+module tests.fail.assignOverActiveAccess;
+
+import core.alloc.GlobalAllocator;
+
+fn useSlice(bytes: ArraySlice<U8>) -> USize {
+    return bytes.len;
+}
+
+fn bad(mut allocator: GlobalAllocator) -> USize {
+    var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
+    bytes.push(1);
+
+    let view = bytes.asSlice();
+    bytes = Vector<U8>.withCapacityIn(8, mut allocator); // expected-error: cannot overwrite value while a dependent access is live
+    return useSlice(view);
+}

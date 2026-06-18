@@ -1,0 +1,20 @@
+# category: codegen-fail
+# purpose: non-escaping closure must not allocate or use interface dispatch
+
+[source]
+file = "src/main.zn"
+text = '''
+fn count(data: ArraySlice<U8>, needle: U8) -> U64 {
+    return data.count((item: U8) => item == needle);
+}
+'''
+
+[bad_codegen]
+contains = [
+    "zeno_alloc closure.env",
+    "Box<Fn>",
+]
+
+[expect]
+error = "non-escaping closure cannot introduce hidden allocation"
+

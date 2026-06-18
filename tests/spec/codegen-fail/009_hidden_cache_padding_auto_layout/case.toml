@@ -1,0 +1,21 @@
+# category: codegen-fail
+# purpose: Auto layout may reduce padding but must not silently insert cache-line padding
+
+[source]
+file = "src/main.zn"
+text = '''
+struct Counters {
+    local: Atomic<U64>,
+    stolen: Atomic<U64>,
+}
+'''
+
+[bad_layout]
+contains = [
+    "local align cacheLine",
+    "hidden cacheLine padding before stolen",
+]
+
+[expect]
+error = "cache-line padding must be requested with CachePadded<T>"
+

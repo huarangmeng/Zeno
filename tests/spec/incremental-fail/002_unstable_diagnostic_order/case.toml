@@ -1,0 +1,18 @@
+# category: incremental-fail
+# purpose: diagnostic ordering must not depend on parallel worker completion
+
+[diagnostics.worker2]
+error = "E0201"
+file = "src/b.zn"
+offset = 10
+
+[diagnostics.worker1]
+error = "E0100"
+file = "src/a.zn"
+offset = 4
+
+[observed]
+order = ["worker2", "worker1"] # expected-error: diagnostics must be sorted by package, file, offset, and error code
+
+[expected]
+order = ["worker1", "worker2"]

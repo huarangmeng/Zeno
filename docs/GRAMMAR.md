@@ -100,7 +100,7 @@ trust_extern_decl = "trust" "extern" string_literal "fn" ident fn_params return_
 trust_impl_decl = "trust" impl_decl ;
 ```
 
-同一作用域中可以出现多个同名 `fn_decl`，但它们必须形成合法重载集。重载键包含函数名、参数数量、参数类型和参数访问模式；返回类型不参与重载键。同一个重载键重复声明必须在语义阶段报错。
+同一作用域中可以出现多个同名 `fn_decl`，但它们必须形成合法重载集。重载键包含函数名、参数数量、参数类型和参数访问模式；返回类型不参与重载键。同一个重载键重复声明必须在语义阶段报错。虽然调用点有 `move` 实参标记，只靠只读参数和 `move` 参数区分的重载集仍然会降低可读性，必须报错。
 
 `@layout(Source)`、`@layout(C)`、`@layout(Packed(1))` 和 `@export("symbol", abi: C)` 都按普通属性解析。布局参数和 `abi` 值不是关键字；语义阶段检查它们的可用位置和含义。
 
@@ -144,18 +144,17 @@ Array<U8>
 Vector<U8>
 ArraySlice<U8>
 Box<Node>
-Writer
 Box<ThreadWorker>
 Shared<SharedWorker>
 Fn<I32, I32>
 MutFn<I32, Unit>
 OnceFn<Result<Unit, Error>>
 Iterator<U8>
+Consumer<Event>
 ```
 
-接口名在类型位置上表示接口访问类型。泛型约束中的 `W: Writer` 表示静态派发约束。
+接口名可以在函数参数和函数返回类型位置表示静态接口泛型。泛型约束中的 `W: Writer` 表示命名静态派发约束；显式拥有者 `Box<Writer>` 表示动态接口对象。
 
-接口访问类型不使用额外关键字。`writer: Writer` 是动态接口访问，`W: Writer` 是静态泛型约束。
 接口能力组合不使用 `+`。需要组合能力时定义命名接口：
 
 ```zn
@@ -164,30 +163,42 @@ interface SharedWorker: Worker, Send, Sync {}
 ```
 
 `Box<Writer>` 不自动等价于 `Box<ThreadWorker>`；接口对象保留哪些能力必须由接口类型本身表达。
-裸接口访问类型是短期访问值，语义阶段必须拒绝它出现在长期存储位置，例如结构体字段、枚举载荷、元组字段、`static`、集合元素、逃逸闭包、线程、任务或 async future 捕获。需要长期保存时使用泛型字段 `W: Writer`，或显式拥有者 `Box<Writer>` / `Shared<Writer>`。
-裸接口访问不拥有具体对象，语义阶段必须拒绝 `move writer: Writer` 这类参数；需要接收拥有式异构接口值时使用 `move writer: Box<Writer>`，共享所有权使用 `Shared<Writer>`。
+裸接口类型只能出现在函数参数和函数返回类型位置。参数位置 `writer: Writer` 等价于隐藏的 `W: Writer` 参数，默认单态化；返回位置 `-> Writer` 表示编译器推断的静态接口返回类型。
+裸接口类型不能出现在结构体字段、枚举载荷、元组字段、`static`、集合元素、逃逸闭包、线程、任务或 async future 捕获等长期存储位置。需要长期保存具体实现时使用泛型字段 `W: Writer`，需要拥有异构实现时使用显式拥有者 `Box<Writer>`，共享所有权使用 `Shared<Writer>`。
+需要消耗具体实现时可以写 `move writer: Writer` 或 `move writer: W`。需要接收拥有式异构接口值时写 `move writer: Box<Writer>`。
+
+泛型接口参数的类型实参在语义阶段求解：
+
+```zn
+fn feed<T>(mut consumer: Consumer<T>, move item: T) { ... }
+```
+
+解析器只保留 `Consumer<T>` 的语法形状；语义阶段把它展开成隐藏 `C: Consumer<T>`，再从普通参数和接口实现共同推断 `T` 与 `C`。
 
 语法允许接口方法使用 `Self`、方法级泛型和 `move self`，但语义阶段必须把这些方法标记为静态专用方法：
 
-- `Self` 出现在非接收者位置的方法不能通过接口访问类型动态调用。
-- 带方法级泛型参数的方法不能通过接口访问类型动态调用。
-- `move self` 接收者方法不能通过接口访问类型动态调用。
+- `Self` 出现在非接收者位置的方法不能通过 `Box<Interface>` / `Shared<Interface>` 动态调用。
+- 带方法级泛型参数的方法不能通过 `Box<Interface>` / `Shared<Interface>` 动态调用。
+- `move self` 接收者方法不能通过 `Box<Interface>` / `Shared<Interface>` 动态调用。
 
 ## 5. 泛型参数
 
 ```ebnf
 generic_params  = "<" generic_param ("," generic_param)* ","? ">" ;
 generic_param   = ident constraint? ;
-constraint      = ":" interface_bound ("," interface_bound)* ;
+constraint      = ":" interface_bound ;
 interface_bound = path_type ;
 ```
 
 ```zn
-fn sort<T: Ord, Copy>(mut items: ArraySlice<T>) { ... }
-struct Map<K: Hash, Eq, V> { ... }
+interface SortKey: Ord, Copy {}
+interface HashKey: Hash, Eq {}
+
+fn sort<T: SortKey>(mut items: ArraySlice<T>) { ... }
+struct Map<K: HashKey, V> { ... }
 ```
 
-泛型参数列表中的逗号既分隔参数，也分隔约束。解析器可以先保留原始名字序列，语义阶段再根据符号表区分“接口约束”和“新的类型参数”。例如 `Map<K: Hash, Eq, V>` 中，`Hash` 和 `Eq` 是已知接口，因此是 `K` 的约束；`V` 是新的泛型类型参数。
+泛型参数列表中的逗号只分隔泛型参数，不分隔约束。一个泛型参数只允许一个直接约束；多能力约束必须先定义成命名接口组合。
 
 ## 6. 结构体
 
@@ -261,12 +272,12 @@ return_type     = "->" type ;
 
 - 没有模式的参数是只读访问。
 - `mut` 参数是唯一可写访问，调用点必须写 `mut`。
-- `move` 参数接收所有权，调用点必须写 `move`。
+- `move` 参数接收所有权；从已有命名位置传入时调用点必须写 `move`，非 `Copy` 实参在调用后不可再用。
 - `self` 接收者是只读访问当前对象。
 - `mut self` 接收者是唯一可写访问当前对象；方法调用点不写 `mut`，但接收者必须是可写位置。
-- `move self` 接收者接收当前对象所有权；方法调用后原接收者不可再用。
+- `move self` 接收者接收当前对象所有权；已有命名接收者调用时写成 `move receiver.method(...)`，方法调用后原接收者不可再用。
 
-方法可以重载。方法重载键除了普通参数形状，还包含接收者类型和接收者模式。`fn open(self)`、`fn open(mut self)` 和 `fn open(move self)` 是不同重载键；同一个调用点只能选择其中唯一一个最佳候选。
+方法可以重载。方法重载键除了普通参数形状，还包含接收者类型和接收者模式。同一重载集中不能只靠只读参数和 `move` 参数区分；接收者模式也不能造成调用点无法唯一选择的歧义。
 
 ```zn
 interface Writer {
@@ -317,23 +328,30 @@ expr            = if_expr
                 | await_expr
                 | try_expr
                 | trust_expr
+                | move_receiver_call
                 | mut_expr
-                | move_expr
                 | assignment ;
 
 await_expr      = "await" expr ;
 try_expr        = "try" expr ;
 trust_expr      = "trust" block ;
+move_receiver_call = "move" method_receiver "." ident call_args? ;
+method_receiver = primary_expr method_receiver_part* ;
+method_receiver_part = call_args | index_args | "." ident ;
 mut_expr        = "mut" expr ;
-move_expr       = "move" expr ;
 
-if_expr         = "if" expr block ("else" (if_expr | block))? ;
-while_expr      = "while" expr block ;
+if_expr         = "if" if_condition block ("else" (if_expr | block))? ;
+if_condition    = let_condition | expr ;
+let_condition   = "let" pattern_mode? pattern "=" expr ;
+while_expr      = "while" while_condition block ;
+while_condition = let_condition | expr ;
 for_expr        = "for" for_binding "in" expr block ;
 for_binding     = for_binding_mode? pattern ;
-for_binding_mode = "mut" | "move" ;
-match_expr      = "match" expr "{" match_arm* "}" ;
+for_binding_mode = pattern_mode ;
+match_expr      = "match" match_mode? expr "{" match_arm* "}" ;
+match_mode      = pattern_mode ;
 match_arm       = pattern "=>" expr_or_block ","? ;
+pattern_mode    = "mut" | "move" ;
 
 closure_expr    = capture_marker? closure_params (return_type? block | "=>" expr) ;
 capture_marker  = "move" ;
@@ -361,7 +379,9 @@ postfix_part    = call_args
 
 call_args       = "(" argument_list? ")" ;
 index_args      = "[" expr "]" ;
-argument_list   = expr ("," expr)* ","? ;
+argument_list   = argument ("," argument)* ","? ;
+argument        = argument_mode? expr ;
+argument_mode   = "mut" | "move" ;
 
 primary_expr    = literal
                 | path
@@ -389,7 +409,9 @@ unit_expr       = "(" ")" ;
 
 `try` 不触发隐式 `Option` 到 `Result` 转换，也不触发隐式错误类型转换。
 
-`for` 绑定上的 `mut` / `move` 表示元素访问模式；`in` 右侧的 `mut expr` / `move expr` 表示集合访问模式。语义阶段必须检查二者匹配，例如 `for mut item in mut items` 和 `for move item in move items`。
+调用实参上的 `mut` / `move` 表示参数访问模式。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者；`return move value`、`let owner = move value` 和独立 `move value;` 无效。
+
+`match`、`if let`、`while let` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。
 
 ## 11. 运算符
 
@@ -397,7 +419,7 @@ unit_expr       = "(" ")" ;
 
 ```text
 postfix:       call, index, field
-prefix:        ! - move mut try trust
+prefix:        ! - mut try trust
 cast:          as
 multiplicative:* / %
 additive:      + -
@@ -413,7 +435,7 @@ range:         ..
 assignment:    = += -= *= /= %=
 ```
 
-`&` 是按位与运算符，不是访问或所有权语法。Zeno 的访问通过参数模式和调用点 `mut` / `move` 表达，不使用 `&T` 或 `&mut T`。
+`&` 是按位与运算符，不是访问或所有权语法。Zeno 的访问通过参数模式、调用点 `mut` 和控制流里的 `move` 模式表达，不使用 `&T` 或 `&mut T`。
 
 ## 12. 模式
 
@@ -443,10 +465,12 @@ match result {
 第一版解析器必须：
 
 - 保留源码 span，方便诊断。
-- 把 `move` 和调用点 `mut` 解析成表达式形式。
+- 把调用点 `mut` / `move` 实参标记、消费接收者 `move receiver.method(...)`、闭包捕获、`for` 绑定和 `match move` 这类控制流模式解析为不同 AST 节点；`move` 不作为普通表达式前缀。
 - 把 `trust { ... }` 解析成信任边界表达式。
-- 把接口名在类型位置上解析成接口访问类型。
 - 把 `W: Writer` 这样的泛型约束保留为静态派发约束。
+- 把函数参数位置的裸接口名展开为匿名静态接口参数。
+- 把函数返回位置的裸接口名记录为静态接口返回，并在语义阶段检查所有返回路径的具体类型一致。
+- 拒绝裸接口名出现在字段、集合元素、`static` 等长期存储类型位置。
 - 在普通包中拒绝 `unsafe`，并给出明确诊断。
 - 支持声明、泛型参数和字面量中的尾逗号。
 - 让语法层与 LLVM 解耦，方便未来自举前端复用。

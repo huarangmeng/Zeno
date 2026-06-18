@@ -1,0 +1,24 @@
+# category: codegen-fail
+# purpose: push loop after successful tryReserve must not keep per-iteration grow slow path
+
+[source]
+file = "src/main.zn"
+text = '''
+fn append(mut out: Vector<U8>, input: ArraySlice<U8>) -> Result<Unit, AllocError> {
+    try out.tryReserve(input.len);
+    for byte in input {
+        out.push(byte);
+    }
+    return Ok(());
+}
+'''
+
+[bad_codegen]
+contains = [
+    "loop.body call zeno_vector_grow",
+    "loop.body call oom",
+]
+
+[expect]
+error = "tryReserve capacity fact must remove push grow slow path inside proven loop"
+

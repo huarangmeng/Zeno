@@ -24,7 +24,7 @@ fn bad() -> U32 {
     let counter = Counter { current: 0 };
     var total: U32 = 0;
     for value in counter {
-        total = total + value; // expected-error: Iterator traversal yields owned values; use `for move value in move counter`
+        total = total + value; // expected-error: Iterator traversal yields owned values; use `for move value in counter`
     }
     return total;
 }

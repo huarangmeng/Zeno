@@ -9,7 +9,7 @@ struct Page {
 impl Page {
     fn new(mut allocator: GlobalAllocator) -> Page {
         let bytes = Array<U8>.filledIn(4096, 0, mut allocator);
-        return Page { bytes: move bytes };
+        return Page { bytes: bytes };
     }
 }
 

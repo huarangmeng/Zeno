@@ -1,0 +1,20 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: replaceAt cannot replace an element while an access to that storage is live
+
+module tests.fail.replaceElementWithLiveAccess;
+
+import core.alloc.GlobalAllocator;
+
+fn useSlice(bytes: ArraySlice<U8>) -> USize {
+    return bytes.len;
+}
+
+fn bad(mut allocator: GlobalAllocator) -> USize {
+    var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
+    bytes.push(1);
+
+    let view = bytes.asSlice();
+    let old = bytes.replaceAt(0, 2); // expected-error: cannot replace element while a dependent access is live
+    return useSlice(view) + old as USize;
+}

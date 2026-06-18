@@ -12,12 +12,12 @@ fn buildBytes(mut allocator: GlobalAllocator) -> Result<Vector<U8>, AllocError> 
     try bytes.tryReserve(2);
     bytes.push(1);
     bytes.push(2);
-    return Ok(move bytes);
+    return Ok(bytes);
 }
 
 fn buildText(mut allocator: GlobalAllocator) -> Result<String, AllocError> {
     var text = String.fromIn("", mut allocator);
     try text.tryReserve(5);
     text.push("hello");
-    return Ok(move text);
+    return Ok(text);
 }

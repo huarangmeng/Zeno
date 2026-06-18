@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: guarded branches do not count as exhaustive coverage
+
+module tests.fail.guardNotExhaustive;
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+fn bad(maybe: Maybe<U32>) -> U32 {
+    return match maybe {
+        Maybe.Some(value) if value > 0 => value,
+        Maybe.None => 0,
+    }; // expected-error: match is not exhaustive; guarded Some branch does not cover all Some values
+}

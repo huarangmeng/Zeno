@@ -1,0 +1,26 @@
+# category: codegen-fail
+# purpose: try early-return edge must run defer and RAII cleanup
+
+[source]
+file = "src/main.zn"
+text = '''
+fn work() -> Result<Unit, Error> {
+    let file = try File.open("out.bin");
+    defer audit.finish();
+    try writeHeader(mut file);
+    return Ok(());
+}
+'''
+
+[bad_mir]
+contains = [
+    "writeHeader.err -> return Err",
+]
+forbid = [
+    "cleanup.defer audit.finish",
+    "cleanup.drop file",
+]
+
+[expect]
+error = "try early return edge must enter cleanup chain"
+

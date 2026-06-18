@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: hosted
+// purpose: string content patterns are not part of v1 pattern matching
+
+module tests.fail.stringPatternRejected;
+
+fn bad(text: StringSlice) -> U32 {
+    return match text {
+        "hello" => 1, // expected-error: String and StringSlice patterns are not supported in v1
+        _ => 0,
+    };
+}

@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: generic allocator-returning APIs must require EscapingAllocator
+
+module tests.fail.allocatorGenericReturnRequiresEscaping;
+
+fn build<A: Allocator>(mut allocator: A) -> Vector<U8> {
+    return Vector<U8>.withCapacityIn(1024, mut allocator); // expected-error: returning owner allocated by generic allocator requires A: EscapingAllocator
+}
+

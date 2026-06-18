@@ -1,0 +1,30 @@
+# category: codegen-pass
+# purpose: generic allocator APIs statically dispatch and zero-size allocator fields can be removed
+
+[source]
+file = "src/main.zn"
+text = '''
+struct GlobalAllocator {}
+
+fn build() -> Vector<U32> {
+    var alloc = GlobalAllocator {};
+    return Vector<U32>.withCapacityIn(64, mut alloc);
+}
+'''
+
+[expect.hir]
+contains = [
+    "GlobalAllocator size 0",
+    "withCapacityIn allocator dispatch static",
+]
+
+[expect.mir.after_opt]
+contains = [
+    "allocatorFieldElided Vector<U32>",
+    "directCall GlobalAllocator.allocate",
+]
+forbid = [
+    "interfaceCall Allocator.allocate",
+    "store allocator field",
+]
+

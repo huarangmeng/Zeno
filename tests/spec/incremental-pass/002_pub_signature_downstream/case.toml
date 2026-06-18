@@ -1,0 +1,19 @@
+# category: incremental-pass
+# purpose: changing a pub signature invalidates only downstream users of that API
+
+[before]
+package = "api"
+item = "parse"
+publicFingerprint = "sha256:parse-u8"
+
+[after]
+publicFingerprint = "sha256:parse-u16"
+
+[graph]
+directUsers = ["app", "tool"]
+nonUsers = ["unrelated"]
+
+[expect]
+recheck = ["api::parse.signature", "app", "tool"]
+keepValid = ["unrelated"]
+invalidateDownstream = ["app", "tool"]

@@ -1,6 +1,6 @@
 // category: compile-fail
 // profile: freestanding
-// purpose: move self methods consume their receiver
+// purpose: self methods consume their receiver
 
 module tests.fail.useAfterMoveSelf;
 
@@ -20,7 +20,7 @@ impl Counter {
 
 fn main() {
     var counter = Counter { value: 1 };
-    let done = counter.finish();
+    let done = move counter.finish();
     let late = counter.get(); // expected-error: receiver used after move self call
     let ignored = done + late;
 }

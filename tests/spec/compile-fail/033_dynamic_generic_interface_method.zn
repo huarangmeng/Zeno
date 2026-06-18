@@ -8,6 +8,6 @@ interface Mapper {
     fn map<T: Copy>(self, value: T) -> T;
 }
 
-fn bad(mapper: Mapper) -> U32 {
+fn bad(mapper: Box<Mapper>) -> U32 {
     return mapper.map(1); // expected-error: generic interface method cannot be dynamically dispatched
 }

@@ -1,0 +1,37 @@
+# category: codegen-pass
+# purpose: assignment evaluates the RHS before dropping the old non-Copy value
+
+[source]
+file = "src/main.zn"
+text = '''
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        os.close(self.fd);
+    }
+}
+
+fn replaceFile(pathA: StringSlice, pathB: StringSlice) -> Result<File, IoError> {
+    var file = try File.open(pathA);
+    file = try File.open(pathB);
+    return Ok(file);
+}
+'''
+
+[expect.mir]
+contains = [
+    "dropFlag file",
+    "rhsTemp = try File.open(pathB)",
+    "try File.open(pathB) err -> cleanup.drop file",
+    "rhs ok -> drop old file",
+    "move rhsTemp -> file",
+    "move file -> setDropFlag file false",
+]
+forbid = [
+    "drop old file before rhsTemp",
+    "doubleDrop file",
+    "drop rhsTemp after move",
+]

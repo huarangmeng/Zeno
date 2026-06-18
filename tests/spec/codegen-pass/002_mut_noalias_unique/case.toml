@@ -1,0 +1,33 @@
+# category: codegen-pass
+# purpose: proven unique mut access may lower to noalias and nocapture
+
+[source]
+file = "src/main.zn"
+text = '''
+fn fill(mut data: ArraySlice<U8>, value: U8) {
+    for i in 0..data.len {
+        data[i] = value;
+    }
+}
+
+fn caller(mut bytes: Vector<U8>) {
+    fill(mut bytes.asSlice(), 7);
+}
+'''
+
+[expect.mir]
+contains = [
+    "AccessRegion data unique",
+    "data mayEscape false",
+    "lowerForRange 0..data.len",
+]
+
+[expect.llvm]
+paramAttrs = [
+    "data.ptr noalias",
+    "data.ptr nocapture",
+]
+forbid = [
+    "alias.scope.missing",
+]
+

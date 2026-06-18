@@ -1,0 +1,56 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: match supports read, move, and mut ownership modes for enum payloads
+
+module tests.pass.matchOwnershipModes;
+
+enum State {
+    Ready(Job),
+    Done,
+}
+
+struct Job {
+    priority: U32,
+}
+
+impl Job {
+    destroy {}
+}
+
+fn consume(move job: Job) -> U32 {
+    return job.priority;
+}
+
+fn inspect(state: State) -> U32 {
+    return match state {
+        Ready(job) => job.priority,
+        Done => 0,
+    };
+}
+
+fn finish(move state: State) -> U32 {
+    return match move state {
+        Ready(job) => consume(move job),
+        Done => 0,
+    };
+}
+
+fn bump(mut state: State) -> U32 {
+    match mut state {
+        Ready(job) => {
+            job.priority = job.priority + 1;
+            return job.priority;
+        },
+        Done => {
+            return 0;
+        },
+    };
+}
+
+fn main() -> U32 {
+    let a = inspect(State.Ready(Job { priority: 1 }));
+    let b = finish(State.Ready(Job { priority: 2 }));
+    var state = State.Ready(Job { priority: 3 });
+    let c = bump(mut state);
+    return a + b + c;
+}

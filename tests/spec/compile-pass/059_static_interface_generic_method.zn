@@ -1,0 +1,21 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: generic interface methods can be called through static interface parameters
+
+module tests.pass.staticInterfaceGenericMethod;
+
+interface Mapper {
+    fn map<T: Copy>(self, value: T) -> T;
+}
+
+struct Identity: Copy {}
+
+impl Mapper for Identity {
+    fn map<T: Copy>(self, value: T) -> T {
+        return value;
+    }
+}
+
+fn apply(mapper: Mapper) -> U32 {
+    return mapper.map(42);
+}

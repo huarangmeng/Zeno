@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: static interface returns cannot merge independent hidden interface parameter types
+
+module tests.fail.staticInterfaceReturnIndependentParams;
+
+interface Writer {
+    fn id(self) -> U64;
+}
+
+fn choose(flag: Bool, left: Writer, right: Writer) -> Writer {
+    if flag {
+        return left;
+    }
+
+    return right; // expected-error: static interface return must resolve to one hidden concrete type
+}

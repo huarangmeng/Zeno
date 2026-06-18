@@ -15,10 +15,10 @@ struct Packet {
 
 impl Packet {
     fn intoBytes(move self) -> Array<U8> {
-        return move self.bytes;
+        return self.bytes;
     }
 }
 
 fn takeBytes(move packet: Packet) -> Array<U8> {
-    return packet.intoBytes();
+    return move packet.intoBytes();
 }

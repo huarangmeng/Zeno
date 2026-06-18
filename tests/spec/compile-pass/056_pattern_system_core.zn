@@ -1,0 +1,82 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-let, and while-let
+
+module tests.pass.patternSystemCore;
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+enum Event {
+    Key(U32),
+    Code(U32),
+    At(Point),
+    Pair((U32, U32)),
+    Done,
+}
+
+struct Point: Copy {
+    x: U32,
+    y: U32,
+}
+
+struct Counter {
+    nextValue: U32,
+}
+
+impl Counter {
+    fn next(mut self) -> Maybe<U32> {
+        if self.nextValue == 0 {
+            return Maybe.None;
+        }
+
+        let value = self.nextValue;
+        self.nextValue = self.nextValue - 1;
+        return Maybe.Some(value);
+    }
+}
+
+fn classify(event: Event) -> U32 {
+    return match event {
+        Event.Key(code) | Event.Code(code) if code < 10 => code,
+        Event.Key(10..=20) | Event.Code(10..=20) => 20,
+        Event.Key(_) | Event.Code(_) => 99,
+        Event.At(Point { x, y }) => x + y,
+        Event.Pair((left, right)) => left + right,
+        Event.Done => 0,
+    };
+}
+
+fn destructure(point: Point, pair: (U32, U32)) -> U32 {
+    let Point { x, y } = point;
+    let (left, right) = pair;
+    return x + y + left + right;
+}
+
+fn optional(maybe: Maybe<U32>) -> U32 {
+    if let Maybe.Some(value) = maybe {
+        return value;
+    } else {
+        return 0;
+    }
+}
+
+fn sumCounter(mut counter: Counter) -> U32 {
+    var sum: U32 = 0;
+    while let Maybe.Some(value) = counter.next() {
+        sum = sum + value;
+    }
+    return sum;
+}
+
+fn main() -> U32 {
+    return classify(Event.Key(7))
+        + classify(Event.Code(11))
+        + classify(Event.At(Point { x: 2, y: 3 }))
+        + classify(Event.Pair((4, 5)))
+        + destructure(Point { x: 1, y: 2 }, (3, 4))
+        + optional(Maybe.Some(8))
+        + sumCounter(Counter { nextValue: 3 });
+}

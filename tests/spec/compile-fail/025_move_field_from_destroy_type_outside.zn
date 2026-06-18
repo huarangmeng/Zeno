@@ -1,6 +1,6 @@
 // category: compile-fail
 // profile: freestanding
-// purpose: fields of types with destroy blocks cannot be moved from outside the type API
+// purpose: fields of types with destroy blocks cannot be moved in safe code
 
 module tests.fail.moveFieldFromDestroyTypeOutside;
 
@@ -13,5 +13,5 @@ impl Packet {
 }
 
 fn bad(move packet: Packet) -> Array<U8> {
-    return move packet.bytes; // expected-error: cannot move field from type with destroy block outside its move self API
+    return packet.bytes; // expected-error: cannot move field from type with destroy block
 }

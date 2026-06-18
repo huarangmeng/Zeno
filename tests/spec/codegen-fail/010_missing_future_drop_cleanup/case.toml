@@ -1,0 +1,24 @@
+# category: codegen-fail
+# purpose: future drop cannot omit cleanup for initialized state
+
+[source]
+file = "src/main.zn"
+text = '''
+async fn task(move file: File) -> Result<Unit, IoError> {
+    defer audit.finish();
+    try await file.readU32();
+    return Ok(());
+}
+'''
+
+[bad_mir]
+contains = [
+    "futureDrop return",
+]
+forbid = [
+    "cleanup.defer audit.finish",
+    "cleanup.drop file",
+]
+
+[expect]
+error = "future drop must clean initialized state"

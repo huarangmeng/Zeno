@@ -1,0 +1,36 @@
+# category: codegen-pass
+# purpose: future drop runs cleanup for initialized state only
+
+[source]
+file = "src/main.zn"
+text = '''
+async fn readHeader(move file: File) -> Result<U32, IoError> {
+    defer metrics.endRead();
+    let header = try await file.readU32();
+    return Ok(header);
+}
+
+fn cancel(move file: File) {
+    {
+        let future = readHeader(move file);
+    }
+}
+'''
+
+[expect.mir]
+contains = [
+    "FutureState readHeader",
+    "state beforeAwait initialized file",
+    "futureDrop switch state",
+    "cleanup.defer metrics.endRead",
+    "cleanup.drop file",
+]
+forbid = [
+    "drop uninitialized header",
+    "await during futureDrop",
+]
+
+[expect.llvm]
+forbid = [
+    "zeno_alloc future",
+]

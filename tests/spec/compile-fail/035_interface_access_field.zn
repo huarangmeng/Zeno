@@ -1,6 +1,6 @@
 // category: compile-fail
 // profile: freestanding
-// purpose: bare interface access types cannot be stored as struct fields
+// purpose: bare interface names cannot be used as struct field types
 
 module tests.fail.interfaceAccessField;
 
@@ -15,5 +15,5 @@ interface Writer {
 }
 
 struct BadSink {
-    writer: Writer, // expected-error: bare interface access cannot be stored as a field
+    writer: Writer, // expected-error: interface name cannot be used as a field type; use W: Writer or Box<Writer>
 }

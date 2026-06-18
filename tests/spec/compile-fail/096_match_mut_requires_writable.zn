@@ -1,0 +1,31 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: match mut requires a writable enum owner
+
+module tests.fail.matchMutRequiresWritable;
+
+enum State {
+    Ready(Job),
+    Done,
+}
+
+struct Job {
+    priority: U32,
+}
+
+impl Job {
+    destroy {}
+}
+
+fn bad() -> U32 {
+    let state = State.Ready(Job { priority: 1 });
+    match mut state { // expected-error: match mut requires writable enum owner
+        Ready(job) => {
+            job.priority = 2;
+            return job.priority;
+        },
+        Done => {
+            return 0;
+        },
+    };
+}

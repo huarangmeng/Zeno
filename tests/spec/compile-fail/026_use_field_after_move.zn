@@ -11,9 +11,9 @@ struct Packet {
 
 impl Packet {
     fn bad(move self) -> U32 {
-        let bytes = move self.bytes;
+        let bytes = self.bytes;
         let len = self.bytes.len; // expected-error: field used after move
-        let ignoredBytes = move bytes;
+        let ignoredBytes = bytes;
         return len + self.checksum;
     }
 }

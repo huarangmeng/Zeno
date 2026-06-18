@@ -1,8 +1,8 @@
-// category: compile-pass
+// category: compile-fail
 // profile: freestanding
-// purpose: types with destroy blocks can expose explicit move self destructuring APIs
+// purpose: self methods of destroy types cannot move out non-Copy fields in safe code
 
-module tests.pass.moveFieldFromDestroySelfMethod;
+module tests.fail.moveFieldFromDestroySelfMethod;
 
 struct Packet {
     bytes: Array<U8>,
@@ -22,7 +22,7 @@ impl Packet {
             self.cleanupNeeded = false;
         }
 
-        return move self.bytes;
+        return self.bytes; // expected-error: cannot move field from type with destroy block
     }
 }
 

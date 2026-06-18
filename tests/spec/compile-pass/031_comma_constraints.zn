@@ -1,8 +1,8 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: generic and interface constraints use commas instead of plus
+// purpose: multiple abilities are named through interface composition
 
-module tests.pass.commaConstraints;
+module tests.pass.namedConstraintComposition;
 
 interface Eq {
     fn eq(self, other: Self) -> Bool;
@@ -32,7 +32,7 @@ impl Ord for Key {
 
 impl SortKey for Key {}
 
-fn min<T: Ord, Copy>(a: T, b: T) -> T {
+fn min<T: SortKey>(a: T, b: T) -> T {
     if a.lessThan(b) {
         return a;
     }

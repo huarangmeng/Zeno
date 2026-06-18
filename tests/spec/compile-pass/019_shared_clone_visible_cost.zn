@@ -11,8 +11,8 @@ struct Packet {
 }
 
 fn share(move packet: Packet, mut allocator: GlobalAllocator) -> Shared<Packet> {
-    let first = Shared.newIn(move packet, mut allocator);
+    let first = Shared.newIn(packet, mut allocator);
     let second = first.clone();
-    let ignored = move second;
-    return move first;
+    let ignored = second;
+    return first;
 }

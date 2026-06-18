@@ -1,0 +1,25 @@
+# category: codegen-fail
+# purpose: packed field access cannot be lowered as naturally aligned load
+
+[source]
+file = "src/main.zn"
+text = '''
+@layout(Packed(1))
+struct Header {
+    tag: U8,
+    length: U32,
+}
+
+fn read(header: Header) -> U32 {
+    return header.length;
+}
+'''
+
+[bad_codegen]
+llvm = [
+    "load i32, align 4",
+]
+
+[expect]
+error = "packed field load must use packed alignment or byte sequence"
+

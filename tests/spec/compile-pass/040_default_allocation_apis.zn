@@ -17,9 +17,9 @@ fn main() {
     let shared = Shared.new(Packet { value: 3 });
     let text = String.from("hello");
 
-    let ignoredPage = move page;
-    let ignoredBytes = move bytes;
-    let ignoredBox = move boxed;
-    let ignoredShared = move shared;
-    let ignoredText = move text;
+    let ignoredPage = page;
+    let ignoredBytes = bytes;
+    let ignoredBox = boxed;
+    let ignoredShared = shared;
+    let ignoredText = text;
 }

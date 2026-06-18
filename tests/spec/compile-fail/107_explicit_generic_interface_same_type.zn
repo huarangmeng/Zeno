@@ -1,0 +1,37 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: explicit generic interface parameters require the same concrete implementation type
+
+module tests.fail.explicitGenericInterfaceSameType;
+
+interface Writer {
+    fn id(self) -> U64;
+}
+
+struct FileWriter {
+    value: U64,
+}
+
+struct MemoryWriter {
+    value: U64,
+}
+
+impl Writer for FileWriter {
+    fn id(self) -> U64 {
+        return self.value;
+    }
+}
+
+impl Writer for MemoryWriter {
+    fn id(self) -> U64 {
+        return self.value;
+    }
+}
+
+fn same<W: Writer>(left: W, right: W) -> U64 {
+    return left.id() + right.id();
+}
+
+fn bad() -> U64 {
+    return same(FileWriter { value: 1 }, MemoryWriter { value: 2 }); // expected-error: W must be one concrete type
+}

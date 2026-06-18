@@ -1,0 +1,41 @@
+# category: codegen-pass
+# purpose: partial initialization uses drop flags and drops only initialized fields
+
+[source]
+file = "src/main.zn"
+text = '''
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        os.close(self.fd);
+    }
+}
+
+struct Pair {
+    left: File,
+    right: File,
+}
+
+fn openPair(pathA: StringSlice, pathB: StringSlice) -> Result<Pair, IoError> {
+    let left = try File.open(pathA);
+    let right = try File.open(pathB);
+    return Ok(Pair { left: left, right: right });
+}
+'''
+
+[expect.mir]
+contains = [
+    "dropFlag left",
+    "dropFlag right",
+    "setDropFlag left true",
+    "try File.open(pathB) err -> cleanup.drop left",
+    "move left -> setDropFlag left false",
+    "move right -> setDropFlag right false",
+]
+forbid = [
+    "drop uninitialized right",
+    "doubleDrop left",
+]

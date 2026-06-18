@@ -28,7 +28,7 @@ impl SharedIdentified for Service {}
 
 fn makeShared(mut allocator: GlobalAllocator) -> Shared<SharedIdentified> {
     let service = Service { idValue: 11 };
-    return Shared.newIn(move service, mut allocator);
+    return Shared.newIn(service, mut allocator);
 }
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {

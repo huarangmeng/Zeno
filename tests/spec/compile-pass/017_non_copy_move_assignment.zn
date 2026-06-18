@@ -1,6 +1,6 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: non-Copy owners can be assigned by explicit move
+// purpose: non-Copy owners move on assignment into an owning binding
 
 module tests.pass.nonCopyMoveAssignment;
 
@@ -18,7 +18,7 @@ fn consume(move handle: Handle) -> U32 {
 
 fn main() {
     let handle = Handle { id: 1 };
-    let moved = move handle;
+    let moved = handle;
     let id = consume(move moved);
     let ignored = id;
 }

@@ -47,7 +47,7 @@ fn consumePackets(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     packets.push(Packet { value: 2 });
 
     var sum: U32 = 0;
-    for move packet in move packets {
+    for move packet in packets {
         sum = sum + consume(move packet);
     }
     return Ok(sum);

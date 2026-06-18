@@ -1,0 +1,32 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: interface parameters consume an anonymous concrete implementation statically
+
+module tests.pass.staticInterfaceMoveParameter;
+
+interface Writer {
+    fn bytesWritten(self) -> USize;
+    fn finish(move self) -> USize;
+}
+
+struct Counter {
+    total: USize,
+}
+
+impl Writer for Counter {
+    fn bytesWritten(self) -> USize {
+        return self.total;
+    }
+
+    fn finish(move self) -> USize {
+        return self.total;
+    }
+}
+
+fn finishAny(move writer: Writer) -> USize {
+    return move writer.finish();
+}
+
+fn main() -> USize {
+    return finishAny(Counter { total: 7 });
+}

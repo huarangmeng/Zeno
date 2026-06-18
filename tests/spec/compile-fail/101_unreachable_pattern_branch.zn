@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: obviously unreachable unguarded pattern branches are rejected
+
+module tests.fail.unreachablePatternBranch;
+
+enum State {
+    Ready,
+    Done,
+}
+
+fn bad(state: State) -> U32 {
+    return match state {
+        _ => 0,
+        State.Ready => 1, // expected-error: unreachable pattern branch
+    };
+}

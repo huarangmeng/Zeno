@@ -1,0 +1,40 @@
+// category: compile-pass
+// profile: hosted
+// purpose: Map and Set are standard owning hash collections with explicit capacity costs
+
+module tests.pass.mapSetCollections;
+
+import core.alloc.AllocError;
+import core.result.{Result, Ok};
+
+fn countUnique(ids: ArraySlice<U64>) -> USize {
+    var seen = Set<U64>.withCapacity(ids.len());
+
+    for id in ids {
+        seen.insert(id);
+    }
+
+    return seen.len();
+}
+
+fn countOccurrences(ids: ArraySlice<U64>) -> Map<U64, USize> {
+    var counts = Map<U64, USize>.withCapacity(ids.len());
+
+    for id in ids {
+        let old = counts.get(id).unwrapOr(0);
+        counts.insert(id, old + 1);
+    }
+
+    return counts;
+}
+
+fn reserveThenInsert(ids: ArraySlice<U64>) -> Result<Set<U64>, AllocError> {
+    var seen = Set<U64>.empty();
+    try seen.tryReserve(ids.len());
+
+    for id in ids {
+        seen.insert(id);
+    }
+
+    return Ok(seen);
+}
