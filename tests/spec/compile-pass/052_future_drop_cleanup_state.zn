@@ -5,8 +5,8 @@
 module tests.pass.futureDropCleanupState;
 
 async fn readHeader(move file: File) -> Result<U32, IoError> {
-    defer file.closeBestEffort();
-    let value = try await file.readU32();
+    defer mut file.closeBestEffort();
+    let value = try await mut file.readU32();
     return Ok(value);
 }
 

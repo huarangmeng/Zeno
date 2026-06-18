@@ -6,7 +6,7 @@ file = "src/main.zn"
 text = '''
 async fn task(move file: File) -> Result<Unit, IoError> {
     defer audit.finish();
-    try await file.readU32();
+    try await mut file.readU32();
     return Ok(());
 }
 '''

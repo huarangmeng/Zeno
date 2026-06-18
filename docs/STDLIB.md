@@ -163,7 +163,7 @@ fn consume(move data: Vector<U8>);                // 接收所有权
 fn parse(data: ArraySlice<U8>) -> Token;          // 临时只读视图
 ```
 
-调用 `move` 参数时，已有命名 owner 必须在调用点写 `move owner`；临时值和字面量没有后续可用绑定，可以直接传给 `move` 参数。
+调用 `move` 参数时，已有命名 owner 必须在调用点写 `move owner`；临时值和字面量没有后续可用绑定，可以直接传给 `move` 参数。`move` 参数在函数体内是唯一拥有者，可以作为 `mut` 接收者或 `mut` 实参使用。
 
 必要方法：
 
@@ -246,6 +246,10 @@ interface Hash {
 interface HashKey: Hash, Eq {}
 interface CopyHashKey: HashKey, Copy {}
 
+interface LookupKey<K: HashKey>: Hash {
+    fn equalsKey(self, key: K) -> Bool;
+}
+
 struct Map<K: HashKey, V> {
     // 开放寻址或等价 cache-friendly 哈希表
 }
@@ -258,21 +262,21 @@ impl<K: HashKey, V> Map<K, V> {
     fn len(self) -> USize;
     fn capacity(self) -> USize;
     fn isEmpty(self) -> Bool;
-    fn containsKey(self, key: K) -> Bool;
+    fn containsKey<Q: LookupKey<K>>(self, key: Q) -> Bool;
     fn reserve(mut self, additional: USize);
     fn reserveExact(mut self, additional: USize);
     fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
     fn tryReserveExact(mut self, additional: USize) -> Result<Unit, AllocError>;
     fn insert(mut self, move key: K, move value: V) -> Option<V>;
-    fn remove(mut self, key: K) -> Option<V>;
-    fn removeEntry(mut self, key: K) -> Option<(K, V)>;
+    fn remove<Q: LookupKey<K>>(mut self, key: Q) -> Option<V>;
+    fn removeEntry<Q: LookupKey<K>>(mut self, key: Q) -> Option<(K, V)>;
     fn entry(mut self, move key: K) -> MapEntry<K, V>;
     fn clear(mut self);
     fn shrinkToFit(mut self);
 }
 
 impl<K: HashKey, V: Copy> Map<K, V> {
-    fn get(self, key: K) -> Option<V>;
+    fn get<Q: LookupKey<K>>(self, key: Q) -> Option<V>;
 }
 
 impl<K: CopyHashKey, V: Copy> Map<K, V> {
@@ -308,14 +312,14 @@ impl<T: HashKey> Set<T> {
     fn len(self) -> USize;
     fn capacity(self) -> USize;
     fn isEmpty(self) -> Bool;
-    fn contains(self, value: T) -> Bool;
+    fn contains<Q: LookupKey<T>>(self, value: Q) -> Bool;
     fn reserve(mut self, additional: USize);
     fn reserveExact(mut self, additional: USize);
     fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
     fn tryReserveExact(mut self, additional: USize) -> Result<Unit, AllocError>;
     fn insert(mut self, move value: T) -> Bool;
-    fn remove(mut self, value: T) -> Bool;
-    fn take(mut self, value: T) -> Option<T>;
+    fn remove<Q: LookupKey<T>>(mut self, value: Q) -> Bool;
+    fn take<Q: LookupKey<T>>(mut self, value: Q) -> Option<T>;
     fn clear(mut self);
     fn shrinkToFit(mut self);
 }
@@ -326,6 +330,51 @@ impl<T: CopyHashKey> Set<T> {
 }
 ```
 
+## 4.1 API 所有权审计
+
+标准库 API 按“读、改、存储、消费”分类。调用点必须能看出可写访问和所有权结束；查找类 API 不能为了方便实现而移动调用方的 key。
+
+| API | 接收者 | 参数 | 所有权语义 | 调用示例 |
+| --- | --- | --- | --- | --- |
+| `Array.len` / `Vector.len` / `String.len` | `self` | 无 | 只读，不移动 | `items.len()` |
+| `Array.asSlice` / `Vector.asSlice` / `String.asSlice` | `self` | 无 | 只读访问，返回短期 view | `items.asSlice()` |
+| `Array.replaceAt` | `mut self` | `index`, `move value` | 修改数组，存储新值，返回旧值 owner | `mut items.replaceAt(i, move value)` |
+| `Vector.push` | `mut self` | `move value` | 修改 vector，存储 value | `mut items.push(move value)` |
+| `Vector.push` with temporary | `mut self` | temporary value | 修改 vector，临时值直接进入容器 | `mut items.push(Item { id: 1 })` |
+| `Vector.pop` / `removeAt` / `swapRemove` | `mut self` | index | 修改 vector，返回被移出的 owner | `let item = mut items.removeAt(i)` |
+| `Vector.reserve` / `tryReserve` | `mut self` | size | 修改容量，不移动元素 | `try mut items.tryReserve(n)` |
+| `Map.get` / `containsKey` | `self` | `LookupKey<K>` | 只读 lookup，不移动 key，不分配 | `users.get(name)` |
+| `Map.remove` | `mut self` | `LookupKey<K>` | 只读 lookup key，移除并销毁表内 key，返回表内 value | `let old = mut users.remove(name)` |
+| `Map.removeEntry` | `mut self` | `LookupKey<K>` | 只读 lookup key，返回表内 key/value owner | `let pair = mut users.removeEntry(name)` |
+| `Map.insert` | `mut self` | `move key`, `move value` | 修改 map，把 key/value 存入表 | `mut users.insert(move name, move user)` |
+| `Map.entry` | `mut self` | `move key` | 可能插入时拥有 key，返回短期 entry view | `let e = mut users.entry(move name)` |
+| `Set.contains` | `self` | `LookupKey<T>` | 只读 lookup，不移动 value | `seen.contains(name)` |
+| `Set.remove` / `take` | `mut self` | `LookupKey<T>` | 只读 lookup value，移除表内 value | `let old = mut seen.take(name)` |
+| `Set.insert` | `mut self` | `move value` | 修改 set，把 value 存入表 | `mut seen.insert(move name)` |
+| `String.push` | `mut self` | `StringSlice` | 修改 string，复制 text 字节，参数不移动 | `mut text.push(" suffix")` |
+| `String.clone` | `self` | 无 | 显式深拷贝，可能分配 | `let copy = text.clone()` |
+| `Box.new` | static | `move value` | 分配并拥有 value | `Box.new(move value)` |
+| `Shared.new` | static | `move value` | 分配控制块并共享拥有 value | `Shared.new(move value)` |
+| `Shared.clone` | `self` | 无 | 增加引用计数，不深拷贝 | `shared.clone()` |
+| `Mutex.new` | static | `move value` | 构造同步容器并拥有 value | `Mutex.new(move value)` |
+| `Mutex.lock` | `self` | 无 | 只读访问 mutex，返回 guard；锁成本由类型可见 | `let guard = try mutex.lock()` |
+| `MutexGuard.get` | `mut self` | 无 | guard 内取得短期可写访问 | `let value = mut guard.get()` |
+| `Thread.spawn` | static | `move task` | 创建 OS 线程并拥有任务闭包 | `Thread.spawn(move task)` |
+| `JoinHandle.join` | `move self` | 无 | 消费 join handle，返回线程结果 | `try move handle.join()` |
+| `Task.await` | `move self` | 无 | 消费任务 handle，返回任务结果 | `try move task.await()` |
+| `Iterator.next` | `mut self` | 无 | 推进迭代器，可能返回一个 owner | `while let Some(x) = mut iter.next()` |
+| `File.read` / `write` | `mut self` | buffer | 推进文件状态或写入 OS 缓冲，不移动文件 | `try mut file.read(mut out)` |
+| async `File.readU32` | `mut self` | 无 | 立即 await 时可暂停并恢复文件拥有者 | `let x = try await mut file.readU32()` |
+| `File.close` | `move self` | 无 | 显式结束资源生命周期，失败时仍触发兜底销毁 | `try move file.close()` |
+
+规则：
+
+- `get`、`contains`、`containsKey`、`remove`、`removeEntry` 和索引 lookup 都不能移动调用方的 key。需要支持 `String` / `StringSlice`、owned / slice、大小写折叠等查找形态时，用 `LookupKey<K>` 或专门 lookup API 表达。
+- `insert`、`push`、`Box.new`、`Shared.new`、`Mutex.new`、`Thread.spawn` 这类会长期保存或消费值的 API，命名 owner 实参必须写 `move`。
+- async `mut self` 调用必须立即 `await`，且接收者由当前 future 拥有；这个调用产生的 future 不能保存、返回、放入容器、传给 `spawn` 或跨另一个 `await`。
+- `mut self` 方法调用已有命名接收者时必须写 `mut receiver.method(...)`；`move self` 方法必须写 `move receiver.method(...)`。
+- 临时值、字面量和函数返回值没有后续可用绑定，传入 `move` 参数时不需要额外 `move`。
+
 `Map<K, V>` 和 `Set<T>` 是拥有集合，默认不是 `Copy`。move 是 O(1) 转移表所有权；clone 是显式深拷贝，v1 只为 `Copy` key/value 开放。无 `In` 后缀 API 使用 profile 默认 allocator，`In` 后缀 API 使用调用方提供的 allocator。
 
 `Hash` 和 `Eq` 必须一致：若 `a.eq(b)` 为 true，则 `a.hash(state)` 和 `b.hash(state)` 必须写入同一语义内容。标准库提供基础整数、`Bool`、`Char`、`String` 和其他常见 key 类型的 `Hash` / `Eq` 实现；`StringSlice` 是非拥有访问值，不能作为长期 key 保存到 `Map` 或 `Set` 中，需要长期保存时使用 `String`。
@@ -334,7 +383,7 @@ impl<T: CopyHashKey> Set<T> {
 
 `insert`、`reserve`、`shrinkToFit` 和 rehash 可能分配。分配失败时调用当前 profile 的 `oom(layout) -> Never`。需要可恢复 OOM 时，调用方先使用 `tryReserve` 或 `tryReserveExact`，成功后再进行一组 `insert` / `entry.insert`。
 
-`Map.get(key)` 只在 `V: Copy` 时返回 `Option<V>`。非 `Copy` value 的读取应使用 checked index 产生短期访问，或使用 `entry` API 做单次探测更新。`MapEntry<K, V>` 是 view-like 值，不能长期保存；它持有一次查找结果和可能的待插入 key，用于避免 `containsKey` + `insert` 的双重哈希。
+`Map.get(key)` 只在 `V: Copy` 时返回 `Option<V>`。`get`、`containsKey`、`remove` 和 `removeEntry` 的 key 是 `LookupKey<K>`，只读、不移动、不分配；例如 `Map<String, V>` 可以用 `String` 或 `StringSlice` 查找。非 `Copy` value 的读取应使用 checked index 产生短期访问，或使用 `entry` API 做单次探测更新。`MapEntry<K, V>` 是 view-like 值，不能长期保存；它持有一次查找结果和可能的待插入 key，用于避免 `containsKey` + `insert` 的双重哈希。
 
 `Set.insert(move value)` 的签名接收 value 所有权；集合已有等价值时返回 false，并销毁传入 value。集合中原有 value 保持不变。`Set.take(value)` 用于把集合中的真实存储值移动出来。
 
@@ -647,6 +696,7 @@ interface Ord: Eq { fn cmp(self, other: Self) -> Ordering; }
 interface Hash { fn hash(self, mut state: Hasher); }
 interface HashKey: Hash, Eq {}
 interface CopyHashKey: HashKey, Copy {}
+interface LookupKey<K: HashKey>: Hash { fn equalsKey(self, key: K) -> Bool; }
 interface Send {}
 interface Sync {}
 interface EscapingAllocator: Allocator {}

@@ -5,9 +5,9 @@
 file = "src/main.zn"
 text = '''
 fn copyInto(mut out: Vector<U8>, input: ArraySlice<U8>) -> Result<Unit, AllocError> {
-    try out.tryReserve(input.len);
+    try mut out.tryReserve(input.len);
     for item in input {
-        out.push(item);
+        mut out.push(item);
     }
     return Ok(());
 }
@@ -34,4 +34,3 @@ forbid = [
     "call zeno_vector_grow in loop",
     "call oom in loop",
 ]
-

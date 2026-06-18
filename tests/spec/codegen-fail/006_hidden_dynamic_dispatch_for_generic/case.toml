@@ -5,7 +5,7 @@
 file = "src/main.zn"
 text = '''
 fn writeAll(mut writer: Writer, data: ArraySlice<U8>) -> Result<Unit, IoError> {
-    try writer.write(data);
+    try mut writer.write(data);
     return Ok(());
 }
 '''

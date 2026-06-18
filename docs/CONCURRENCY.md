@@ -29,7 +29,7 @@ let handle = try Thread.spawn(move () -> Result<Unit, WorkError> {
     return process(move work);
 });
 
-try handle.join();
+try move handle.join();
 ```
 
 规则：
@@ -86,7 +86,7 @@ let task = try runtime.spawn(move () -> Result<Unit, WorkError> {
     return process(move work);
 });
 
-try task.await();
+try move task.await();
 ```
 
 规则：
@@ -106,8 +106,8 @@ try task.await();
 
 ```zn
 async fn readAll(move file: File) -> Result<Vector<U8>, IoError> {
-    let header = try await file.readHeader();
-    return file.readBody(header);
+    let header = try await mut file.readHeader();
+    return try await mut file.readBody(header);
 }
 ```
 
@@ -116,7 +116,8 @@ async fn readAll(move file: File) -> Result<Vector<U8>, IoError> {
 - 创建 future 不会自动开始执行。
 - poll 或 await 需要程序选择 executor/runtime。
 - future 对象拥有它捕获的状态。
-- 跨 `await` 存活的非 `Copy` 值必须由 future 拥有，例如 `move file: File`；短期 `self` / `mut self` 访问不能跨 `await`。
+- 跨 `await` 存活的非 `Copy` 值必须由 future 拥有，例如 `move file: File`；短期 `self` / `mut self` 访问不能作为独立值跨 `await`。
+- `await mut file.readHeader()` 这种立即等待的 async `mut self` 调用允许用于 future 自己拥有的值；它不能被拆成 `let pending = mut file.readHeader(); await pending;`，也不能被返回或传给 `spawn`。
 - future 只有在其状态全是 `Send` 时，才可以被移动到其他线程或多线程 runtime。
 - 非逃逸 async 状态不应分配，除非函数体显式分配。
 - 非逃逸 future 可以被栈上保存、内联 poll 或标量替换。
@@ -124,7 +125,7 @@ async fn readAll(move file: File) -> Result<Vector<U8>, IoError> {
 - 丢弃未完成 future 表示取消；drop 必须销毁当前状态中已经初始化且仍拥有的字段。
 - 跨过 `await` 的 `defer` 会成为 future 状态的一部分，并在正常完成、错误提前返回、panic-unwind 或取消 drop 时执行。
 - future drop 不能 `await`；跨 `await` 的 `defer` 也不能包含 `await`。
-- 非拥有访问值不能跨 `await` 进入 future 状态，因此 v1 不需要用户可见 `Pin` 来保证自引用 future 安全。
+- 非拥有访问值不能作为独立状态字段或可逃逸 future 跨 `await`，因此 v1 不需要用户可见 `Pin` 来保证自引用 future 安全。
 - Freestanding 目标可以编译 async 状态机，但不提供 executor。
 
 ## 4. 性能策略

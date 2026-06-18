@@ -25,17 +25,17 @@ fn usePacket(move packet: Packet) -> U32 {
 
 fn demo(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     var packets = Vector<Packet>.withCapacityIn(4, mut allocator);
-    packets.push(Packet { value: 1 });
-    packets.push(Packet { value: 2 });
+    mut packets.push(Packet { value: 1 });
+    mut packets.push(Packet { value: 2 });
 
     let firstValue = packets[0].value;
     normalize(mut packets[0]);
 
-    let old = packets.replaceAt(1, Packet { value: 10 });
-    let removed = packets.removeAt(0);
+    let old = mut packets.replaceAt(1, Packet { value: 10 });
+    let removed = mut packets.removeAt(0);
 
-    packets.push(Packet { value: 20 });
-    let fast = packets.swapRemove(0);
+    mut packets.push(Packet { value: 20 });
+    let fast = mut packets.swapRemove(0);
 
     return Ok(firstValue + usePacket(move old) + usePacket(move removed) + usePacket(move fast));
 }

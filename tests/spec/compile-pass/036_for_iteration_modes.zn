@@ -43,8 +43,8 @@ fn sumByIndex(bytes: ArraySlice<U8>) -> U32 {
 
 fn consumePackets(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     var packets = Vector<Packet>.withCapacityIn(2, mut allocator);
-    packets.push(Packet { value: 1 });
-    packets.push(Packet { value: 2 });
+    mut packets.push(Packet { value: 1 });
+    mut packets.push(Packet { value: 2 });
 
     var sum: U32 = 0;
     for move packet in packets {

@@ -20,6 +20,6 @@ fn main(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
         before = readLen(slice);
     }
 
-    bytes.push(1);
+    mut bytes.push(1);
     return Ok(before + bytes.len);
 }

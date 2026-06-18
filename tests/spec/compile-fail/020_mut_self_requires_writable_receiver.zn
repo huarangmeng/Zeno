@@ -16,5 +16,5 @@ impl Counter {
 
 fn main() {
     let counter = Counter { value: 1 };
-    counter.bump(); // expected-error: mut self method requires writable receiver
+    mut counter.bump(); // expected-error: mut self method requires writable receiver
 }

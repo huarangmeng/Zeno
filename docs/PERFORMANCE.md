@@ -161,9 +161,9 @@ for i in 0..tail.len {
 ```
 
 ```zn
-try out.tryReserve(input.len);
+try mut out.tryReserve(input.len);
 for item in input {
-    out.push(item);
+    mut out.push(item);
 }
 ```
 

@@ -26,7 +26,7 @@ impl Writer for Counter {
 }
 
 fn writeAll<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, WriteError> {
-    let n = try writer.write(bytes);
+    let n = try mut writer.write(bytes);
     if n == bytes.len {
         return Ok(());
     }

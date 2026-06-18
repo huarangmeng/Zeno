@@ -20,6 +20,6 @@ fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let handle = try Thread.spawn(move () -> USize {
         return forThread.strongCount();
     });
-    let ignored = try handle.join();
+    let ignored = try move handle.join();
     return Ok(());
 }

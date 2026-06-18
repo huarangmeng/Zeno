@@ -5,9 +5,9 @@
 file = "src/main.zn"
 text = '''
 fn append(mut out: Vector<U8>, input: ArraySlice<U8>) -> Result<Unit, AllocError> {
-    try out.tryReserve(input.len);
+    try mut out.tryReserve(input.len);
     for byte in input {
-        out.push(byte);
+        mut out.push(byte);
     }
     return Ok(());
 }
@@ -21,4 +21,3 @@ contains = [
 
 [expect]
 error = "tryReserve capacity fact must remove push grow slow path inside proven loop"
-

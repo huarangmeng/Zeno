@@ -21,7 +21,7 @@ fn owned() -> String {
 
 fn append() -> String {
     var text = String.from("zeno");
-    text.push(" language");
+    mut text.push(" language");
     return text;
 }
 

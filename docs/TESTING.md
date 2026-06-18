@@ -155,7 +155,7 @@ feature = "shared"
 - `Shared<T>.clone` 只表达引用计数复制，成本通过类型名可见。
 - 默认参数只读访问非 `Copy` 资源后，调用方仍然拥有该资源。
 - `mut` 参数唯一可写访问后，调用方仍然拥有该资源。
-- `move` 参数在声明处接收所有权；从已有命名位置传入时调用点必须写 `move`，调用后源绑定不可再用。
+- `move` 参数在声明处接收所有权；从已有命名位置传入时调用点必须写 `move`，调用后源绑定不可再用；函数体内的 `move` 参数可以作为 `mut` 接收者或 `mut` 实参使用。
 - `self`、`mut self` 和 `move self` 方法接收者语义。
 - 从 `move self` 中移出字段后只销毁剩余字段。
 - 带 `destroy` 的类型可以用 `close`、`flush` 或 `finish` 这类 `move self` 方法显式完成资源，并通过状态让后续 `destroy` no-op。
@@ -227,6 +227,7 @@ feature = "shared"
 - 可选任务运行时的所有权转移。
 - async future 状态所有权。
 - future drop 会清理当前状态中已初始化字段和跨 `await` 的 `defer`。
+- 立即 `await mut receiver.method()` 可以用于 future 拥有的接收者。
 - 共享可变状态只能通过同步类型访问。
 
 ## 4. 必要 compile-fail 覆盖
@@ -352,7 +353,8 @@ feature = "shared"
 - 在返回 `Result` 的函数中直接 `try Option<T>`。
 - 对错误类型不同的 `Result<T, E>` 直接使用 `try`。
 - `trust` 边界中违反普通所有权、初始化或类型规则。
-- 非拥有访问值跨 `await` 进入 future 状态。
+- 非拥有访问值作为独立值跨 `await` 进入 future 状态。
+- async `mut self` 调用产生的访问 future 被保存、返回、传给 `spawn` 或跨另一个 `await`。
 - 跨 `await` 存活的 `defer` 中使用 `await`。
 
 ## 5. 诊断格式
@@ -365,7 +367,7 @@ error[E0201]: 使用了已移动的值 `file`
    |
  7 |     let owner = file;
    |                 ---- 值在这里被移动
- 8 |     file.write("late");
+ 8 |     mut file.write("late");
    |     ^^^^ 移动后继续使用
 help: 在移动前读取该值，或只移动一次
 ```

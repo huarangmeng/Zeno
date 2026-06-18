@@ -27,6 +27,6 @@ fn main() -> Result<Unit, Error> {
         let ignored = handle.raw;
         return Ok(());
     });
-    try thread.join();
+    try move thread.join();
     return Ok(());
 }

@@ -27,6 +27,6 @@ pub fn demo() -> Result<Unit, WorkError> {
         return process(move work);
     });
 
-    try handle.join();
+    try move handle.join();
     return Ok(());
 }

@@ -25,6 +25,6 @@ fn main() -> Result<Unit, Error> {
     let handle = try Thread.spawn(move () -> Result<Unit, Error> {
         return run(move job);
     });
-    try handle.join();
+    try move handle.join();
     return Ok(());
 }

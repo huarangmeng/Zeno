@@ -23,8 +23,8 @@ impl Writer for CountingWriter {
 }
 
 fn writeTwice<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, IoError> {
-    let first = try writer.write(bytes);
-    let second = try writer.write(bytes);
+    let first = try mut writer.write(bytes);
+    let second = try mut writer.write(bytes);
     if first != second {
         return Err(IoError.Interrupted);
     }
@@ -32,5 +32,5 @@ fn writeTwice<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, I
 }
 
 fn writeOnceInterface(mut writer: Writer, bytes: ArraySlice<U8>) -> Result<USize, IoError> {
-    return writer.write(bytes);
+    return mut writer.write(bytes);
 }

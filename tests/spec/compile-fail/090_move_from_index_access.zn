@@ -16,6 +16,6 @@ impl Packet {
 
 fn bad(mut allocator: GlobalAllocator) -> Packet {
     var packets = Vector<Packet>.withCapacityIn(1, mut allocator);
-    packets.push(Packet { value: 1 });
+    mut packets.push(Packet { value: 1 });
     return packets[0]; // expected-error: cannot move out through indexed access; use removeAt or swapRemove
 }

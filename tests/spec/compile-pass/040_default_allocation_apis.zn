@@ -11,7 +11,7 @@ struct Packet {
 fn main() {
     let page = Array<U8>.filled(4, 0);
     var bytes = Vector<U8>.withCapacity(4);
-    bytes.push(1);
+    mut bytes.push(1);
 
     let boxed = Box.new(Packet { value: 2 });
     let shared = Shared.new(Packet { value: 3 });

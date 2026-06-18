@@ -10,6 +10,6 @@ import core.result.{Result, Ok};
 fn bad(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
     let slice = bytes.asSlice();
-    bytes.push(1); // expected-error: vector structural mutation while slice is live
+    mut bytes.push(1); // expected-error: vector structural mutation while slice is live
     return Ok(slice.len);
 }

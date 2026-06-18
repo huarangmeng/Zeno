@@ -20,6 +20,6 @@ struct StaticSink<W: Writer> {
 
 impl<W: Writer> StaticSink<W> {
     fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
-        return self.writer.write(bytes);
+        return mut self.writer.write(bytes);
     }
 }

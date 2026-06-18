@@ -12,9 +12,9 @@ fn useSlice(bytes: ArraySlice<U8>) -> USize {
 
 fn bad(mut allocator: GlobalAllocator) -> USize {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
-    bytes.push(1);
+    mut bytes.push(1);
 
     let view = bytes.asSlice();
-    let old = bytes.replaceAt(0, 2); // expected-error: cannot replace element while a dependent access is live
+    let old = mut bytes.replaceAt(0, 2); // expected-error: cannot replace element while a dependent access is live
     return useSlice(view) + old as USize;
 }

@@ -41,11 +41,11 @@ fn replaceField() -> U32 {
 
 fn replaceElement(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     var handles = Vector<Handle>.withCapacityIn(2, mut allocator);
-    handles.push(makeHandle(5));
+    mut handles.push(makeHandle(5));
     handles[0] = makeHandle(6);
 
-    let old = handles.replaceAt(0, makeHandle(7));
-    let removed = handles.removeAt(0);
+    let old = mut handles.replaceAt(0, makeHandle(7));
+    let removed = mut handles.removeAt(0);
 
     return Ok(consume(move old) + consume(move removed));
 }

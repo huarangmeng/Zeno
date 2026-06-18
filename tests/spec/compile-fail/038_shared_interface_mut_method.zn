@@ -15,5 +15,5 @@ interface Writer {
 }
 
 fn bad(writer: Shared<Writer>, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
-    return writer.write(bytes); // expected-error: Shared<Interface> cannot call mut self interface methods
+    return mut writer.write(bytes); // expected-error: Shared<Interface> cannot call mut self interface methods
 }

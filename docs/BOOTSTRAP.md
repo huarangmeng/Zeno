@@ -83,7 +83,7 @@ HIR、MIR、LLVM 降级和 codegen 优化不变量见 [IR.md](IR.md)。
 
 - 完整 `Shared<T>` runtime、`Shared<Interface>` 动态派发和跨线程引用计数释放。
 - scoped 并发、`Thread.scope` 和 `splitDisjoint` 这类 disjoint API 的不重叠证明记录。
-- 完整 async lowering、future 状态机、任务运行时和多线程 executor；如果后续 stage0 迭代实现 async 子集，必须同时实现 future drop cleanup、禁止访问值跨 `await` 和非逃逸 future 无分配。
+- 完整 async lowering、future 状态机、任务运行时和多线程 executor；如果后续 stage0 迭代实现 async 子集，必须同时实现 future drop cleanup、禁止访问值逃逸跨 `await` 和非逃逸 future 无分配。
 - 跨 package `pub fn -> Interface` opaque return metadata。
 - 高级逃逸闭包对象化和 callable interface owner。
 - 自定义 hasher policy、有序关联集合和持久化稳定哈希。

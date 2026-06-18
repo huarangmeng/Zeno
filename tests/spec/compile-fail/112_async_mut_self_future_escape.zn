@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: async mut self calls must be awaited immediately and cannot escape as access futures
+
+module tests.fail.asyncMutSelfFutureEscape;
+
+async fn other() -> Result<Unit, IoError> {
+    return Ok(());
+}
+
+async fn bad(move file: File) -> Result<U32, IoError> {
+    let pending = mut file.readU32(); // expected-error: async mut self call must be immediately awaited
+    try await other();
+    return try await pending;
+}

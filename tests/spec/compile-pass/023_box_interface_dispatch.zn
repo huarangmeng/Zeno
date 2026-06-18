@@ -32,5 +32,5 @@ fn makeWriter(mut allocator: GlobalAllocator) -> Box<Writer> {
 }
 
 fn writeBox(mut writer: Box<Writer>, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
-    return writer.write(bytes);
+    return mut writer.write(bytes);
 }

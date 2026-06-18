@@ -352,9 +352,10 @@ future drop lowering：
 - 丢弃未完成 future 时，按当前状态运行需要执行的 `defer`。
 - 然后销毁当前状态中已经初始化且仍拥有的字段。
 - future drop 不能 `await`，不能调用异步清理。
-- 非拥有访问值不能跨 `await` 存入 future 状态。
+- 非拥有访问值不能作为独立字段跨 `await` 存入 future 状态。
+- 立即 `await mut receiver.method(...)` 的 async `mut self` 调用应在 MIR 中表示为“future 拥有者字段 + 暂停点内活动可写访问”，不能生成可逃逸的访问 future。
 
-禁止访问值跨 `await` 后，v1 不需要用户可见 `Pin`。future 在未交给 runtime 前按普通 move 规则移动；交给 runtime 后，用户移动的是 task handle。
+禁止访问值逃逸跨 `await` 后，v1 不需要用户可见 `Pin`。future 在未交给 runtime 前按普通 move 规则移动；交给 runtime 后，用户移动的是 task handle。
 
 ## 13. 接口派发
 

@@ -9,15 +9,15 @@ import core.result.{Result, Ok};
 
 fn buildBytes(mut allocator: GlobalAllocator) -> Result<Vector<U8>, AllocError> {
     var bytes = Vector<U8>.withCapacityIn(0, mut allocator);
-    try bytes.tryReserve(2);
-    bytes.push(1);
-    bytes.push(2);
+    try mut bytes.tryReserve(2);
+    mut bytes.push(1);
+    mut bytes.push(2);
     return Ok(bytes);
 }
 
 fn buildText(mut allocator: GlobalAllocator) -> Result<String, AllocError> {
     var text = String.fromIn("", mut allocator);
-    try text.tryReserve(5);
-    text.push("hello");
+    try mut text.tryReserve(5);
+    mut text.push("hello");
     return Ok(text);
 }

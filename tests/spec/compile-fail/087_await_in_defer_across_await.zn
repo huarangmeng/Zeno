@@ -6,9 +6,9 @@ module tests.fail.awaitInDeferAcrossAwait;
 
 async fn bad(move file: File) -> Result<Unit, IoError> {
     defer {
-        await file.closeAsync(); // expected-error: defer crossing await cannot contain await
+        await mut file.closeAsync(); // expected-error: defer crossing await cannot contain await
     }
 
-    try await file.readU32();
+    try await mut file.readU32();
     return Ok(());
 }

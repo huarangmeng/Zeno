@@ -15,5 +15,5 @@ interface Writer {
 }
 
 fn writeInterface(mut writer: Writer, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
-    return writer.write(bytes);
+    return mut writer.write(bytes);
 }

@@ -6,7 +6,7 @@ file = "src/main.zn"
 text = '''
 async fn readHeader(move file: File) -> Result<U32, IoError> {
     defer metrics.endRead();
-    let header = try await file.readU32();
+    let header = try await mut file.readU32();
     return Ok(header);
 }
 

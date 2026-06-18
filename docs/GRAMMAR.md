@@ -272,9 +272,9 @@ return_type     = "->" type ;
 
 - 没有模式的参数是只读访问。
 - `mut` 参数是唯一可写访问，调用点必须写 `mut`。
-- `move` 参数接收所有权；从已有命名位置传入时调用点必须写 `move`，非 `Copy` 实参在调用后不可再用。
+- `move` 参数接收所有权；从已有命名位置传入时调用点必须写 `move`，非 `Copy` 实参在调用后不可再用。函数体内的 `move` 参数是唯一拥有者，可以作为 `mut` 接收者或 `mut` 实参使用。
 - `self` 接收者是只读访问当前对象。
-- `mut self` 接收者是唯一可写访问当前对象；方法调用点不写 `mut`，但接收者必须是可写位置。
+- `mut self` 接收者是唯一可写访问当前对象；已有命名接收者调用时写成 `mut receiver.method(...)`，且接收者必须是可写位置。
 - `move self` 接收者接收当前对象所有权；已有命名接收者调用时写成 `move receiver.method(...)`，方法调用后原接收者不可再用。
 
 方法可以重载。方法重载键除了普通参数形状，还包含接收者类型和接收者模式。同一重载集中不能只靠只读参数和 `move` 参数区分；接收者模式也不能造成调用点无法唯一选择的歧义。
@@ -409,7 +409,7 @@ unit_expr       = "(" ")" ;
 
 `try` 不触发隐式 `Option` 到 `Result` 转换，也不触发隐式错误类型转换。
 
-调用实参上的 `mut` / `move` 表示参数访问模式。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者；`return move value`、`let owner = move value` 和独立 `move value;` 无效。
+调用实参上的 `mut` / `move` 表示参数访问模式。`mut receiver.method(...)` 表示调用 `mut self` 方法并取得已有命名接收者的短期唯一可写访问；`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者。`await mut receiver.method(...)` 表示立即等待一次 async `mut self` 调用；这个调用产生的 future 不能被命名、保存或逃逸。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`return move value`、`let owner = move value` 和独立 `move value;` 无效。
 
 `match`、`if let`、`while let` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。
 
@@ -465,7 +465,7 @@ match result {
 第一版解析器必须：
 
 - 保留源码 span，方便诊断。
-- 把调用点 `mut` / `move` 实参标记、消费接收者 `move receiver.method(...)`、闭包捕获、`for` 绑定和 `match move` 这类控制流模式解析为不同 AST 节点；`move` 不作为普通表达式前缀。
+- 把调用点 `mut` / `move` 实参标记、可写接收者 `mut receiver.method(...)`、消费接收者 `move receiver.method(...)`、闭包捕获、`for` 绑定和 `match move` 这类控制流模式解析为不同 AST 节点；`move` 不作为普通表达式前缀。
 - 把 `trust { ... }` 解析成信任边界表达式。
 - 把 `W: Writer` 这样的泛型约束保留为静态派发约束。
 - 把函数参数位置的裸接口名展开为匿名静态接口参数。

@@ -47,7 +47,7 @@ compile-fail 示例：
 ```zn
 let a = File.open("log.txt")?;
 let b = a;
-a.write("bad"); // expected-error: use of moved value
+mut a.write("bad"); // expected-error: use of moved value
 ```
 
 ## 3. 初始化
@@ -85,7 +85,7 @@ header.version = 1;
 
 大多数参数是非拥有访问路径。源码中使用普通类型名表达，编译器负责检查。
 
-参数规则是：默认读，`mut` 写，`move` 拿走。
+参数规则是：默认读，`mut` 写，`move` 拿走。`move` 参数进入函数体后是唯一拥有者，可以作为 `mut` 接收者或 `mut` 实参使用；调用方不写 `mut move`，仍然只写 `move value`。
 
 只读访问：
 
@@ -116,9 +116,8 @@ header.version = 1;
 方法接收者遵守同一套规则：
 
 - `self` 方法只读访问接收者。
-- `mut self` 方法唯一可写访问接收者，不取得所有权；接收者必须是可写位置。
+- `mut self` 方法唯一可写访问接收者，不取得所有权；已有命名接收者调用时写成 `mut receiver.method(...)`，且接收者必须是可写位置。可写位置包括 `var` 绑定、可写字段、可写元素、`move` 参数和方法体内的 `move self`。
 - `move self` 方法取得接收者所有权；已有命名接收者调用时写成 `move receiver.method(...)`，方法调用后原接收者不可再用。
-- `mut self` 方法调用点不写 `mut`，普通函数 `mut` 参数调用点仍然必须写 `mut`。
 
 拒绝示例：
 
@@ -230,7 +229,7 @@ fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError>
 fn badPush(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
     let view = bytes.asSlice();
-    bytes.push(1); // expected-error: vector structural mutation while view is live
+    mut bytes.push(1); // expected-error: vector structural mutation while view is live
     return Ok(view.len);
 }
 ```
@@ -246,7 +245,7 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
         parseHeader(view);
     }
 
-    bytes.push(1);
+    mut bytes.push(1);
     return Ok(());
 }
 ```
@@ -261,7 +260,7 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
 
 索引访问不表示所有权转移。`collection[index]` 是检查元素访问；`T: Copy` 时可以复制元素值，非 `Copy` 时只能形成短期只读元素访问。`mut collection[index]` 可以形成短期唯一可写元素访问。普通代码不能把 `collection[index]` 放进拥有位置，因为这会在容器里留下未初始化洞；从 `Vector<T>` 中取走元素必须通过 `pop`、`removeAt` 或 `swapRemove`，替换并取回旧值使用 `replaceAt`。
 
-`Map.get(key)` 只为 `V: Copy` 提供。非 `Copy` value 的短期读取或可写更新使用 `map[key]` / `mut map[key]` 的检查访问，或使用 `Map.entry(mut self, move key)`。`MapEntry<K, V>` 是短期 view-like 值，不能保存到结构体、集合、`static`、`Box`、`Shared`、逃逸闭包、线程、任务或 async future。
+`Map.get(key)` 只为 `V: Copy` 提供，且 key 是只读 lookup key，不移动调用方的 `String`、`Array` 或其他非 `Copy` key。非 `Copy` value 的短期读取或可写更新使用 `map[key]` / `mut map[key]` 的检查访问。只有 `insert(move key, move value)` 和“可能插入”的 `entry(mut self, move key)` 需要拥有 key。`MapEntry<K, V>` 是短期 view-like 值，不能保存到结构体、集合、`static`、`Box`、`Shared`、逃逸闭包、线程、任务或 async future。
 
 索引必须保证边界安全：
 
@@ -364,7 +363,7 @@ let shared = Shared.new(count);
 let t = Thread.spawn(move () {
     shared.fetchAdd(1, Ordering.Relaxed);
 });
-try t.join();
+try move t.join();
 ```
 
 ## 11. Future 取消安全
@@ -376,8 +375,9 @@ try t.join();
 - future drop 必须根据当前状态销毁已经初始化且仍拥有的字段。
 - 跨 `await` 存活的 `defer` 必须进入 future 状态，并在完成、错误提前返回、panic-unwind 或取消 drop 时执行。
 - future drop 不能 `await`；跨 `await` 的 `defer` 不能包含 `await`。
-- 短期访问、`ArraySlice<T>`、`StringSlice` 和 scoped allocator owner 不能跨 `await` 进入 future 状态。接口约束按具体类型处理；若具体类型需要跨 `await`，它必须由 future 拥有并满足对应所有权规则。
-- v1 通过禁止访问值跨 `await` 避免用户可见 `Pin`。
+- 短期访问、`ArraySlice<T>`、`StringSlice` 和 scoped allocator owner 不能作为独立值跨 `await` 进入 future 状态。接口约束按具体类型处理；若具体类型需要跨 `await`，它必须由 future 拥有并满足对应所有权规则。
+- `await mut receiver.method(...)` 允许立即等待 async `mut self` 调用，前提是 `receiver` 由当前 future 拥有；编译器把可写访问限制在被等待调用内部。把这个调用结果先保存、返回、放入结构体、传给 `spawn` 或跨另一个 `await` 使用都必须拒绝。
+- v1 通过禁止访问值逃逸跨 `await` 避免用户可见 `Pin`。
 
 ## 12. FFI 与底层安全
 

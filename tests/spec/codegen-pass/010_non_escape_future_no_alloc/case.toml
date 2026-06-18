@@ -5,7 +5,7 @@
 file = "src/main.zn"
 text = '''
 async fn parse(move reader: Reader) -> Result<U32, IoError> {
-    let header = try await reader.readU32();
+    let header = try await mut reader.readU32();
     return Ok(header);
 }
 

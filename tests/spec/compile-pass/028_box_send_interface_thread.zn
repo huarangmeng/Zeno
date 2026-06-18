@@ -36,6 +36,6 @@ fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     let handle = try Thread.spawn(move () -> U32 {
         return service.id();
     });
-    let ignored = try handle.join();
+    let ignored = try move handle.join();
     return Ok(());
 }

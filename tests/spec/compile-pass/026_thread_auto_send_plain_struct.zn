@@ -22,6 +22,6 @@ fn main() -> Result<Unit, Error> {
         let ignored = job.id + job.priority as U64;
         return Ok(());
     });
-    try handle.join();
+    try move handle.join();
     return Ok(());
 }

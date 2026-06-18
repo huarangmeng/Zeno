@@ -12,7 +12,7 @@ fn useSlice(bytes: ArraySlice<U8>) -> USize {
 
 fn bad(mut allocator: GlobalAllocator) -> USize {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
-    bytes.push(1);
+    mut bytes.push(1);
 
     let view = bytes.asSlice();
     bytes = Vector<U8>.withCapacityIn(8, mut allocator); // expected-error: cannot overwrite value while a dependent access is live
