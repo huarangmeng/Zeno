@@ -120,8 +120,12 @@ feature = "shared"
 - 并行编译和缓存命中不会改变诊断顺序或错误码。
 - 同 package 文件可以在签名中互相引用，且不会执行代码。
 - 普通 `struct` 使用默认 Auto layout，`sizeOf`、`alignOf` 和 `offsetOf` 可在编译期求值。
+- `const` 可以通过完整 CTFE 执行普通函数、循环、`match`、泛型和静态接口派发。
+- 局部 `const` 是编译期绑定，不产生运行期存储。
+- `static` 初始化默认通过 CTFE 物化，不执行隐式动态初始化。
+- 常量泛型参数可以参与类型、函数和 impl 的单态化。
 - `@layout(Source)` 保留源码字段顺序和自然对齐。
-- `@layout(C)` 接受 C-compatible 字段，并与目标 C ABI 对齐。
+- `@layout(C)` 接受 C-compatible 字段、拒绝自定义 `destroy`，并与目标 C ABI 对齐。
 - `@layout(Packed(N))` 接受 `U16`、`U32` 等普通 Copy 字段，并通过 unaligned load/store 访问字段。
 - 单真实存储字段结构体是零成本包装。
 - `Option<Box<T>>`、`Option<Shared<T>>` 和 core/std 句柄类型使用 niche 优化，不增加大小。
@@ -229,9 +233,16 @@ feature = "shared"
 - `@export("symbol", abi: C)` 可以把非泛型顶层 `pub fn` 导出为 C ABI 符号。
 - 重载函数可以通过不同 `@export` 符号分别导出。
 - C ABI 导入和导出的签名只接受 C-compatible 类型。
+- `@export("symbol", bridge: C)` 可以把 bridge-compatible Zeno 签名导出为生成的 C ABI thunk。
+- C bridge 支持 C-compatible 类型、`ArraySlice<T>` / `mut ArraySlice<T>`、`StringSlice`、`Option<T>` 返回和 `Result<T, E>` 返回。
+- C bridge 的 `Result<T, E>` 错误类型必须显式映射为 C 错误码。
 - 导出函数在 abort / trap profile 下不会让 panic unwind 穿过 C ABI。
-- 可选任务运行时的所有权转移。
+- 可选任务运行时通过 `Runtime.spawn(future)` 消费 async future，并返回 `Task<T>`。
+- 命名 future 传给 `Runtime.spawn` 时必须写 `move future`；临时 async 调用可以直接传入。
 - `Runtime.spawnBlocking` 把同步阻塞工作路由到独立 blocking pool，并返回 `Task<T>`。
+- `Runtime.spawnWithContext` 和 `Runtime.spawnBlockingWithContext` 能显式传入 `TaskContext`。
+- `TaskGroup<T>` 可以启动多个 future，并通过 `joinAll` / `tryJoinAll` 结构化收尾。
+- `TaskGroup.next` / `tryNext` 可以按完成顺序流式消费结果。
 - `await task` 消费 `Task<T>` 句柄并返回任务结果。
 - 同步入口可以通过 `mut runtime.blockOn(move task)` 或 `mut executor.blockOn(move future)` 显式阻塞等待。
 - `Task.cancel` 和 `Task.detach` 显式消费并收尾任务句柄。
@@ -277,6 +288,12 @@ feature = "shared"
 - 同一个结构体声明多个 layout 策略。
 - `@layout(...)` 标在非结构体声明上。
 - `@layout(C)` 结构体包含非 C-compatible 字段，例如 `Vector<T>`、`String`、接口拥有者或闭包。
+- `@layout(C)` 结构体带自定义 `destroy`。
+- `@export` 或 `trust extern` 签名使用 `Char`、普通 enum、`Option<T>`、`Result<T, E>`、普通 struct 或未标注 `@layout(C)` 的零成本包装。
+- `@export(..., bridge: C)` 签名使用 `String`、`Vector<T>`、`Box<T>`、`Shared<T>`、接口拥有者、闭包或带 `destroy` 的资源拥有者。
+- `@export(..., bridge: C)` 的 `Result<T, E>` 中 `E` 没有错误码映射，或 `T` 不是 bridge 可返回的 C-compatible 类型。
+- `@export(..., bridge: C)` 需要生成隐藏分配、隐藏复制、隐藏释放或动态派发 thunk。
+- v1 中直接请求 C++ bridge / C++ bindgen 语言语义；诊断应说明 C++ 路线预留但不属于 v1。
 - `@layout(Packed(N))` 的 `N` 不是 1、2、4、8 或 16。
 - `@layout(Packed(N))` 结构体包含非 `Copy` 字段、拥有资源字段或带 `destroy` 的字段。
 - packed 字段作为 `mut` 访问或长期访问逃逸。
@@ -362,6 +379,8 @@ feature = "shared"
 - async 上下文中调用 `blockOn`，应使用 `await`。
 - `Task<T>` 句柄离开作用域前没有通过 `await`、`blockOn`、`cancel` 或 `detach` 显式收尾。
 - `Task.cancel` 或 `Task.detach` 调用漏写 `move task`。
+- `TaskGroup<T>` 离开作用域前没有通过 `joinAll`、`tryJoinAll`、`cancelRemaining` 或完整 drain 收尾。
+- `TaskGroup.next` / `tryNext` 循环提前退出后没有 `cancelRemaining` 或消费 group。
 - `TaskContext` 返回、保存进结构体/集合/`Box`/`Shared`/`static`，或被线程、子任务、逃逸闭包捕获。
 - 使用隐藏全局当前任务查询来检查取消，例如 `Task.isCancellationRequested()`。
 - `Box<Interface>` 在缺少 `Send` 能力时跨线程移动。
@@ -377,11 +396,18 @@ feature = "shared"
 - `@export` 标在非 `pub` 函数、泛型函数、方法或非函数声明上。
 - 两个导出使用同一个外部符号名。
 - `@export(..., abi: C)` 签名包含非 C-compatible 类型，例如 `String`、`Vector<T>`、`ArraySlice<T>`、接口或闭包。
+- `@export(..., abi: C)` 签名暴露非 `pub` 命名结构体类型。
+- `@export(..., bridge: C)` 签名包含非 bridge-compatible 类型，或桥接 `Result` 的错误类型没有实现 `CErrorCode`。
 - unwind profile 下导出函数可能 panic 且没有 `@noPanic` 或等价边界策略。
 - `unsafe` 语法。
 - no-allocation 上下文中的隐藏堆分配。
 - 常量越界索引。
 - 常量除零、取模零和非法移位。
+- `const` 初始化环或 `static` 初始化环。
+- CTFE 中调用 `trust`、extern、裸内存、硬件访问、inline asm、线程、任务、`await`、当前时间、随机数、环境变量、网络或未声明文件输入。
+- 需要运行期拥有者时，直接把编译期 `String`、`Array<T>`、`Vector<T>`、`Map<K, V>` 或 `Set<T>` 当作运行期拥有者使用，隐藏分配或复制成本。
+- 常量泛型实参无法得到稳定 fingerprint，例如含有运行期地址身份或非结构化拥有者。
+- 隐式动态 `static` 初始化。
 - 用 `as` 执行可能截断或改变符号含义的整数转换。
 - 在返回 `Result` 的函数中直接 `try Option<T>`。
 - 对错误类型不同的 `Result<T, E>` 直接使用 `try`。
@@ -473,6 +499,13 @@ help: 在移动前读取该值，或只移动一次
 - `Box<ThreadWriter>` 与 `Box<Writer>` 的运行时布局成本相同，只是类型系统保留了额外能力证明。
 - `trust` 不能让优化器凭空推导 `noalias`、非空、对齐、初始化或生命周期事实；裸指针默认按未知 provenance / 未知别名关系处理。
 - `@export(..., abi: C)` 应按目标 C ABI 生成外部符号，不使用 Zeno 内部 mangling。
+- `@layout(C)` 的 field offsets、size、align 和 by-value aggregate passing ABI 必须来自目标 C ABI，并进入 ABI fingerprint。
+- CTFE 结果应在 HIR/MIR 前稳定，可被布局、常量泛型、属性和 codegen 复用。
+- CTFE 使用编译期 arena 不应产生运行期堆分配、引用计数或动态派发。
+- 常量泛型 value fingerprint 必须进入 mono key、layout key 和增量缓存 key。
+- `@export(..., bridge: C)` 应生成一个 C ABI thunk，原函数继续使用 Zeno ABI；slice 降为 pointer + length，`Result<T, E>` 降为 status + out 参数。
+- C bridge thunk 不应包含堆分配、引用计数、动态派发、字符串复制或 Zeno 资源布局暴露。
+- `bindgen c` 的 header hash、include path、宏定义、target triple、目标 C ABI、Clang 资源目录和生成器版本应进入增量缓存 key。
 - `@layout(Packed(N))` 字段读取应在 MIR/LLVM 中标记为 unaligned load，不能伪造成自然对齐字段访问。
 - 修改函数体的增量构建不应重新检查无关 package；修改 `pub` API 应只失效实际依赖该 API 的下游。
 - 并行 parse、body check、monomorphization 和 codegen 不应改变最终诊断顺序。

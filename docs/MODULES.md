@@ -170,7 +170,7 @@ pub struct Client {
 }
 ```
 
-`pub` 只是源码 API 可见性，不表示外部 ABI 稳定，也不导出链接符号。需要导出 C ABI 符号时必须使用 `@export("symbol", abi: C)`。
+`pub` 只是源码 API 可见性，不表示外部 ABI 稳定，也不导出链接符号。需要导出严格 C ABI 符号时必须使用 `@export("symbol", abi: C)`；需要导出用户友好的 C bridge thunk 时使用 `@export("symbol", bridge: C)`。
 
 `private` 表示只在当前文件可见：
 
@@ -317,10 +317,10 @@ Zeno v1 不提供隐式 prelude wildcard。`Result`、`Option`、`Thread`、`Mut
 
 顶层只能包含声明，没有顶层语句。
 
-- `const` 必须在编译期求值。
-- `static` 初始化式必须满足当前 profile 的静态初始化规则。
-- hosted profile 可以支持受控动态 static 初始化，但必须按依赖图拓扑排序；循环初始化报错。
-- freestanding / kernel / embedded profile 默认拒绝需要运行时动态初始化的 `static`。
+- `const` 必须通过 CTFE 求值。
+- `static` 初始化式默认也必须通过 CTFE 求值，并物化为静态数据。
+- 隐式动态 `static` 初始化不进入 v1；以后如果支持，必须用显式属性和 profile 策略开启，并按依赖图拓扑排序。
+- freestanding / kernel / embedded profile 拒绝需要运行时动态初始化的 `static`。
 
 ## 12. trust 与依赖审计
 

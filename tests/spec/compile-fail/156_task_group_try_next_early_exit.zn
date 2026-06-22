@@ -1,0 +1,27 @@
+// category: compile-fail
+// profile: hosted
+// purpose: early exit from a TaskGroup streaming loop must settle remaining tasks
+
+module tests.fail.taskGroupTryNextEarlyExit;
+
+async fn fetchPage(move job: Job) -> Result<Page, FetchError> {
+    return fetch(move job);
+}
+
+async fn bad(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Unit, FetchError> {
+    var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
+
+    for move job in jobs {
+        try mut group.spawn(fetchPage(move job));
+    }
+
+    while val Some(page) = try await mut group.tryNext() {
+        if shouldStop(page) {
+            return Ok(()); // expected-error: task group may still contain unfinished tasks; call move group.cancelRemaining() before leaving
+        }
+
+        consume(move page);
+    }
+
+    return Ok(());
+}

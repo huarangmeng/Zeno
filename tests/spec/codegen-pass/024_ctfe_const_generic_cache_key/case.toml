@@ -1,0 +1,44 @@
+# category: codegen-pass
+# purpose: CTFE results feed const generics, layout, and cache keys without runtime work
+
+[source]
+file = "src/main.zn"
+text = '''
+fn pow2(n: USize) -> USize {
+    var value: USize = 1;
+    var i: USize = 0;
+
+    while i < n {
+        value = value * 2;
+        i = i + 1;
+    }
+
+    return value;
+}
+
+const pageSize: USize = pow2(12);
+
+struct Page<const Size: USize> {
+    bytes: Array<U8>,
+}
+
+fn makePage() -> Page<pageSize> {
+    return Page<pageSize> {
+        bytes: Array<U8>.filled(pageSize, 0),
+    };
+}
+'''
+
+[expect.hir]
+contains = [
+    "ctfe pow2(12) -> 4096",
+    "const pageSize valueFingerprint=USize:4096",
+    "constGeneric Size valueFingerprint=USize:4096",
+    "monoKey includes constArg Size=4096",
+    "layoutKey includes constArg Size=4096",
+]
+forbid = [
+    "runtime call pow2 for pageSize",
+    "dynamic dispatch for const generic",
+    "hidden runtime CTFE allocation",
+]

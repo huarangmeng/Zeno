@@ -288,7 +288,7 @@ allowedPackages = ["kernel", "platform"]
 
 字段含义：
 
-- `ffi`：允许 `trust extern` 和裸 ABI 绑定。
+- `ffi`：允许 `trust extern`、裸 ABI 导入和裸外部调用。`@export(..., bridge: C)` 只生成安全 C thunk，本身不需要 `trust.ffi`；如果 thunk 或同包封装调用了 `trust extern`，仍然必须开启对应能力。
 - `rawMemory`：允许裸地址 / 裸指针构造、偏移、解引用、按位重解释和手动对齐声明。
 - `hardware`：允许 MMIO、端口 I/O、volatile 硬件访问、物理地址映射和链接段控制。
 - `inlineAsm`：允许 inline asm。
@@ -335,7 +335,7 @@ manifest 会影响这些规则：
 - `panic.stack` 决定 `PanicInfo.stack()` 能提供的最低诊断能力。
 - `oom.strategy = "panic"` 会让可能分配的 API 在 `@noPanic` 中被拒绝。
 - `trust` 字段决定 `trust` 边界内可使用的底层能力类别。
-- `target.profile` 决定 hosted `std`、OS 线程、文件系统和动态初始化 `static` 是否可用。
+- `target.profile` 决定 hosted `std`、OS 线程和文件系统是否可用。v1 不提供隐式动态 `static` 初始化；`static` 默认通过 CTFE 物化。
 
 manifest 不会改变普通所有权、move、初始化、访问值和 `Send` / `Sync` 的核心规则。
 

@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C bridge must not hide ownership transfer or allocation for owned String
+
+module tests.fail.bridgeOwnedStringRejected;
+
+@export("take_string", bridge: C)
+pub fn takeString(text: String) -> I32 { // expected-error: String is not bridge-compatible; use StringSlice, CStr, or an explicit handle API
+    return text.len() as I32;
+}

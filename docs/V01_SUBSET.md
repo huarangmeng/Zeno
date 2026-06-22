@@ -38,6 +38,8 @@
 - 基础整数、浮点、`Bool`、`Char`、`Unit`、`Never`。
 - `struct`、`enum`、`interface`、`impl`。
 - 默认 Auto layout、`@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`。
+- `const` 项、局部 `const`、`static` CTFE 初始化、常量泛型参数和布局查询。
+- CTFE 必须能执行普通函数、方法、循环、`match`、泛型和静态接口派发；不能只实现字面量表达式。
 - `val`、`var`、块、`if`、`while`、`for`、基础 `match`。
 - 基础 pattern、穷尽性检查、只读 / `mut` / `move` enum payload 访问。
 - 闭包语法：`(params) -> T { ... }` 和 `(params) => expr`。
@@ -100,6 +102,8 @@
 - manifest trust 能力检查和 trust 报告基础记录，包括 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts` 和 `threadSafety` 类别。
 - `@export("symbol", abi: C)`。
 - C-compatible 签名检查。
+- `@export("symbol", bridge: C)` 的最小 C bridge：C-compatible 类型、`ArraySlice<T>` / `mut ArraySlice<T>`、`StringSlice`、`Option<T>` 返回、`Result<T, E>` 返回和 C thunk 生成。
+- `zeno bindgen c` 可以作为工具链能力实现；完整 C++ bindgen 不属于 v1 门禁，但缓存和包元数据不能排斥后续 `cxx` 前端。
 - 导出符号唯一性。
 - panic 跨 C ABI 边界检查。
 
@@ -138,7 +142,7 @@ stage0 MVP 不要求实现：
 
 - 完整 `Shared<T>` runtime。
 - `Shared<Interface>` 动态接口对象。
-- async lowering、future 状态机、executor 和 task runtime。
+- async lowering、future 状态机、executor、task runtime 和 `TaskGroup<T>`。
 - `Thread.scope`、scoped thread、`splitDisjoint` 的不重叠证明。
 - 跨 package `pub fn -> Interface` opaque return metadata。
 - registry 解析、git fetch、发布协议。

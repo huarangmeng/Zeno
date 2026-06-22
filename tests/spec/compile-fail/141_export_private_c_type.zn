@@ -1,0 +1,17 @@
+// category: compile-fail
+// profile: hosted
+// panic.strategy: abort
+// purpose: exported C ABI signatures cannot expose non-public named structs
+
+module tests.fail.exportPrivateCType;
+
+@layout(C)
+struct HiddenPoint {
+    x: F32,
+    y: F32,
+}
+
+@export("hidden_point_sum", abi: C)
+pub fn hiddenPointSum(point: HiddenPoint) -> F32 { // expected-error: exported C ABI signature exposes non-pub type HiddenPoint
+    return point.x + point.y;
+}

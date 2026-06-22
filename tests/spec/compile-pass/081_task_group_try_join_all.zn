@@ -1,0 +1,19 @@
+// category: compile-pass
+// profile: hosted
+// purpose: TaskGroup starts multiple futures and settles them through tryJoinAll
+
+module tests.pass.taskGroupTryJoinAll;
+
+async fn fetchPage(move job: Job) -> Result<Page, FetchError> {
+    return fetch(move job);
+}
+
+async fn loadAll(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Vector<Page>, FetchError> {
+    var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
+
+    for move job in jobs {
+        try mut group.spawn(fetchPage(move job));
+    }
+
+    return try await move group.tryJoinAll();
+}

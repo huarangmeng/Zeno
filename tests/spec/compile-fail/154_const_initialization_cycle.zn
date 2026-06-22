@@ -1,0 +1,8 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: const initialization cycles are rejected before CTFE
+
+module tests.fail.constInitializationCycle;
+
+const a: USize = b + 1; // expected-error: const initialization cycle a -> b -> a
+const b: USize = a + 1;

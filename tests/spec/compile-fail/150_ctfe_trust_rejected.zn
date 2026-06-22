@@ -1,0 +1,16 @@
+// category: compile-fail
+// profile: hosted
+// trust.ffi: true
+// purpose: CTFE is complete but hermetic; trust and extern calls cannot execute at compile time
+
+module tests.fail.ctfeTrustRejected;
+
+trust extern "C" fn getpid() -> I32;
+
+fn currentPid() -> I32 {
+    return trust {
+        getpid()
+    };
+}
+
+const pid: I32 = currentPid(); // expected-error: CTFE cannot execute trust or extern calls

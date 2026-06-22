@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C++ bridge is reserved for a later bindgen cxx tool and is not v1 language semantics
+
+module tests.fail.bridgeCxxNotV1;
+
+@export("cpp_add", bridge: Cxx)
+pub fn add(a: I32, b: I32) -> I32 { // expected-error: bridge Cxx is reserved for future bindgen cxx; v1 supports bridge C only
+    return a + b;
+}

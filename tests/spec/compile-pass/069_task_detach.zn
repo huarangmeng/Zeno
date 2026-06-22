@@ -4,10 +4,12 @@
 
 module tests.pass.taskDetach;
 
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 fn launchBackground(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     move task.detach();
     return Ok(());

@@ -4,10 +4,12 @@
 
 module tests.fail.taskDetachRequiresMove;
 
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     task.detach(); // expected-error: detach consumes the task handle; use move task.detach()
     return Ok(());

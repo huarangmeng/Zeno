@@ -1,0 +1,24 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C bridge Result payload cannot require hidden allocation, ownership transfer, or Zeno layout exposure
+
+module tests.fail.bridgeResultOwnedPayloadRejected;
+
+import core.result.{Result, Ok, Err};
+import core.ffi.CErrorCode;
+
+enum LookupError {
+    Missing,
+}
+
+impl CErrorCode for LookupError {
+    fn toCCode(self) -> I32 {
+        return 2;
+    }
+}
+
+@export("lookup_name", bridge: C)
+pub fn lookupName(id: I32) -> Result<String, LookupError> { // expected-error: bridge C Result payload String is not C-compatible; return StringSlice for immediate access or use CHandle
+    val ignored = id;
+    return Ok(String.from("root"));
+}

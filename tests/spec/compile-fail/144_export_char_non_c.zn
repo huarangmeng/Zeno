@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: hosted
+// panic.strategy: abort
+// purpose: Char is not a C-compatible scalar; use an explicit integer width
+
+module tests.fail.exportCharNonC;
+
+@export("take_char", abi: C)
+pub fn takeChar(ch: Char) -> I32 { // expected-error: Char is not C-compatible in an exported C ABI signature
+    val ignored = ch;
+    return 0;
+}

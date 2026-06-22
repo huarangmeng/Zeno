@@ -4,18 +4,22 @@
 
 module tests.fail.taskContextThreadEscape;
 
-fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, Error> {
-    val task = try runtime.spawn(move (ctx: TaskContext) -> Result<Unit, Error> {
-        val handle = try Thread.spawn(move () -> Unit {
-            if ctx.isCancellationRequested() { // expected-error: TaskContext cannot be captured by Thread.spawn
-                return;
-            }
+async fn runBad(move work: Work, ctx: TaskContext) -> Result<Unit, Error> {
+    val handle = try Thread.spawn(move () -> Unit {
+        if ctx.isCancellationRequested() { // expected-error: TaskContext cannot be captured by Thread.spawn
             return;
-        });
-
-        try move handle.join();
-        return process(move work);
+        }
+        return;
     });
+
+    try move handle.join();
+    return process(move work);
+}
+
+fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, Error> {
+    val task = try runtime.spawnWithContext(
+        move (ctx: TaskContext) => runBad(move work, ctx)
+    );
 
     return try mut runtime.blockOn(move task);
 }

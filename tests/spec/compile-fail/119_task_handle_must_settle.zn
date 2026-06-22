@@ -4,10 +4,12 @@
 
 module tests.fail.taskHandleMustSettle;
 
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     return Ok(()); // expected-error: task handle must be settled with await, blockOn, cancel, or detach
 }

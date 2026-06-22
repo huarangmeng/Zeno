@@ -80,10 +80,12 @@ Thread.scope((mut scope) {
 示例：
 
 ```zn
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 async fn run(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     try await task;
     return Ok(());
@@ -94,12 +96,25 @@ async fn run(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> 
 
 - runtime 是显式值。
 - 没有程序选择的 runtime 或 executor，任务不能运行。
-- `spawn` 可能分配，也可能失败，并且消费 `OnceFn<T>` 任务闭包。
+- `Runtime.spawn` 接收并消费 `Future<T>`，返回 `Task<T>`。
+- `spawn` 可能分配 task control block，也可能因为 runtime 已关闭、队列饱和或 profile 定义的资源限制失败。
+- 临时 async 调用可以直接传给 `spawn`；已有命名 future 必须在调用点写 `move future`。
 - `await task` 是语言操作，会消费 `Task<T>` 句柄；等待后原 task 绑定不可再用。
 - 同步入口等待任务必须写成 `mut runtime.blockOn(move task)`；它阻塞当前线程，成本由 `Runtime` 和方法名共同暴露。
-- 可跨 worker 运行的任务要求捕获状态和返回值是 `Send`。
-- 可能长期阻塞 worker 的同步工作必须使用 `spawnBlocking`，不能放进普通 `spawn`。
+- 可跨 worker 运行的 future 状态和返回值必须是 `Send`。
+- 普通 `spawn` 不接收同步闭包；同步工作要么写成 `async fn`，要么使用 `spawnBlocking`，要么显式使用底层 `Thread.spawn`。
 - 库 API 不得偷偷捕获全局 runtime。
+
+命名 future 示例：
+
+```zn
+async fn runNamed(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val future = runWork(move work);
+    val task = try runtime.spawn(move future);
+
+    return try await task;
+}
+```
 
 阻塞工作示例：
 
@@ -125,11 +140,13 @@ async fn readConfig(move runtime: Runtime, move path: Path) -> Result<Bytes, IoE
 同步入口示例：
 
 ```zn
+async fn workAsync() -> Result<Unit, WorkError> {
+    return work();
+}
+
 fn main() -> Result<Unit, WorkError> {
     var runtime = try Runtime.withWorkerCount(8);
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return work();
-    });
+    val task = try runtime.spawn(workAsync());
 
     try mut runtime.blockOn(move task);
     return Ok(());
@@ -144,6 +161,75 @@ fn main() -> Result<Unit, WorkError> {
 - `blockOn(move task)` 消费任务句柄并阻塞当前线程直到任务完成。
 - `blockOn` 返回被等待对象的输出；如果输出是 `Result<T, E>`，调用方可以写 `try mut runtime.blockOn(move task)`。
 
+### TaskGroup 结构化并发
+
+`TaskGroup<T>` 是一组同类型任务的拥有者，用来表达“启动多个任务，然后在当前结构内统一收尾”。它解决两件事：避免把并发写成层层回调；同时保证任务不会在函数返回时被遗忘。
+
+主路径用 `joinAll` / `tryJoinAll`，一次性消费 group：
+
+```zn
+async fn loadAll(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Vector<Page>, FetchError> {
+    var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
+
+    for move job in jobs {
+        try mut group.spawn(fetchPage(move job));
+    }
+
+    return try await move group.tryJoinAll();
+}
+```
+
+流式处理完成结果时，用 `next` / `tryNext`：
+
+```zn
+async fn loadStreaming(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Unit, FetchError> {
+    var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
+
+    for move job in jobs {
+        try mut group.spawn(fetchPage(move job));
+    }
+
+    while val Some(page) = try await mut group.tryNext() {
+        consume(move page);
+    }
+
+    return Ok(());
+}
+```
+
+必要 API：
+
+```zn
+impl<T: Send> TaskGroup<T> {
+    fn withCapacity(capacity: USize, mut runtime: Runtime) -> TaskGroup<T>;
+    fn spawn(mut self, move future: Future<T>) -> Result<Unit, SpawnError>;
+    async fn next(mut self) -> Option<T>;
+    async fn joinAll(move self) -> Vector<T>;
+    async fn joinAllOrdered(move self) -> Vector<T>;
+    fn cancelRemaining(move self) -> TaskCancelSummary;
+}
+
+impl<T: Send, E: Send> TaskGroup<Result<T, E>> {
+    async fn tryNext(mut self) -> Result<Option<T>, E>;
+    async fn tryJoinAll(move self) -> Result<Vector<T>, E>;
+    async fn tryJoinAllOrdered(move self) -> Result<Vector<T>, E>;
+}
+```
+
+规则：
+
+- `TaskGroup` 是显式拥有者；它可能为任务表、完成队列和 task control block 分配内存。
+- `withCapacity` 预留 group 元数据容量；它不启动任务。
+- `group.spawn(future)` 消费 future，并要求 future 状态和输出满足跨 worker 的 `Send` 规则。
+- `joinAll` / `tryJoinAll` 消费 group，等待所有任务，并按完成顺序返回结果；这是最低额外协调成本的默认行为。
+- 需要保持 spawn 顺序时使用 `joinAllOrdered` / `tryJoinAllOrdered`。有序收集可能需要额外索引和结果槽位，成本由方法名表达。
+- `next` / `tryNext` 每次返回一个完成结果，顺序是完成顺序。循环提前退出时，调用方必须用 `move group.cancelRemaining()` 或其他消费 API 显式收尾。
+- `next` / `tryNext` 返回 `None` 后，group 进入 drained 状态，离开作用域不再需要额外收尾。编译器必须认识 `while val Some(x) = await mut group.next()` 和 `while val Some(x) = try await mut group.tryNext()` 这类 drain 循环。
+- `tryNext` / `tryJoinAll` 遇到第一个 `Err` 时，会请求取消剩余任务并把 group 标记为 settled。等待或丢弃结果的策略由 runtime profile 定义，但不能让未收尾任务逃出 group。
+- 对 `try await mut group.tryNext()`，`try` 的提前返回路径被视为已经收尾，因为 `tryNext` 的 `Err` 路径已经 settled group。
+- `cancelRemaining(move self)` 消费 group，请求取消仍未完成的任务并丢弃后续输出；它不隐藏阻塞等待。
+- `TaskGroup<T>` 不能被隐式 drop。离开作用域前必须被 `joinAll`、`tryJoinAll`、`cancelRemaining` 消费，或者被 `next` / `tryNext` 完整 drain 到 `None`。
+
 ### Task 句柄生命周期
 
 `Task<T>` 是必须显式收尾的资源。一个任务句柄不能在作用域末尾被隐式丢弃；它必须被移动给调用方，或通过下面任意一种方式消费：
@@ -156,27 +242,25 @@ fn main() -> Result<Unit, WorkError> {
 示例：
 
 ```zn
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 async fn runOrStop(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     try await task;
     return Ok(());
 }
 
 fn cancelQueued(move runtime: Runtime, move work: Work) -> Result<TaskCancelStatus, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
-    return move task.cancel();
+    return Ok(move task.cancel());
 }
 
 fn launchBackground(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     move task.detach();
     return Ok(());
@@ -206,17 +290,21 @@ enum TaskCancelStatus {
 
 ### 取消检查
 
-任务内部需要主动检查取消请求时，在 `spawn` / `spawnBlocking` 闭包中声明 `TaskContext` 参数：
+任务内部需要主动检查取消请求时，使用显式上下文入口。普通 `Runtime.spawn(future)` 不创建用户可见 `TaskContext`，因此没有额外参数和检查成本。
 
 ```zn
-async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move (ctx: TaskContext) -> Result<Unit, WorkError> {
-        if ctx.isCancellationRequested() {
-            return Err(WorkError.Cancelled);
-        }
+async fn processCancellable(move work: Work, ctx: TaskContext) -> Result<Unit, WorkError> {
+    if ctx.isCancellationRequested() {
+        return Err(WorkError.Cancelled);
+    }
 
-        return process(move work);
-    });
+    return process(move work);
+}
+
+async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawnWithContext(
+        move (ctx: TaskContext) => processCancellable(move work, ctx)
+    );
 
     return try await task;
 }
@@ -226,7 +314,7 @@ async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, 
 
 ```zn
 fn launchBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelStatus, IoError> {
-    val task = try runtime.spawnBlocking(move (ctx: TaskContext) -> Result<Bytes, IoError> {
+    val task = try runtime.spawnBlockingWithContext(move (ctx: TaskContext) -> Result<Bytes, IoError> {
         if ctx.isCancellationRequested() {
             return Err(IoError.Cancelled);
         }
@@ -240,7 +328,10 @@ fn launchBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelSt
 
 规则：
 
-- `Runtime.spawn` 和 `Runtime.spawnBlocking` 接受两种任务闭包：`OnceFn<T>` 和 `OnceFn<TaskContext, T>`。不需要取消检查时继续写零参数闭包。
+- `Runtime.spawn(future)` 是日常异步入口，接收 `Future<T>`。
+- `Runtime.spawnWithContext(makeFuture)` 是高级入口，接收 `OnceFn<TaskContext, Future<T>>`。闭包只在启动时调用一次，runtime 保存它返回的 future，不保存闭包本身。
+- `Runtime.spawnBlocking(job)` 接收同步 `OnceFn<T>`。
+- `Runtime.spawnBlockingWithContext(job)` 接收同步 `OnceFn<TaskContext, T>`。
 - `TaskContext` 是 task-local 的轻量能力值，通常 lowered 为任务控制块中的取消位读取；`isCancellationRequested()` 不能分配、不能加锁、不能执行系统调用。
 - `isCancellationRequested()` 只报告取消请求是否已经对当前任务可见，不会自动返回、不会 panic，也不会改变任务返回类型。任务用自己的错误类型或返回值表达“已取消”。
 - `TaskContext` 可以复制并传给当前任务内的普通 helper 函数；它可以作为当前任务 future 状态的一部分跨 `await` 存活。

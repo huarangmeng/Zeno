@@ -1,0 +1,11 @@
+// category: compile-fail
+// profile: hosted
+// purpose: const owned values cannot become runtime owners without explicit allocation or copying
+
+module tests.fail.constOwnedStringRuntimeMaterialization;
+
+const name: String = String.from("zeno");
+
+fn bad() -> String {
+    return name; // expected-error: const String cannot be materialized as a runtime owned String without explicit String.from
+}

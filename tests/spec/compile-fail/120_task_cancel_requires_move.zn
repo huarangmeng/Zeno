@@ -4,10 +4,12 @@
 
 module tests.fail.taskCancelRequiresMove;
 
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     val status = task.cancel(); // expected-error: cancel consumes the task handle; use move task.cancel()
     val ignored = status;

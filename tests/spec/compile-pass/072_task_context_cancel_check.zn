@@ -1,17 +1,21 @@
 // category: compile-pass
 // profile: hosted
-// purpose: task closures can receive TaskContext and explicitly check cancellation
+// purpose: spawnWithContext can provide TaskContext for explicit cancellation checks
 
 module tests.pass.taskContextCancelCheck;
 
-async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move (ctx: TaskContext) -> Result<Unit, WorkError> {
-        if ctx.isCancellationRequested() {
-            return Err(WorkError.Cancelled);
-        }
+async fn processCancellable(move work: Work, ctx: TaskContext) -> Result<Unit, WorkError> {
+    if ctx.isCancellationRequested() {
+        return Err(WorkError.Cancelled);
+    }
 
-        return process(move work);
-    });
+    return process(move work);
+}
+
+async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawnWithContext(
+        move (ctx: TaskContext) => processCancellable(move work, ctx)
+    );
 
     return try await task;
 }

@@ -150,7 +150,10 @@ Zeno 使用 SemVer，但系统语言兼容性比普通库更严格。
 patch 版本不能破坏：
 
 - `pub` API 名称、类型签名和可见性。
+- `pub const` 值、常量泛型参数和可见 CTFE 结果的稳定 fingerprint。
 - `@layout(C)` 类型的字段、顺序、大小、对齐和 C-compatible 状态。
+- `@export(..., bridge: C)` 生成的 thunk 低层签名、头文件片段、错误码映射和 bridge-compatible 状态。
+- bindgen 输入摘要，包括前端类型 `c` / `cxx`、header hash、include path、宏定义、target triple、目标 ABI、Clang 资源目录、生成器版本和 Zeno 版本。
 - `@export` 外部符号名、ABI、参数和返回类型。
 - manifest 中声明的 profile 要求和 trust 能力集合。
 

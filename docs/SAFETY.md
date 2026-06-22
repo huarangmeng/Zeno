@@ -400,7 +400,8 @@ try move t.join();
 
 任务取消检查使用 `TaskContext`：
 
-- `TaskContext` 由 runtime 传给声明了上下文参数的任务闭包，表示当前任务的取消检查能力。
+- `TaskContext` 只由 `Runtime.spawnWithContext` 或 `Runtime.spawnBlockingWithContext` 传给声明了上下文参数的入口，表示当前任务的取消检查能力。
+- 普通 `Runtime.spawn(future)` 不提供用户可见上下文，因此不承担取消检查成本。
 - `TaskContext` 可以作为当前任务 future 状态的一部分跨 `await`，因为任务控制块至少活到该任务完成。
 - `TaskContext` 不能返回、不能进入长期拥有者、不能被线程、子任务或逃逸闭包捕获；否则可能让取消检查能力超过原任务生命周期。
 - `TaskContext.isCancellationRequested()` 不同步用户数据。需要在取消请求和其他数据之间建立顺序时，必须使用 `Mutex`、atomic、channel 或其他同步原语。
@@ -413,7 +414,9 @@ try move t.join();
 trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 ```
 
-导出给外部 ABI 必须显式写 `@export("symbol", abi: C)`。导出函数只能使用 C-compatible 签名，不能让 panic unwind 穿过 ABI 边界，也不能把 Zeno 资源拥有者布局暴露给 C 侧猜测。
+导出给外部 ABI 必须显式写 `@export("symbol", abi: C)` 或 `@export("symbol", bridge: C)`。`abi: C` 导出函数只能使用 C-compatible 签名，不能让 panic unwind 穿过 ABI 边界，也不能把 Zeno 资源拥有者布局暴露给 C 侧猜测。
+
+`bridge: C` 允许导出更接近普通 Zeno 的源码签名，但它不是放宽 ABI。编译器必须生成一个严格 C-compatible 的 thunk，并且只允许零分配、零复制、零动态派发转换，例如 `ArraySlice<T>` 到 pointer + length、`StringSlice` 到 bytes + length、`Result<T, E>` 到 status + out 参数。拥有资源、接口对象、闭包和带 `destroy` 的类型不能自动 bridge；需要跨 C 长期保存时必须使用 handle 或明确所有权类型。
 
 裸 FFI 调用、地址构造和指针操作必须出现在 `trust` 块中：
 

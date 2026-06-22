@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// panic.strategy: abort
+// purpose: zero-cost single-field wrappers are not C-compatible unless explicitly layout(C)
+
+module tests.fail.exportPlainWrapperNonC;
+
+struct FileDescriptor {
+    value: I32,
+}
+
+@export("fd_value", abi: C)
+pub fn fdValue(fd: FileDescriptor) -> I32 { // expected-error: FileDescriptor is not C-compatible; add @layout(C)
+    return fd.value;
+}

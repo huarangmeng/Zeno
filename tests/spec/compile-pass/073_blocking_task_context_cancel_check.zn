@@ -5,7 +5,7 @@
 module tests.pass.blockingTaskContextCancelCheck;
 
 fn cancelBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelStatus, IoError> {
-    val task = try runtime.spawnBlocking(move (ctx: TaskContext) -> Result<Bytes, IoError> {
+    val task = try runtime.spawnBlockingWithContext(move (ctx: TaskContext) -> Result<Bytes, IoError> {
         if ctx.isCancellationRequested() {
             return Err(IoError.Cancelled);
         }

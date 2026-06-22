@@ -1,0 +1,34 @@
+# category: codegen-pass
+# purpose: layout(C) records target C ABI layout and aggregate passing facts
+
+[source]
+file = "src/main.zn"
+text = '''
+@layout(C)
+pub struct CPoint {
+    pub x: F32,
+    pub y: F32,
+}
+
+@export("point_sum", abi: C)
+pub fn pointSum(point: CPoint) -> F32 {
+    return point.x + point.y;
+}
+'''
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+
+[expect.layout]
+contains = [
+    "CPoint layout=C target=x86_64-unknown-linux-gnu",
+    "field x offset=0",
+    "field y offset=4",
+    "size=8 align=4",
+    "abiFingerprint includes target C ABI",
+    "pointSum param point uses C aggregate passing",
+]
+forbid = [
+    "Auto layout reorder CPoint",
+    "Zeno internal aggregate ABI for pointSum",
+]

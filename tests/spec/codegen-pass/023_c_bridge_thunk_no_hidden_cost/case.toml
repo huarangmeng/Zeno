@@ -1,0 +1,52 @@
+# category: codegen-pass
+# purpose: bridge C export generates a strict C ABI thunk without allocation, copying, or dynamic dispatch
+
+[source]
+file = "src/main.zn"
+text = '''
+import core.result.{Result, Ok, Err};
+import core.ffi.CErrorCode;
+
+enum IoError {
+    Failed,
+}
+
+impl CErrorCode for IoError {
+    fn toCCode(self) -> I32 {
+        return 5;
+    }
+}
+
+@layout(C)
+pub struct FileDescriptor {
+    pub value: I32,
+}
+
+@export("zeno_read", bridge: C)
+pub fn read(fd: FileDescriptor, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
+    if out.len() == 0 {
+        return Ok(0);
+    }
+
+    out[0] = 1;
+    return Ok(1);
+}
+'''
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+
+[expect.hir]
+contains = [
+    "export bridge=C symbol=zeno_read",
+    "bridge source signature read(FileDescriptor, mut ArraySlice<U8>) -> Result<USize, IoError>",
+    "bridge thunk signature zeno_read(FileDescriptor, U8*, USize, USize*) -> I32",
+    "IoError implements CErrorCode",
+    "abiFingerprint includes bridge thunk and header",
+]
+forbid = [
+    "bridge alloc",
+    "bridge copy String",
+    "bridge dynamic dispatch",
+    "expose Zeno Result layout",
+]

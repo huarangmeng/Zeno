@@ -35,6 +35,8 @@
 - `Array<T>`：拥有、连续、长度固定。
 - `Vector<T>`：拥有、连续、可增长。
 - `ArraySlice<T>`：非拥有连续片段，不作为字段、集合元素、`static`、逃逸闭包、线程、任务或 async future 状态保存。
+- 完整 CTFE：`const` / `static` 初始化、常量泛型、布局查询和普通 Zeno 函数的编译期执行；不新增 `comptime` 关键字。
+- CTFE 可以使用编译期 arena 构造临时集合，但运行期拥有者物化必须显式表达分配或复制成本。
 - `Map<K, V>`：拥有哈希表，保存唯一 key 到 value 的映射。
 - `Set<T>`：拥有哈希表，保存唯一值集合。
 - `String`：拥有 UTF-8 文本，可增长。
@@ -79,7 +81,8 @@
 
 - 没有默认虚拟线程，没有全局 executor。
 - `Thread.spawn` 是 OS 线程，显式消耗 `OnceFn<T>`。
-- `Runtime` 是可选任务运行时，不是语言强制运行时。
+- `Runtime` 是可选任务运行时，不是语言强制运行时；日常入口是 `Runtime.spawn(future)`。
+- `TaskGroup<T>` 是结构化并发拥有者，用 `joinAll` / `tryJoinAll` 或完整 drain 保证收尾。
 - `async fn` 降低为 future 状态机，创建 future 不自动运行。
 - `Send` 表示所有权可跨线程/任务移动。
 - `Sync` 表示只读共享可跨线程使用。
@@ -97,8 +100,11 @@
 - 普通所有权、初始化、类型、访问、layout 和 `Send` / `Sync` 检查在 `trust` 中仍然生效。
 - Manifest 控制 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts` 和依赖 trust。
 - `trust` 不给优化器额外 alias、非空、对齐、初始化、生命周期或线程安全事实；这些事实必须由显式 API 契约提供。
-- `@export("symbol", abi: C)` 是唯一外部符号导出方式。
-- 外部 C ABI 只允许 C-compatible 类型；静态接口参数/返回、接口拥有者、闭包和资源拥有者默认不能跨 C ABI。
+- `@export("symbol", abi: C)` 是严格外部符号导出方式。
+- `@export("symbol", bridge: C)` 是用户友好的 C bridge 导出方式；编译器生成 C ABI thunk 和头文件。
+- 外部裸 C ABI 只允许 C-compatible 类型；静态接口参数/返回、接口拥有者、闭包、普通 enum、`Option`、`Result`、`Char`、普通 struct 和资源拥有者默认不能跨 C ABI。
+- C bridge 可以接受有限 bridge-compatible 类型，但必须零分配、零复制、零动态派发，并把 `Result` / `Option` 返回 lowering 成错误码 / found 标志加 out 参数。
+- 官方 `bindgen c` 生成 raw/safe 两层；C++ 绑定后续通过独立 `bindgen cxx` 和 C shim / opaque handle 路线接入，不进入 v1 完整语言语义。
 
 审计结果：SPEC、SAFETY、FFI、MANIFEST、PACKAGE 已一致。
 
@@ -145,7 +151,7 @@ stage0 MVP 的详细必做清单、明确延后项和测试门禁见 [V01_SUBSET
 
 核心边界：
 
-- 必做：lexer/parser/AST、module/import/visibility、基础类型、`struct`/`enum`/`interface`/`impl`、所有权、RAII、`destroy`、`Result`/`Option`/`try`、静态泛型、泛型接口参数推断、同 package 静态接口返回、`Box<Interface>` 最小动态派发、核心集合、`String`/`StringSlice`、`trust extern`、`@export`、C-compatible 检查、HIR/MIR/LLVM lowering。
+- 必做：lexer/parser/AST、module/import/visibility、基础类型、`struct`/`enum`/`interface`/`impl`、完整 CTFE、常量泛型、所有权、RAII、`destroy`、`Result`/`Option`/`try`、静态泛型、泛型接口参数推断、同 package 静态接口返回、`Box<Interface>` 最小动态派发、核心集合、`String`/`StringSlice`、`trust extern`、`@export`、C-compatible / bridge-compatible 检查、HIR/MIR/LLVM lowering。
 - 延后：完整 `Shared<T>` runtime、async lowering、scoped 并发、跨 package opaque return metadata、registry/git package manager、高级增量缓存、宏、反射、downcast、稳定外部 ABI。
 
 ## 5. 审计命令

@@ -13,6 +13,7 @@ Zeno 编译器目标是：前端可并行、增量失效精确、缓存安全、
 - target triple、cpu、features。
 - profile、allocator、panic/OOM、trust 配置。
 - builtin/core/alloc/std 包 hash。
+- 声明式编译期 build input 内容 hash。
 - 构建模式：debug/release、优化等级、诊断严格度。
 
 这些输入进入 build session fingerprint。任何一项变化，都不能复用不安全缓存。
@@ -33,6 +34,7 @@ Zeno 的语义编译单元是 package。
 - declaration 单元：顶层声明签名。
 - body-check 单元：函数体、方法体、闭包体。
 - layout 单元：每个具体类型。
+- const-eval 单元：每个 `const`、`static` 初始化、常量泛型实参、属性参数和布局查询。
 - mono 单元：每个单态化函数 / 方法 / 类型实例。
 - codegen 单元：MIR partition 或 mono item group。
 
@@ -51,6 +53,7 @@ package graph
   -> resolve imports and names
   -> type/interface checking
   -> ownership/init/access/escape checking
+  -> const evaluation
   -> layout computation
   -> typed HIR
   -> monomorphization planning
@@ -71,6 +74,7 @@ package graph
 - name resolution 使用 package 级 symbol table，按声明 SCC 并行。
 - 函数体检查按依赖和可见签名并行。
 - layout 计算按类型依赖图 SCC 并行。
+- CTFE 按依赖图 SCC 并行；同一 SCC 中的 const 初始化环必须稳定诊断。
 - monomorphization 按实例并行。
 - MIR 优化和 LLVM codegen 按 codegen unit 并行。
 
@@ -91,8 +95,8 @@ stable node id
 
 每个 package 输出：
 
-- `publicFingerprint`：外部可见 API、`pub` 类型、`pub` 函数签名、静态接口返回的 opaque return identity 与 layout/drop 摘要、`@layout(C)`、`@export`、trust 能力摘要。
-- `packageFingerprint`：package-visible 签名、impl 集合、重载集合、layout 结果。
+- `publicFingerprint`：外部可见 API、`pub` 类型、`pub` 函数签名、静态接口返回的 opaque return identity 与 layout/drop 摘要、`@layout(C)`、`@export`、C bridge thunk 摘要、trust 能力摘要。
+- `packageFingerprint`：package-visible 签名、impl 集合、重载集合、const 值摘要、layout 结果。
 - `bodyFingerprint`：函数体和局部实现。
 - `codegenFingerprint`：MIR、优化配置、target 配置。
 
@@ -101,8 +105,12 @@ stable node id
 - 修改函数体但不改签名：重查该 body 和受调用内联影响的 mono/codegen；下游 package 不失效。
 - 修改 package-visible 签名：当前 package 相关 body 失效；外部 package 不失效，除非该签名通过 `pub` API 泄露。
 - 修改 `pub` 签名：下游依赖该 API 的 package 失效。
+- 修改 `pub const` 值、常量泛型默认值或可见 CTFE 结果：依赖该值的下游 const-eval、layout、mono 和 codegen 失效。
 - 修改 `pub fn -> Interface` 的隐藏具体返回类型、layout fingerprint 或 drop glue：依赖该返回值布局或接口调用的下游 mono/codegen 失效。
 - 修改 `@layout(C)` 字段、大小、对齐或 C-compatible 状态：所有使用该类型的 FFI/codegen 单元失效。
+- 修改 `@export(..., bridge: C)` 源码签名、生成 thunk 低层签名、头文件片段或错误码映射：依赖该外部 ABI 的 FFI/codegen 单元失效。
+- 修改 bindgen 输入 header、include path、宏定义、target triple、目标 C/C++ ABI、Clang 资源目录、生成器版本或 Zeno 版本：对应生成包和依赖它的 FFI/codegen 单元失效。
+- 修改声明式编译期 build input：依赖该输入的 CTFE、layout、mono 和 codegen 单元失效。
 - 修改 Auto layout 类型：当前 package 依赖该 layout 的 codegen 失效；若该类型出现在 `pub` API，依赖方按 ABI 不稳定规则重新检查。
 - 修改 `@export` symbol 或 ABI 签名：链接和下游 FFI consumer 失效。
 - 修改 `trust` 能力：信任报告、lockfile 校验和依赖策略重新执行。
@@ -122,6 +130,7 @@ panic strategy
 oom strategy
 allocator strategy
 trust config
+declared build input hashes
 Zeno.toml hash
 Zeno.lock hash
 package source hash
@@ -135,6 +144,7 @@ public/package/body/codegen fingerprint
 - type cache：signature fingerprints -> typed declarations。
 - layout cache：type fingerprints + target -> layout result。
 - body-check cache：body fingerprint + type context -> checked HIR.
+- const-eval cache：CTFE dependency fingerprint + const args + target/profile -> const value / materialized data / diagnostics.
 - mono cache：generic item + concrete type args + constraints -> mono HIR/MIR.
 - codegen cache：MIR + target + opt config -> object/bitcode.
 - pgo cache：profile data hash + source mapping -> hot/cold and layout/codegen hints.
@@ -147,7 +157,7 @@ public/package/body/codegen fingerprint
 
 - 泛型定义 package 负责类型检查泛型体的约束正确性。
 - 使用 package 负责请求具体实例。
-- mono item key 包含泛型定义 stable id、类型实参 layout fingerprint、接口约束满足证明、target 和优化配置。
+- mono item key 包含泛型定义 stable id、类型实参 layout fingerprint、常量实参 value fingerprint、接口约束满足证明、target 和优化配置。
 - 未被代码生成实际使用的类型参数不进入 codegen key。
 - 只依赖 layout shape 的内部实现可以做 shape sharing；这只影响机器代码复用，不能引入隐藏动态派发。
 - cold block、panic/OOM 和错误格式化路径可以 outline，避免每个 mono 实例复制大型冷路径。

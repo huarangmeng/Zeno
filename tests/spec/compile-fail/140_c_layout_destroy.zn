@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: hosted
+// purpose: C layout structs cannot have custom destroy semantics
+
+module tests.fail.cLayoutDestroy;
+
+@layout(C)
+struct FileHandle {
+    fd: I32,
+}
+
+impl FileHandle {
+    destroy { // expected-error: @layout(C) type cannot define destroy
+        closeBestEffort(self.fd);
+    }
+}
+
+fn closeBestEffort(fd: I32) {}

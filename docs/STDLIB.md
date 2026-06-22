@@ -13,6 +13,8 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 - 基础接口。
 - `Option`、`Result`。
 - `ArraySlice`、`StringSlice`。
+- FFI bridge 的 `CErrorCode`、`CStr`、`CHandle<T>` 和 `CBuffer<T>` 契约。
+- `core.mem` 的 `sizeOf<T>()`、`alignOf<T>()`、`offsetOf<T>("field")` 布局查询。
 - `CachePadded<T>` 这类不依赖分配器的低层布局工具。
 - 编译器需要的 move / destroy 辅助能力。
 - 分配器接口定义，但不要求全局分配器。
@@ -137,6 +139,27 @@ val maybeByte = U8.fromChecked(wide);
 val low = U8.truncate(wide);
 val clamped = U8.saturate(wide);
 ```
+
+## 3.1 编译期与布局查询
+
+`core.mem` 暴露编译器内建布局查询：
+
+```zn
+fn sizeOf<T>() -> USize;
+fn alignOf<T>() -> USize;
+fn offsetOf<T>(field: StringSlice) -> USize;
+```
+
+这些查询只能在编译期求值。结果取决于目标 triple、目标 ABI、layout 策略和具体类型实例，因此必须进入 layout key、ABI fingerprint 和增量缓存 key。
+
+CTFE 可以在编译期构造临时 `String`、`Array`、`Vector`、`Map` 和 `Set`。如果最终需要运行期拥有者，标准库必须提供显式物化 API，不能让 `const` 使用点隐藏分配：
+
+```zn
+val ownedText = String.from(constText);
+val ownedBytes = Array.fromConst(constBytes);
+```
+
+`StringSlice` 和 `ArraySlice<T>` 可以零拷贝指向只读静态数据；需要可写或拥有数据时必须显式复制。
 
 ## 4. 集合
 
@@ -363,8 +386,16 @@ impl<T: CopyHashKey> Set<T> {
 | `MutexGuard.get` | `mut self` | 无 | guard 内取得短期可写访问 | `val value = mut guard.get()` |
 | `Thread.spawn` | static | `move task` | 创建 OS 线程并拥有任务闭包 | `Thread.spawn(move task)` |
 | `JoinHandle.join` | `move self` | 无 | 消费 join handle，返回线程结果 | `try move handle.join()` |
-| `Runtime.spawn` | `self` | `move OnceFn<T>` / `move OnceFn<TaskContext, T>` | 把普通任务放入 runtime worker，返回 `Task<T>` | `runtime.spawn(move task)` |
-| `Runtime.spawnBlocking` | `self` | `move OnceFn<T>` / `move OnceFn<TaskContext, T>` | 把阻塞同步工作放入独立 blocking pool，返回 `Task<T>` | `runtime.spawnBlocking(move job)` |
+| `Runtime.spawn` | `self` | `move Future<T>` | 把 async future 放入 runtime worker，返回 `Task<T>` | `runtime.spawn(load(move path))` |
+| `Runtime.spawnWithContext` | `self` | `move OnceFn<TaskContext, Future<T>>` | 创建带取消上下文的 future，返回 `Task<T>` | `runtime.spawnWithContext(move (ctx) => run(ctx))` |
+| `Runtime.spawnBlocking` | `self` | `move OnceFn<T>` | 把阻塞同步工作放入独立 blocking pool，返回 `Task<T>` | `runtime.spawnBlocking(move job)` |
+| `Runtime.spawnBlockingWithContext` | `self` | `move OnceFn<TaskContext, T>` | 把可协作检查取消的阻塞同步工作放入 blocking pool | `runtime.spawnBlockingWithContext(move job)` |
+| `TaskGroup.withCapacity` | static | capacity, `mut runtime` | 创建结构化任务拥有者并预留元数据容量 | `TaskGroup<Result<Page, Error>>.withCapacity(n, mut runtime)` |
+| `TaskGroup.spawn` | `mut self` | `move Future<T>` | 把 future 交给 group 拥有和收尾 | `try mut group.spawn(fetch(move job))` |
+| `TaskGroup.next` / `tryNext` | `mut self` | 无 | 按完成顺序取一个完成结果 | `try await mut group.tryNext()` |
+| `TaskGroup.joinAll` / `tryJoinAll` | `move self` | 无 | 消费 group，等待所有任务并返回完成顺序结果 | `try await move group.tryJoinAll()` |
+| `TaskGroup.joinAllOrdered` / `tryJoinAllOrdered` | `move self` | 无 | 消费 group，等待所有任务并返回 spawn 顺序结果 | `try await move group.tryJoinAllOrdered()` |
+| `TaskGroup.cancelRemaining` | `move self` | 无 | 消费 group，请求取消未完成任务并丢弃输出 | `move group.cancelRemaining()` |
 | `await task` | 语言操作 | `Task<T>` 拥有者 | 消费任务句柄，返回任务结果 | `try await task` |
 | `Runtime.blockOn` / `Executor.blockOn` | `mut self` | `move Future<T>` / `move Task<T>` | 阻塞当前线程并返回输出 | `try mut runtime.blockOn(move task)` |
 | `Task.cancel` | `move self` | 无 | 消费任务句柄，请求协作式取消，丢弃输出 | `val status = move task.cancel()` |
@@ -391,19 +422,50 @@ struct TaskContext: Copy {
 impl TaskContext {
     fn isCancellationRequested(self) -> Bool;
 }
+
+struct TaskGroup<T> {
+    // opaque structured-concurrency owner
+}
+
+struct TaskCancelSummary {
+    requested: USize,
+    queuedCancelled: USize,
+    alreadyFinished: USize,
+}
+
+impl<T: Send> TaskGroup<T> {
+    fn withCapacity(capacity: USize, mut runtime: Runtime) -> TaskGroup<T>;
+    fn spawn(mut self, move future: Future<T>) -> Result<Unit, SpawnError>;
+    async fn next(mut self) -> Option<T>;
+    async fn joinAll(move self) -> Vector<T>;
+    async fn joinAllOrdered(move self) -> Vector<T>;
+    fn cancelRemaining(move self) -> TaskCancelSummary;
+}
+
+impl<T: Send, E: Send> TaskGroup<Result<T, E>> {
+    async fn tryNext(mut self) -> Result<Option<T>, E>;
+    async fn tryJoinAll(move self) -> Result<Vector<T>, E>;
+    async fn tryJoinAllOrdered(move self) -> Result<Vector<T>, E>;
+}
 ```
 
 规则：
 
 - `get`、`contains`、`containsKey`、`remove`、`removeEntry` 和索引 lookup 都不能移动调用方的 key。需要支持 `String` / `StringSlice`、owned / slice、大小写折叠等查找形态时，用 `LookupKey<K>` 或专门 lookup API 表达。
 - `insert`、`push`、`Box.new`、`Shared.new`、`Mutex.new`、`Thread.spawn`、`Runtime.spawn` 和 `Runtime.spawnBlocking` 这类会长期保存或消费值的 API，命名 owner 实参必须写 `move`。
+- `Runtime.spawn` 只接收 `Future<T>`。普通 async 调用产生的临时 future 可以直接传入；已有命名 future 必须写 `move future`。
+- `Runtime.spawnWithContext` 只在任务需要显式取消检查时使用。它的闭包只负责用 `TaskContext` 构造 future，runtime 保存返回的 future，不保存闭包。
 - `Runtime.spawnBlocking` 是显式阻塞工作边界，必须使用独立且有上限的 blocking pool；捕获状态和返回值必须是 `Send`。
 - `Task<T>` 没有 `await` 方法；等待任务写成 `await task`，由语言操作消费句柄。
 - `blockOn` 是同步阻塞边界，不允许在 async 上下文调用；它必须显式写出 `mut runtime` / `mut executor` 和 `move task` / `move future`。
 - `Task<T>` 是必须显式收尾的资源。任务句柄可以移动或返回给调用方，但不能在作用域末尾隐式 drop；收尾方式只有 `await task`、`blockOn(move task)`、`move task.cancel()` 和 `move task.detach()`。
 - `Task.cancel(move self) -> TaskCancelStatus` 不阻塞等待任务真正停止。`QueuedCancelled` 表示任务尚未开始且已被跳过；`Requested` 表示运行时记录了协作取消请求；`AlreadyFinished` 表示任务已经完成且结果被丢弃。
 - `Task.detach(move self)` 不取消任务；它只显式表达 fire-and-forget，任务完成时丢弃输出并销毁捕获资源。
-- `TaskContext` 只由 `Runtime.spawn` / `Runtime.spawnBlocking` 传给声明了 `TaskContext` 参数的任务闭包。零参数任务闭包不会收到上下文，也不承担取消检查成本。
+- `TaskGroup<T>` 是必须显式收尾的资源。主路径是 `joinAll` / `tryJoinAll` 消费 group；需要流式处理时用 `next` / `tryNext` drain 到 `None`，提前退出必须 `cancelRemaining`。
+- `TaskGroup.next` / `tryNext` 返回 `None` 后，group 进入 drained 状态。编译器必须认识 drain 循环，避免要求用户在正常 drain 后再写一个多余的收尾调用。
+- `TaskGroup.tryNext` / `tryJoinAll` 的 `Err` 路径会请求取消剩余任务并把 group 标记为 settled；因此 `try await mut group.tryNext()` 的提前返回路径不泄漏 group。
+- `TaskGroup.joinAll` / `tryJoinAll` 返回完成顺序结果；需要 spawn 顺序时调用 `joinAllOrdered` / `tryJoinAllOrdered`，并接受额外索引和结果槽位成本。
+- `TaskContext` 只由 `Runtime.spawnWithContext` / `Runtime.spawnBlockingWithContext` 传给声明了 `TaskContext` 参数的入口。普通 `Runtime.spawn(future)` 不提供上下文，也不承担取消检查成本。
 - `TaskContext.isCancellationRequested()` 不能分配、加锁或执行系统调用；它只检查当前任务的取消位，不负责同步其他用户数据。
 - `TaskContext` 可以复制并传给当前任务内的普通 helper 函数，也可以作为当前任务 future 状态跨 `await` 存活；它不能返回、不能保存进长期拥有者，也不能被线程、子任务或逃逸闭包捕获。
 - async `mut self` 调用必须立即 `await`，且接收者由当前 future 拥有；这个调用产生的 future 不能保存、返回、放入容器、传给 `spawn` 或跨另一个 `await`。
@@ -875,6 +937,38 @@ fn closeBestEffort(rawFd: I32) {
 `File.close` 是显式错误处理 API。`destroy` 中只能调用 `closeBestEffort` 这类不可失败兜底 API，不能使用 `try`。显式 `close` 成功后应解除兜底清理，避免 `destroy` 二次关闭。
 
 标准库应把 `trust` 边界保持得很小，并在公开 API 中使用 `Result`、`Handle<T>`、`ArraySlice<T>`、`Mmio<T>`、`Port<T>` 等有语义的类型。
+
+### 9.1 C bridge 核心契约
+
+C bridge 只需要少量核心契约，不引入隐藏运行时。这些契约位于 `core.ffi`：
+
+```zn
+interface CErrorCode {
+    fn toCCode(self) -> I32;
+}
+```
+
+`@export(..., bridge: C)` 返回 `Result<T, E>` 时，`E` 必须实现 `CErrorCode`。错误码映射由用户或平台库显式定义，编译器不能猜测 enum layout。
+
+`0` 是 C bridge 的成功状态码；`toCCode` 必须为错误返回非零值。明显返回 `0` 的实现应被诊断，复杂映射可以由 lint 或测试约束。
+
+`CStr` 表示来自 C 的 nul-terminated 字符串访问值。它不等同于 `StringSlice`：
+
+- `CStr` 适合调用传统 C API。
+- `StringSlice` 是 UTF-8 bytes + length，不要求 nul 结尾。
+- `StringSlice` 转 `CString` / `CStr` 如果需要复制或追加 nul，必须通过显式 API 完成，不能由 bridge thunk 隐式分配。
+
+`CHandle<T>` 表示 C 边界上的不透明 typed handle：
+
+- 它是 C-compatible 句柄，不暴露 `T` 的 Zeno 对象布局。
+- 普通代码不能解引用 `CHandle<T>`；只能交给提供该 handle 的模块 API。
+- 创建、使用和销毁 handle 必须由显式导出函数表达。
+
+`CBuffer<T>` 表示 C 侧可以长期保存的显式缓冲区所有权描述：
+
+- 它不同于 `ArraySlice<T>`，后者只适合立即调用，不允许 C 侧长期保存。
+- `CBuffer<T>` 的创建、释放和所有权转移必须通过显式 API；是否由 Zeno allocator、C allocator 或平台 allocator 管理，需要在创建函数名和文档中写清楚。
+- 对 `CBuffer<T>` 内部地址的构造、偏移和释放仍属于 `trust` / `rawMemory` 边界。
 
 ## 10. Panic 与 OOM
 

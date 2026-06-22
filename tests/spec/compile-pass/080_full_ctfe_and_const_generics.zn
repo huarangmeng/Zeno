@@ -1,0 +1,63 @@
+// category: compile-pass
+// profile: hosted
+// purpose: full CTFE executes ordinary functions, loops, local consts, static initializers, and const generics
+
+module tests.pass.fullCtfeAndConstGenerics;
+
+fn pow2(n: USize) -> USize {
+    var value: USize = 1;
+    var i: USize = 0;
+
+    while i < n {
+        value = value * 2;
+        i = i + 1;
+    }
+
+    return value;
+}
+
+fn sumFirst(n: USize) -> USize {
+    var values = Vector<USize>.withCapacity(n);
+    var i: USize = 0;
+
+    while i < n {
+        mut values.push(i);
+        i = i + 1;
+    }
+
+    var total: USize = 0;
+    for value in values {
+        total = total + value;
+    }
+    return total;
+}
+
+const pageSize: USize = pow2(12);
+const warmupTotal: USize = sumFirst(16);
+
+static maxPacketSize: USize = pow2(14);
+
+struct RingBuffer<T, const Capacity: USize> {
+    data: Array<T>,
+    len: USize,
+}
+
+impl<T, const Capacity: USize> RingBuffer<T, Capacity> {
+    fn capacity(self) -> USize {
+        return Capacity;
+    }
+}
+
+fn pageMask() -> USize {
+    const localPageSize: USize = pow2(12);
+    return localPageSize - 1;
+}
+
+fn main() -> USize {
+    val buffer = RingBuffer<U8, pageSize> {
+        data: Array<U8>.filled(pageSize, 0),
+        len: 0,
+    };
+
+    return buffer.capacity() + warmupTotal + maxPacketSize + pageMask();
+}

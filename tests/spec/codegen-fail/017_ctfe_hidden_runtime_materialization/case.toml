@@ -1,0 +1,22 @@
+# category: codegen-fail
+# purpose: CTFE-owned data must not become runtime owned data through hidden allocation
+
+[source]
+file = "src/main.zn"
+text = '''
+const text: String = String.from("zeno");
+
+fn makeText() -> String {
+    return text;
+}
+'''
+
+[bad_codegen]
+lowering = [
+    "allocate runtime String for const text implicitly",
+    "copy const String into runtime owner implicitly",
+    "materialize CTFE arena allocation as runtime heap object",
+]
+
+[expect]
+error = "const owned value requires explicit runtime materialization"

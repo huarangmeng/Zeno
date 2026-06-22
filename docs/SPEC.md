@@ -97,7 +97,7 @@ return self Self static struct true trust try type val var while
 | `async` | 声明返回 `Future` 状态机的异步函数，不启动线程或任务。 |
 | `await` | 在 async 上下文中等待 `Future<T>` 或 `Task<T>` 继续执行；等待命名任务句柄会消费该句柄。 |
 | `break` | 跳出循环，可选携带循环表达式的值。 |
-| `const` | 声明编译期常量或常量项。 |
+| `const` | 声明编译期值，或在泛型参数列表中声明常量参数。 |
 | `continue` | 跳到下一次循环迭代。 |
 | `destroy` | 在 `impl Type` 中定义类型销毁前运行的生命周期清理块。 |
 | `else` | `if` 的备用分支。 |
@@ -146,7 +146,8 @@ v0.1 用户级属性：
 - `@noAlloc`：被标注函数及其可达调用图不得执行堆分配，除非编译器能证明该路径不可达。
 - `@noPanic`：被标注函数不得触发 `panic` 路径；若当前 profile 把 OOM 配置成 `panic`，会分配的 API 也算 panic 路径。它不等价于“不可能终止”，需要禁止堆分配时应使用 `@noAlloc`。
 - `@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`：声明结构体内存布局策略。普通结构体默认使用 Auto layout。
-- `@export("symbol", abi: C)`：把非泛型顶层 `pub fn` 作为外部 C ABI 符号导出。
+- `@export("symbol", abi: C)`：把非泛型顶层 `pub fn` 作为严格外部 C ABI 符号导出。
+- `@export("symbol", bridge: C)`：把非泛型顶层 `pub fn` 通过编译器生成的 C ABI thunk 和头文件导出。
 
 编译器发行包专用属性：
 
@@ -208,14 +209,42 @@ var buffer: Buffer;
 
 局部绑定的最终销毁顺序按源码声明顺序的逆序决定，延迟初始化和重新赋值不改变该 cleanup 位置；未初始化或已移动的位置跳过销毁。
 
-## 6. 常量与静态存储
+## 6. 常量、CTFE 与静态存储
 
-`const` 声明编译期常量。它没有运行期存储身份，使用处可以被内联。
+`const` 声明编译期值。它没有运行期存储身份，使用处可以被内联。
 
 ```zn
 const pageSize: USize = 4096;
 const version: StringSlice = "0.1.0";
 ```
+
+`const` 可以是顶层项、`impl` 项，也可以是块内局部编译期绑定。`const` 初始化必须通过编译期执行完成，初始化环是编译错误。
+
+Zeno 支持完整 CTFE：编译期上下文可以执行普通 Zeno 代码，包括函数、方法、泛型、控制流、`match`、闭包、结构体、枚举、集合临时值、移动语义、RAII 和 `destroy`。Zeno 不引入 `comptime` 关键字，也不要求用户写 `const fn`；任何普通函数只要被用在编译期上下文中，编译器就尝试解释执行。
+
+```zn
+fn fib(n: U32) -> U32 {
+    if n < 2 {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+const fib10: U32 = fib(10);
+```
+
+编译期上下文包括：
+
+- `const` 初始化。
+- `static` 初始化。
+- 常量泛型实参。
+- 属性参数。
+- `sizeOf<T>()`、`alignOf<T>()`、`offsetOf<T>("field")`。
+- pattern range 端点和其他要求编译期常量的位置。
+
+CTFE 是 hermetic 的。编译期执行不能调用 `trust` / FFI、裸内存、硬件访问、inline asm、线程、任务、`await`、当前时间、随机数、环境变量、网络或未声明文件输入。需要文件内容进入编译期时，必须通过构建系统显式声明，并让内容 hash 进入缓存 key。
+
+CTFE 可以使用编译器管理的编译期 arena 来构造临时 `String`、`Array`、`Vector`、`Map` 和 `Set`。这不代表运行期堆分配。编译期拥有值进入运行期时必须遵守成本模型：`Copy` 值可以内联；`StringSlice` / `ArraySlice<T>` 可以指向只读静态数据；需要运行期拥有 `String`、`Array<T>` 或 `Vector<T>` 时必须显式调用分配 / 复制 API。
 
 `static` 声明拥有固定存储地址和整个程序生命周期的静态项。
 
@@ -225,10 +254,12 @@ static REQUESTS: Atomic<U64> = Atomic<U64>.new(0);
 
 规则：
 
-- `static` 初始化式必须能在编译期或加载期完成。
+- `static` 初始化式默认必须能在编译期完成，并物化为静态数据或目标支持的静态初始化记录。
 - 普通 `static` 默认不可变。
 - Zeno 不提供裸 `static mut` 全局变量；跨线程可变全局状态必须放在 `Atomic<T>`、`Mutex<T>` 或其他同步类型中。
-- Freestanding profile 可以选择不支持需要动态初始化的 `static`。
+- 隐式动态 `static` 初始化不进入 v1；以后如果支持，必须通过显式属性和 profile 策略开启。
+
+完整规则见 [COMPTIME.md](COMPTIME.md)。
 
 ## 7. 类型
 
@@ -329,6 +360,8 @@ struct FileDescriptor {
 ```
 
 默认 enum layout 可以做 niche optimization。编译器必须保证 `Option<Box<T>>` 与 `Box<T>` 同大小，`Option<Shared<T>>` 与 `Shared<T>` 同大小；core/std 中声明了无效句柄值的句柄类型也应使用无额外 tag 的表示。
+
+`@layout(C)` 结构体只接受 C-compatible 字段，不能有自定义 `destroy`，并且布局、对齐和聚合传参规则由目标 C ABI 决定。普通 enum、`Option<T>`、`Result<T, E>`、`Char`、普通 struct 和未标注 `@layout(C)` 的零成本包装不自动 C-compatible。
 
 `pub` 只表示源码 API 对外部 package 可见，不表示布局或 ABI 稳定。完整布局规则见 [LAYOUT.md](LAYOUT.md)。
 
@@ -1608,11 +1641,20 @@ struct Map<K: HashKey, V> {
     // K 是 key 类型，要求 HashKey。
     // V 是 value 类型，没有额外约束。
 }
+
+struct RingBuffer<T, const Capacity: USize> {
+    data: Array<T>,
+    head: USize,
+    len: USize,
+}
 ```
 
 规则：
 
 - 类型参数可以受一个命名接口约束，例如 `T: Writer`。
+- 泛型参数也可以是常量参数，例如 `const Capacity: USize`。
+- 常量泛型实参必须在编译期求值，并进入单态化 key、layout key、ABI fingerprint 和增量缓存 key。
+- 常量泛型参数的身份必须可稳定 fingerprint：整数、`Bool`、`Char`、无载荷 enum variant，或由这些值组成的 tuple / 纯 `Copy` struct。任意复杂 CTFE 可以先运行，但最终作为类型身份的结果必须稳定。
 - 一个泛型参数位置只允许一个直接约束。需要多个能力时，先定义命名组合接口，例如 `interface SortKey: Ord, Copy {}`，再写 `T: SortKey`。
 - 泛型参数列表中的逗号只分隔泛型参数，不分隔约束。Zeno 不提供 `T: Ord, Copy`、`T: Ord + Copy` 或 `where` 约束语法。
 - 多个泛型参数用于表达多个未知类型，例如 `Result<T, E>`、`Map<K, V>` 或 `Fn<A, B>`。
@@ -1919,10 +1961,12 @@ try move handle.join();
 任务运行时是显式值：
 
 ```zn
+async fn runWork(move data: Data) -> Result<Unit, WorkError> {
+    return process(move data);
+}
+
 async fn runTask(move runtime: Runtime, move data: Data) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move data);
-    });
+    val task = try runtime.spawn(runWork(move data));
 
     try await task;
     return Ok(());
@@ -1952,13 +1996,21 @@ future 取消和销毁规则：
 - `await mut receiver.method(...)` 只在“立即 await”的 async `mut self` 调用中允许，且 `receiver` 必须由当前 future 拥有。编译器把拥有者保存在 future 状态中，把可写访问限制在被等待调用内部；这个调用产生的 future 不能绑定到变量、返回、放入结构体、传给 `spawn` 或跨另一个 `await` 逃逸。
 - `await task` 是语言操作，不是 `Task.await()` 方法。它消费 `Task<T>` 句柄并返回任务结果；等待后原 task 绑定不可再用。同步阻塞等待必须由显式 blocking API 表达，不能伪装成普通方法调用。
 - 同步代码等待 future 或 task 必须使用显式 executor/runtime，例如 `mut runtime.blockOn(move task)` 或 `mut executor.blockOn(move future)`。`blockOn` 是阻塞当前线程的 `mut self` API，只能出现在同步上下文；async 上下文中必须使用 `await`。
+- `Runtime.spawn(future)` 是日常异步入口。它接收并消费 `Future<T>`，返回 `Task<T>`；临时 async 调用可以直接传入，已有命名 future 必须写 `move future`。
+- 普通 `Runtime.spawn` 不接收同步任务闭包。同步阻塞工作使用 `spawnBlocking`，需要底层 OS 线程时使用 `Thread.spawn`。
+- `Runtime.spawnWithContext(makeFuture)` 是高级取消入口，接收 `OnceFn<TaskContext, Future<T>>`。闭包只在启动时调用一次，runtime 保存它返回的 future，不保存闭包本身。
 - `Runtime.spawnBlocking(move job)` 用于同步文件 I/O、DNS、压缩、加密、阻塞 C API 和长时间不让出 worker 的 CPU 工作。它返回普通 `Task<T>`，但创建点必须写出 `spawnBlocking`。blocking pool 必须与普通 worker pool 分离且有上限；上限、队列策略和饱和行为必须由 runtime 构造参数或 profile 文档暴露，实现不能偷偷为每个 blocking job 创建无界 OS 线程。
+- `Runtime.spawnBlockingWithContext(move job)` 是阻塞任务的显式取消检查入口，接收 `OnceFn<TaskContext, T>`。
+- `TaskGroup<T>` 是结构化并发拥有者。它通过 `spawn(future)` 启动一组同类型 future，通过 `joinAll` / `tryJoinAll` 消费 group 并统一收尾；流式完成处理使用 `next` / `tryNext`。
+- `TaskGroup.joinAll` / `tryJoinAll` 默认按完成顺序返回，这是最低额外协调成本的路径；需要 spawn 顺序时显式使用 `joinAllOrdered` / `tryJoinAllOrdered`。
+- `TaskGroup.next` / `tryNext` 返回 `None` 后，group 进入 drained 状态。`tryNext` / `tryJoinAll` 的 `Err` 路径必须请求取消剩余任务并把 group 标记为 settled。
+- `TaskGroup<T>` 不能隐式 drop。离开作用域前必须被 `joinAll`、`tryJoinAll`、`cancelRemaining` 消费，或者被 `next` / `tryNext` 完整 drain 到 `None`。
 - `Task<T>` 是必须显式收尾的资源。任务句柄可以被移动或返回给调用方，但不能在作用域末尾隐式 drop；否则是编译错误。
 - `Task<T>` 的合法收尾方式包括 `await task`、`mut runtime.blockOn(move task)` / `mut executor.blockOn(move task)`、`move task.cancel()` 和 `move task.detach()`。
 - `Task.cancel(move self) -> TaskCancelStatus` 消费任务句柄，请求协作式取消并丢弃输出。`TaskCancelStatus` 包含 `QueuedCancelled`、`Requested` 和 `AlreadyFinished`：尚未开始的任务可以被跳过并销毁捕获状态；已经开始的任务只能在 poll / yield 边界或显式取消检查处观察请求；已经完成的任务只丢弃结果。
 - `Task.detach(move self) -> Unit` 消费任务句柄，让任务继续运行并在完成时丢弃输出。`detach` 不取消任务，也不等待任务完成。
 - `Task<T>` 的析构不能 `await`、不能阻塞、不能隐式取消，也不能隐式 detach。未收尾任务的错误必须由编译器在普通控制流中发现；析构只作为 profile 诊断或崩溃恢复兜底。
-- 需要任务内部感知取消时，`Runtime.spawn` / `Runtime.spawnBlocking` 可以接收 `OnceFn<TaskContext, T>` 闭包；不需要取消检查时仍使用 `OnceFn<T>` 零参数闭包。
+- 需要任务内部感知取消时，源码中必须出现 `TaskContext` 参数；普通 `Runtime.spawn(future)` 没有用户可见上下文，也不承担取消检查成本。
 - `TaskContext.isCancellationRequested(self) -> Bool` 是显式取消检查。它只读取当前任务的取消请求状态，不自动返回、不 panic、不改变任务返回类型。
 - `TaskContext` 是 task-local 轻量能力值，可以复制并传给当前任务内的 helper 函数，也可以作为当前任务 future 状态的一部分跨 `await` 存活。它不能返回、不能存入长期拥有者、不能被线程、子任务或其他逃逸闭包捕获。
 - 标准库和编译器不得提供隐藏的全局当前任务查询来替代 `TaskContext` 参数；取消检查的能力必须在源码签名中可见。
@@ -2005,7 +2057,22 @@ pub fn add(a: I32, b: I32) -> I32 {
 }
 ```
 
-`@export` 函数必须使用 C-compatible 参数和返回类型，不能是泛型函数，不能让 panic unwind 穿过外部 ABI。完整规则见 [FFI.md](FFI.md)。
+`@export(..., abi: C)` 函数必须使用 C-compatible 参数和返回类型，不能是泛型函数，不能是方法，不能暴露非 `pub` 命名结构体类型，也不能让 panic unwind 穿过外部 ABI。完整规则见 [FFI.md](FFI.md)。
+
+普通库想把 Zeno 风格 API 暴露给 C 时，优先使用 bridge 导出：
+
+```zn
+@export("zeno_read", bridge: C)
+pub fn read(fd: FileDescriptor, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
+    return fd.read(mut out);
+}
+```
+
+`bridge: C` 允许源码签名使用有限的 bridge-compatible 类型，例如 C-compatible 类型、`ArraySlice<T>`、`mut ArraySlice<T>`、`StringSlice`、`Option<T>` 返回和 `Result<T, E>` 返回。编译器生成的 thunk 必须降低成严格 C-compatible 签名，并且转换必须零分配、零复制、零动态派发。`Result<T, E>` bridge 返回要求 `E` 实现 `core.ffi.CErrorCode`，从而把错误明确映射成 C `I32` 状态码；`0` 表示成功，错误码必须非零。
+
+`bridge: C` 仍然不允许把 `String`、`Array<T>`、`Vector<T>`、`Box<T>`、`Shared<T>`、`Mutex<T>`、接口拥有者、闭包或带 `destroy` 的资源类型自动跨 C。拥有资源必须通过 `@layout(C)` handle、`CHandle<T>`、`CBuffer<T>` 或项目自定义 handle 暴露，并提供显式 create / destroy API。
+
+官方工具链提供 `zeno bindgen c` 生成 C 绑定。v1 不实现完整 C++ 绑定，但 bindgen 架构、缓存 key 和 ABI fingerprint 必须预留后续 `zeno bindgen cxx`：C++ 默认通过生成 C shim、opaque handle、显式模板实例化和异常到错误码转换来接入，不把 C++ name mangling、异常 ABI 或复杂类布局直接作为 Zeno 语言承诺。
 
 底层操作必须放在 `trust` 块里：
 

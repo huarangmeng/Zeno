@@ -1,0 +1,23 @@
+// category: compile-pass
+// profile: hosted
+// purpose: TaskGroup can stream completed fallible results with tryNext until drained
+
+module tests.pass.taskGroupTryNextStreaming;
+
+async fn fetchPage(move job: Job) -> Result<Page, FetchError> {
+    return fetch(move job);
+}
+
+async fn loadStreaming(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Unit, FetchError> {
+    var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
+
+    for move job in jobs {
+        try mut group.spawn(fetchPage(move job));
+    }
+
+    while val Some(page) = try await mut group.tryNext() {
+        consume(move page);
+    }
+
+    return Ok(());
+}

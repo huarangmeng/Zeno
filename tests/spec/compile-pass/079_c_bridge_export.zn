@@ -1,0 +1,58 @@
+// category: compile-pass
+// profile: hosted
+// panic.strategy: abort
+// purpose: bridge C export accepts ergonomic Zeno signatures and lowers them through a C ABI thunk
+
+module tests.pass.cBridgeExport;
+
+import core.result.{Result, Ok, Err};
+import core.option.{Option, Some, None};
+import core.ffi.CErrorCode;
+
+enum IoError {
+    Interrupted,
+    Failed,
+}
+
+impl CErrorCode for IoError {
+    fn toCCode(self) -> I32 {
+        return match self {
+            IoError.Interrupted => 4,
+            IoError.Failed => 5,
+        };
+    }
+}
+
+@layout(C)
+pub struct FileDescriptor {
+    pub value: I32,
+}
+
+impl FileDescriptor {
+    fn read(self, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
+        if out.len() == 0 {
+            return Ok(0);
+        }
+
+        out[0] = 42;
+        return Ok(1);
+    }
+}
+
+@export("zeno_read", bridge: C)
+pub fn read(fd: FileDescriptor, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
+    return fd.read(mut out);
+}
+
+@export("zeno_name_len", bridge: C)
+pub fn nameLen(name: StringSlice) -> Result<USize, IoError> {
+    return Ok(name.len());
+}
+
+@export("zeno_first_byte", bridge: C)
+pub fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
+    if bytes.len() == 0 {
+        return None;
+    }
+    return Some(bytes[0]);
+}

@@ -20,6 +20,7 @@ Zeno 的核心目标：
 - [docs/PACKAGE.md](docs/PACKAGE.md)：依赖解析、版本、workspace、`Zeno.lock` 和可复现构建。
 - [docs/MODULES.md](docs/MODULES.md)：模块、包、依赖和导入解析规则。
 - [docs/COMPILATION.md](docs/COMPILATION.md)：编译模型、并行调度、增量缓存和稳定诊断。
+- [docs/COMPTIME.md](docs/COMPTIME.md)：完整 CTFE、`const`、常量泛型、静态初始化和编译期缓存规则。
 - [docs/IR.md](docs/IR.md)：HIR、MIR、LLVM 降级、高性能 codegen 和优化不变量。
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md)：别名、布局、泛型、边界检查、分配器和并发的高性能契约。
 - [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。

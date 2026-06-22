@@ -1,0 +1,22 @@
+# category: codegen-fail
+# purpose: layout(C) must not be lowered with Auto layout field reordering
+
+[source]
+file = "src/main.zn"
+text = '''
+@layout(C)
+pub struct CHeader {
+    pub tag: U8,
+    pub length: U32,
+}
+'''
+
+[bad_layout]
+contains = [
+    "field length offset=0",
+    "field tag offset=4",
+    "layout kind Auto",
+]
+
+[expect]
+error = "layout(C) must preserve source field order and target C ABI padding"

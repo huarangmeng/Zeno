@@ -11,6 +11,11 @@ pub struct CPoint {
     pub y: F32,
 }
 
+@layout(C)
+pub struct FileDescriptor {
+    pub value: I32,
+}
+
 @export("zeno_add", abi: C)
 pub fn add(a: I32, b: I32) -> I32 {
     return a + b;
@@ -19,4 +24,9 @@ pub fn add(a: I32, b: I32) -> I32 {
 @export("point_sum", abi: C)
 pub fn pointSum(point: CPoint) -> F32 {
     return point.x + point.y;
+}
+
+@export("fd_value", abi: C)
+pub fn fdValue(fd: FileDescriptor) -> I32 {
+    return fd.value;
 }

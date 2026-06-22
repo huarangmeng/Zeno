@@ -1,0 +1,18 @@
+// category: compile-fail
+// profile: hosted
+// panic.strategy: abort
+// purpose: Result is a Zeno enum and is not C-compatible in exported ABI signatures
+
+module tests.fail.exportResultNonC;
+
+enum Error {
+    Bad,
+}
+
+@export("parse_i32", abi: C)
+pub fn parse(value: I32) -> Result<I32, Error> { // expected-error: Result is not C-compatible in an exported C ABI signature
+    if value < 0 {
+        return Err(Error.Bad);
+    }
+    return Ok(value);
+}

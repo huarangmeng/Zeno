@@ -4,10 +4,12 @@
 
 module tests.fail.blockOnInAsync;
 
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 async fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return process(move work);
-    });
+    val task = try runtime.spawn(runWork(move work));
 
     try mut runtime.blockOn(move task); // expected-error: blockOn is only allowed in synchronous contexts; use await task
     return Ok(());

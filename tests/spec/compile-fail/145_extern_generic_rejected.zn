@@ -1,0 +1,9 @@
+// category: compile-fail
+// profile: hosted
+// trust.ffi: true
+// purpose: extern C declarations cannot be generic
+
+module tests.fail.externGenericRejected;
+
+trust extern "C" fn identity<T>(value: T) -> T;
+// expected-error: extern C declarations cannot be generic

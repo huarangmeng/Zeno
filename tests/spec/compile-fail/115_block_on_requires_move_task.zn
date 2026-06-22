@@ -4,11 +4,13 @@
 
 module tests.fail.blockOnRequiresMoveTask;
 
+async fn workAsync() -> Result<Unit, WorkError> {
+    return work();
+}
+
 fn bad() -> Result<Unit, WorkError> {
     var runtime = try Runtime.withWorkerCount(8);
-    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
-        return work();
-    });
+    val task = try runtime.spawn(workAsync());
 
     try mut runtime.blockOn(task); // expected-error: blockOn consumes the task handle; use move task
     return Ok(());

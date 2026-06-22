@@ -71,8 +71,11 @@ HIR、MIR、LLVM 降级和 codegen 优化不变量见 [IR.md](IR.md)。
 - `StringSlice` literal、`String.from` / `String.fromIn` 拥有构造、默认 allocator、`tryReserve` 可恢复 OOM 入口与字符串访问规则。
 - `EscapingAllocator`、scoped allocator owner 的 allocation region 逃逸检查。
 - 整数 wrapping 运算、checked 运算、无损 `as` 转换检查、`fromChecked` / `truncate` / `saturate` 转换 API。
+- 完整 CTFE 基础：`const`、`static` 初始化、常量泛型实参、属性参数、布局查询，以及普通函数 / 循环 / 泛型的编译期解释执行。
 - `trust` 边界、`trust extern` 和信任报告的基础记录。
 - `@export(..., abi: C)`、C-compatible 签名检查、导出符号唯一性和 panic ABI 边界检查。
+- `@export(..., bridge: C)`、bridge-compatible 签名检查、C thunk 生成、头文件生成和无隐藏成本检查。
+- `zeno bindgen c` 的 raw/safe 源码生成和缓存 key 记录。完整 C++ 绑定不进入 v1，但 bindgen 架构必须预留后续 `cxx` 前端。
 - 带接口约束的泛型函数。
 - 静态接口派发、匿名接口参数展开、泛型接口参数推断和静态接口返回一致性检查。
 - `Box<T>` 和最小 `Box<Interface>` 擦除、动态派发、销毁 lowering。

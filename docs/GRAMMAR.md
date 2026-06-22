@@ -1,6 +1,6 @@
-# Zeno 语法草案
+# Zeno 语法冻结草案
 
-这份语法草案刻意保持小而清晰，便于 stage0 使用手写递归下降解析器或 Pratt 解析器。它还不是完整形式化语法，但仓库中的所有语法示例都应该能落在这个形状里。
+这份语法草案是 stage0 parser 的冻结入口。它刻意保持小而清晰，便于使用手写递归下降解析器和 Pratt 表达式解析器实现。本文不是机器可直接生成 parser 的完整形式化语法；但仓库中的所有 `.zn` 示例都必须能落在这个形状里，新增语法必须先更新本文。
 
 包级 `Zeno.toml` manifest 是构建配置，不属于 `.zn` 源码语法。
 
@@ -102,7 +102,7 @@ trust_impl_decl = "trust" impl_decl ;
 
 同一作用域中可以出现多个同名 `fn_decl`，但它们必须形成合法重载集。重载键包含函数名、参数数量、参数类型和参数访问模式；返回类型不参与重载键。同一个重载键重复声明必须在语义阶段报错。虽然调用点有 `move` 实参标记，只靠只读参数和 `move` 参数区分的重载集仍然会降低可读性，必须报错。
 
-`@layout(Source)`、`@layout(C)`、`@layout(Packed(1))` 和 `@export("symbol", abi: C)` 都按普通属性解析。布局参数和 `abi` 值不是关键字；语义阶段检查它们的可用位置和含义。
+`@layout(Source)`、`@layout(C)`、`@layout(Packed(1))`、`@export("symbol", abi: C)` 和 `@export("symbol", bridge: C)` 都按普通属性解析。布局参数、`abi` 值和 `bridge` 值不是关键字；语义阶段检查它们的可用位置和含义。
 
 ## 4. 类型
 
@@ -127,14 +127,15 @@ primitive_type  = "Bool"
 
 self_type       = "Self" ;
 path_type       = path generic_args? ;
-generic_args    = "<" type ("," type)* ","? ">" ;
+generic_args    = "<" generic_arg ("," generic_arg)* ","? ">" ;
+generic_arg     = type | expr ;
 access_type     = "mut" type ;
 tuple_type      = "(" type "," type ("," type)* ","? ")" ;
 fn_type         = "Fn" "<" fn_type_args ">" ;
 fn_type_args    = type_list "," type ;
 
 type_list       = type ("," type)* ;
-const_expr      = literal | path ;
+const_expr      = expr ;
 ```
 
 示例：
@@ -185,7 +186,9 @@ fn feed<T>(mut consumer: Consumer<T>, move item: T) { ... }
 
 ```ebnf
 generic_params  = "<" generic_param ("," generic_param)* ","? ">" ;
-generic_param   = ident constraint? ;
+generic_param   = type_generic_param | const_generic_param ;
+type_generic_param = ident constraint? ;
+const_generic_param = "const" ident ":" type ;
 constraint      = ":" interface_bound ;
 interface_bound = path_type ;
 ```
@@ -196,9 +199,10 @@ interface HashKey: Hash, Eq {}
 
 fn sort<T: SortKey>(mut items: ArraySlice<T>) { ... }
 struct Map<K: HashKey, V> { ... }
+struct RingBuffer<T, const Capacity: USize> { ... }
 ```
 
-泛型参数列表中的逗号只分隔泛型参数，不分隔约束。一个泛型参数只允许一个直接约束；多能力约束必须先定义成命名接口组合。
+泛型参数列表中的逗号只分隔泛型参数，不分隔约束。一个类型泛型参数只允许一个直接约束；多能力约束必须先定义成命名接口组合。`const` 泛型参数必须写显式类型，实参必须在编译期求值。
 
 ## 6. 结构体
 
@@ -301,6 +305,7 @@ Zeno 块中包含语句。块的最后一个表达式可以作为块值。
 block           = "{" stmt* expr? "}" ;
 stmt            = val_stmt
                 | var_stmt
+                | const_stmt
                 | return_stmt
                 | break_stmt
                 | continue_stmt
@@ -308,11 +313,13 @@ stmt            = val_stmt
 
 val_stmt        = "val" pattern type_annotation? ("=" expr)? ";" ;
 var_stmt        = "var" pattern type_annotation? ("=" expr)? ";" ;
+const_stmt      = "const" ident type_annotation? "=" expr ";" ;
 type_annotation = ":" type ;
 return_stmt     = "return" expr? ";" ;
 break_stmt      = "break" expr? ";" ;
 continue_stmt   = "continue" ";" ;
 expr_stmt       = expr ";" ;
+expr_or_block   = expr | block ;
 ```
 
 没有初始化表达式的 `val` / `var` 是延迟初始化声明，只允许单个名字 pattern，并且必须写类型标注；其他 pattern 必须立即初始化。
@@ -352,7 +359,8 @@ for_binding     = for_binding_mode? pattern ;
 for_binding_mode = pattern_mode ;
 match_expr      = "match" match_mode? expr "{" match_arm* "}" ;
 match_mode      = pattern_mode ;
-match_arm       = pattern "=>" expr_or_block ","? ;
+match_arm       = pattern match_guard? "=>" expr_or_block ","? ;
+match_guard     = "if" expr ;
 pattern_mode    = "mut" | "move" ;
 
 closure_expr    = capture_marker? closure_params (return_type? block | "=>" expr) ;
@@ -368,7 +376,7 @@ binary_expr     = cast_expr (binary_op cast_expr)* ;
 binary_op       = "||" | "&&" | "|" | "^" | "&"
                 | "==" | "!=" | "<" | "<=" | ">" | ">="
                 | "<<" | ">>" | "+" | "-" | "*" | "/" | "%"
-                | ".." ;
+                | ".." | "..=" ;
 
 cast_expr       = prefix_expr ("as" type)* ;
 prefix_expr     = ("!" | "-") prefix_expr
@@ -386,17 +394,20 @@ argument        = argument_mode? expr ;
 argument_mode   = "mut" | "move" ;
 
 primary_expr    = literal
-                | path
                 | type_static_expr
                 | struct_literal
+                | path
                 | tuple_expr
+                | paren_expr
                 | unit_expr
                 | block ;
 
 type_static_expr = type "." ident call_args? ;
-struct_literal  = path "{" field_init* "}" ;
-field_init      = ident ":" expr "," ;
+struct_literal  = path_type "{" field_init_list? "}" ;
+field_init_list = field_init ("," field_init)* ","? ;
+field_init      = ident ":" expr ;
 tuple_expr      = "(" expr "," expr ("," expr)* ","? ")" ;
+paren_expr      = "(" expr ")" ;
 unit_expr       = "(" ")" ;
 ```
 
@@ -444,15 +455,26 @@ assignment:    = += -= *= /= %=
 ## 12. 模式
 
 ```ebnf
-pattern         = "_"
+pattern         = pattern_alt ("|" pattern_alt)* ;
+pattern_alt     = "_"
                 | ident
-                | literal
+                | literal_pattern
+                | range_pattern
                 | tuple_pattern
-                | enum_pattern ;
+                | struct_pattern
+                | enum_pattern
+                | path_pattern ;
 
+literal_pattern = literal ;
+range_pattern   = pattern_const (".." | "..=") pattern_const ;
+pattern_const   = literal | path ;
 tuple_pattern   = "(" pattern ("," pattern)+ ","? ")" ;
+struct_pattern  = path "{" field_pattern_list? "}" ;
+field_pattern_list = field_pattern ("," field_pattern)* ","? ;
+field_pattern   = ident | ident ":" pattern ;
 enum_pattern    = path "(" pattern_list? ")" ;
-pattern_list    = pattern ("," pattern)* ;
+path_pattern    = path ;
+pattern_list    = pattern ("," pattern)* ","? ;
 ```
 
 示例：
@@ -464,6 +486,16 @@ match result {
 }
 ```
 
+`match` guard 写在 pattern 后：
+
+```zn
+match event {
+    Event.Key(code) | Event.Code(code) if code < 10 => code,
+    Event.Key(10..=20) => 20,
+    Event.At(Point { x, y }) => x + y,
+}
+```
+
 ## 13. stage0 解析器要求
 
 第一版解析器必须：
@@ -472,6 +504,8 @@ match result {
 - 把调用点 `mut` / `move` 实参标记、可写接收者 `mut receiver.method(...)`、消费接收者 `move receiver.method(...)`、闭包捕获、`for` 绑定和 `match move` 这类控制流模式解析为不同 AST 节点；`move` 不作为普通表达式前缀。
 - 把 `trust { ... }` 解析成信任边界表达式。
 - 把 `W: Writer` 这样的泛型约束保留为静态派发约束。
+- 支持 `const` 泛型参数、常量泛型实参、泛型结构体字面量和类型静态方法调用，例如 `RingBuffer<U8, pageSize> { ... }` 与 `Vector<U8>.withCapacity(4)`。
+- 支持括号表达式、tuple、unit、结构体 pattern、or-pattern、range pattern 和 match guard。
 - 把函数参数位置的裸接口名展开为匿名静态接口参数。
 - 把函数返回位置的裸接口名记录为静态接口返回，并在语义阶段检查所有返回路径的具体类型一致。
 - 拒绝裸接口名出现在字段、集合元素、`static` 等长期存储类型位置。
@@ -496,4 +530,5 @@ trust_extern_decl = "trust" "extern" string_literal "fn" ident fn_params return_
 - `trust impl` 只允许用于编译器认可的标记接口，例如 `Send` / `Sync` 这类需要人工证明的平台或线程安全不变量；普通接口实现不能写成 `trust impl`。
 - 编译器必须为 `trust` 边界保留源码 span，用于信任报告和构建策略。
 - `@noAlloc` 是普通用户属性，表示被标注函数不能直接或间接执行堆分配。
-- `@export("symbol", abi: C)` 是普通用户属性，表示把非泛型顶层 `pub fn` 导出为外部 C ABI 符号；语义阶段必须检查 C-compatible 签名和 panic 边界。
+- `@export("symbol", abi: C)` 是普通用户属性，表示把非泛型顶层 `pub fn` 导出为严格外部 C ABI 符号；语义阶段必须检查 C-compatible 签名和 panic 边界。
+- `@export("symbol", bridge: C)` 是普通用户属性，表示把非泛型顶层 `pub fn` 通过生成的 C ABI thunk 导出；语义阶段必须检查 bridge-compatible 签名、错误码映射、panic 边界和无隐藏成本 lowering。
