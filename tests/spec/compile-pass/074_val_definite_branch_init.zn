@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: delayed val can be initialized exactly once on every control-flow path
 

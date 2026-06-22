@@ -13,6 +13,8 @@ Zeno 是面向内核、运行时、编译器、引擎、数据库、嵌入式组
 - 可恢复错误不使用异常。
 - 不使用继承式 class 对象模型。
 - 不隐藏堆分配、引用计数、锁或调度器。
+- 不强制全局运行时；线程池、async executor、反射元数据、格式化大模块和调用栈符号化都是按需能力。
+- 不执行隐式模块初始化、全局构造函数或全局析构函数。
 - 普通用户代码没有 `unsafe` 语言模式。
 - 裸指针、裸地址、裸 C ABI、inline asm 和硬件访问必须出现在显式 `trust` 边界中。
 - 必须能编译 freestanding 程序，不依赖 hosted 标准库。
@@ -64,6 +66,8 @@ manifest 会影响类型检查和 codegen，例如：
 - `oom.strategy = "panic"` 时，`@noPanic` 中可能分配的 API 被拒绝。
 - `panic.strategy = "unwind"` 时，panic 路径生成 unwind 清理；abort / trap 不生成 unwind 清理。
 - `trust` 字段决定 `trust` 边界内可使用哪些底层能力。
+
+profile 让能力可用，但不代表自动链接或自动初始化能力。Hosted profile 可以使用 OS、默认 allocator、线程和 hosted `std`，但程序只有在源码可达调用实际使用这些能力时才链接对应 runtime shim 或库模块。
 
 manifest 不改变普通所有权、move、初始化、访问值和 `Send` / `Sync` 的核心规则。
 
@@ -246,7 +250,7 @@ CTFE 是 hermetic 的。编译期执行不能调用 `trust` / FFI、裸内存、
 
 CTFE 可以使用编译器管理的编译期 arena 来构造临时 `String`、`Array`、`Vector`、`Map` 和 `Set`。这不代表运行期堆分配。编译期拥有值进入运行期时必须遵守成本模型：`Copy` 值可以内联；`StringSlice` / `ArraySlice<T>` 可以指向只读静态数据；需要运行期拥有 `String`、`Array<T>` 或 `Vector<T>` 时必须显式调用分配 / 复制 API。
 
-`static` 声明拥有固定存储地址和整个程序生命周期的静态项。
+`static` 声明拥有固定存储地址和整个程序生命周期的静态项。`static` 不表示运行期初始化钩子。
 
 ```zn
 static REQUESTS: Atomic<U64> = Atomic<U64>.new(0);
@@ -254,10 +258,33 @@ static REQUESTS: Atomic<U64> = Atomic<U64>.new(0);
 
 规则：
 
-- `static` 初始化式默认必须能在编译期完成，并物化为静态数据或目标支持的静态初始化记录。
+- `static` 初始化式必须能在编译期完成，并物化为静态数据或目标支持的静态初始化记录。
 - 普通 `static` 默认不可变。
 - Zeno 不提供裸 `static mut` 全局变量；跨线程可变全局状态必须放在 `Atomic<T>`、`Mutex<T>` 或其他同步类型中。
-- 隐式动态 `static` 初始化不进入 v1；以后如果支持，必须通过显式属性和 profile 策略开启。
+- v1 不提供隐式动态 `static` 初始化；不会生成模块初始化函数、全局构造函数、CRT 构造函数或等价启动钩子。
+- `static` 不能要求程序退出时自动运行 `destroy`；v1 不提供隐藏全局析构链或 `atexit` 注册。
+- `static` 初始化不能执行运行期 I/O、FFI 调用、系统调用、线程启动、任务运行时创建、默认 allocator 分配或其他只能在运行期完成的操作。
+- CTFE 可以使用编译期 arena 和临时集合计算值，但最终 `static` 只能物化为静态数据。需要运行期拥有者、堆分配、OS 句柄、线程池或缓存时，必须在 `main`、显式 `init` / `open` / `load` / `new` API，或显式懒初始化类型中完成。
+- 显式懒初始化必须把成本放在类型里，例如 `Once<T>`、`Mutex<T>`、`Atomic<T>` 或平台库定义的同步容器；这些类型的静态初始化本身仍必须是 CTFE / 静态可物化的。
+
+示例：
+
+```zn
+static Hits: Atomic<U64> = Atomic<U64>.new(0); // ok: 静态可物化
+
+static Config = File.readToString("app.toml"); // error: runtime IO in static initializer
+static Cache = Map<String, User>.withCapacity(1024); // error: runtime allocation/global cleanup
+```
+
+运行期初始化必须显式出现在可执行路径里：
+
+```zn
+fn main() -> Result<Unit, Error> {
+    val config = try Config.load("app.toml");
+    var app = try App.init(move config);
+    return mut app.run();
+}
+```
 
 完整规则见 [COMPTIME.md](COMPTIME.md)。
 
@@ -1777,6 +1804,15 @@ Zeno 把普通错误、程序 bug 和资源耗尽分开：
 - 程序不变量被破坏使用 `panic(message)`。
 - 默认分配 API 或 `In` 分配 API 遇到内存耗尽时使用 `oom(layout)`。
 
+可失败 API 规则：
+
+- 普通拥有值构造不因为分配失败返回 `Result`。例如 `String.from(text)`、`Vector.withCapacity(n)`、`Map.withCapacity(n)`、`Box.new(value)` 和 `Shared.new(value)` 失败时进入当前 profile 的 OOM 策略。
+- 指定 allocator 的普通拥有值构造同样不返回 `Result`。例如 `String.fromIn(text, mut allocator)` 和 `Vector.withCapacityIn(n, mut allocator)` 失败时进入 OOM 策略；如果 allocator 是 scoped allocator，逃逸检查由类型系统处理。
+- 可恢复 OOM 只通过显式容量预留入口表达，例如 `tryReserve` / `tryReserveExact`。这些 API 返回 `Result<Unit, AllocError>`，成功后为后续容量内操作提供优化事实。
+- 系统资源获取、I/O、线程、运行时创建、锁获取、FFI 包装和业务校验可以返回 `Result`，调用方用 `try` 传播。例如 `File.open(path)`、`Thread.spawn(move job)` 和 `Runtime.withWorkerCount(n)` 不是普通内存构造，它们可能因为 OS 或 profile 条件失败。
+- 不引入 `tryNew`、`tryFrom`、`tryClone`、`tryPush` 这类成套 fallible 构造 API。需要可恢复分配时，先显式 `tryReserve`；需要可恢复业务或系统错误时，直接让该操作返回 `Result`。
+- `Result` 表示调用方应当能处理的失败；OOM 策略表示当前 profile 选择的资源耗尽终止路径。二者不能混用来隐藏成本或规避 `@noAlloc` / `@noPanic` 检查。
+
 核心声明形状：
 
 ```zn
@@ -2152,6 +2188,9 @@ fn readByte(address: USize) -> U8 {
 - 非 `Copy` 值的所有权转移：被调用函数签名中的 `move` 参数、方法签名中的 `move self`、`match move`、`for move` 或 `move` 闭包捕获。
 - 逃逸 callable 分配：显式 `Box<Fn<...>>`、`Box<MutFn<...>>`、`Box<OnceFn<...>>` 或任务类型。
 - 底层信任边界：`trust`。
+- 任务运行时 / executor：显式 `Runtime`、`Executor`、`TaskGroup` 或等价类型。
+- 全局懒初始化和同步全局状态：显式 `Once<T>`、`Mutex<T>`、`Atomic<T>` 或同步容器。
+- 反射、类型名、调用栈符号化和高级格式化：显式 API、manifest/profile 能力或可达库模块。
 
 如果库 API 以误导性的名称或返回类型隐藏成本，编译器应该给出警告。
 

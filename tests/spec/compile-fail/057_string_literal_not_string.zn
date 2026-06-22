@@ -1,9 +1,11 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: string literal does not implicitly construct owned String
 
 module tests.fail.stringLiteralNotString;
 
 fn bad() {
-    val text: String = "hello"; // expected-error: string literal is StringSlice; use String.from("hello") for owned String
+    val text: String = "hello"; // expected-error[E0301]: string literal is StringSlice; use String.from("hello") for owned String
 }

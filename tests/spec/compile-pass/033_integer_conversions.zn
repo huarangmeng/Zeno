@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: integer conversions distinguish lossless, checked, truncating, and saturating forms
 

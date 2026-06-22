@@ -110,7 +110,7 @@ stage0 C++ 实现不使用 C++ exception 作为编译流程控制；错误通过
 | 里程碑 | 目标 | 完成标准 |
 | --- | --- | --- |
 | M0 scaffold | CMake/Ninja、LLVM 21 探测、`zeno --version`、基础单元测试框架 | macOS arm64 和 Linux x86_64 可构建空编译器 |
-| M1 source/diag/lexer/parser | SourceManager、稳定错误码、human / JSON Lines 诊断、lexer、parser、AST dump | `zeno check --parse` 能解析语法测试并稳定报错 |
+| M1 source/diag/lexer/parser | SourceManager、稳定错误码、human / JSON Lines 诊断、lexer、parser、AST dump | `zeno check` 能解析语法测试并稳定报错；`zeno test --stage mvp --milestone M1` 可运行 |
 | M2 package/names | `Zeno.toml`、`Zeno.lock`、固定 `src/`、workspace、builtin/path dependency、声明收集、模块和可见性 | module/package/manifest 测试可运行 |
 | M3 HIR/type/basic sema | HIR、基础类型、控制流、重载、接口骨架、布局骨架、内建声明包加载 | 基础 compile-pass/fail 能进入类型检查 |
 | M4 ownership/RAII/access | `val`/`var`、move、初始化、drop flags、`destroy`、访问逃逸、视图规则 | use-after-move、悬垂视图、非法可写共享等测试稳定失败 |
@@ -121,6 +121,39 @@ stage0 C++ 实现不使用 C++ exception 作为编译流程控制；错误通过
 | M9 performance gate | no hidden allocation/dynamic dispatch/exception lowering、基础边界检查消除、缓存 key 验证 | 第一批 codegen / incremental 性能规格通过 |
 
 实现顺序不能跳过 M1-M6 直接进入 LLVM。Zeno 的性能和安全事实必须先在 HIR/MIR 里建立，再交给 LLVM。
+
+### 0.3 M0-M2 开发验收冻结
+
+正式开发从 M0 开始，但 M0-M2 只建立编译器骨架和前端输入，不实现完整语义。
+
+M0 scaffold 必须完成：
+
+- 根 `CMakeLists.txt` 能配置 `compiler/stage0`。
+- CMake 能探测 LLVM 21，并在版本不匹配时给出清晰错误。
+- `zeno --version` 输出 compiler identity、LLVM major 版本、host triple 和 build mode。
+- `zeno --help` 列出 `check`、`build`、`test` 以及通用选项。
+- 建立基础单元测试入口，CI 或本地命令能运行空测试。
+- 建立 `base`、`source`、`diag`、`lex`、`parse`、`ast`、`driver` 的最小目录和库目标。
+
+M1 source / diag / lexer / parser 必须完成：
+
+- `SourceManager` 提供稳定 `FileId`、UTF-8 byte span、1-based 行列映射和源码缓存。
+- `DiagnosticEngine` 支持稳定错误码、primary span、labels、notes、help、human 输出和 JSON Lines 输出。
+- lexer 能识别关键字、标识符、字面量、注释、属性、运算符和分隔符，并产生 `E0001` / `E0002`。
+- parser 能构造 AST，覆盖 package 源文件、模块声明、import、函数、类型、impl、interface、表达式、pattern、闭包和属性。
+- parser 遇到局部语法错误时尽量恢复，并用 `E0003` / `E0004` 给稳定诊断。
+- `zeno check` 在后续语义阶段尚未实现时，仍必须能跑完 SourceManager、lexer 和 parser，并稳定输出 parser 诊断；AST dump 可以作为开发期内部开关，不能成为 stage0 用户 CLI 的必需能力。
+
+M2 package / names 必须完成：
+
+- 解析 `Zeno.toml`、本地 `Zeno.lock`、固定 `src/` 源码根、workspace member、builtin package 和 path dependency。
+- `kind = "application"` 默认查找 `src/main.zn` 的 `main`；`kind = "library"` 不要求入口。
+- 文件路径推导模块路径；显式 `module` 只做路径校验。
+- 同 package 声明默认直接可见；外部 package 和内建包才需要 `import`。
+- 支持 `pub` 外部可见、默认 package-visible、`private` 文件私有。
+- Declaration Collection 建立顶层声明、重载入口、stable node id 和源码 span。
+- Name / Module Resolution 能解析同包名字、模块限定名、导入项和可见性，并产生 `E0101`、`E0102`、`E0201`、`E0202`、`E0203`。
+- `zeno test --stage mvp --milestone M2` 能运行 manifest、module、package 和 parser 相关 MVP 测试。
 
 ## 1. stage0 目标
 

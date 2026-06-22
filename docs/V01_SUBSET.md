@@ -18,6 +18,9 @@
 - 首批产物：application executable、library static archive、`.zmeta` 编译器元数据。
 - LLVM 22+ 只作为后续显式后端升级，不进入 stage0 MVP 基线。
 - 实现目录与里程碑见 [BOOTSTRAP.md](BOOTSTRAP.md)：`compiler/stage0`、`lib/zeno/{core,alloc,std}`、`runtime/stage0`，M0-M9 分批交付。
+- M0-M2 的具体验收清单已经冻结在 [BOOTSTRAP.md](BOOTSTRAP.md)。
+- 首批稳定错误码冻结在 [COMPILATION.md](COMPILATION.md)；新增或进入 `stage: mvp` 的失败测试应使用稳定错误码。
+- 首批 MVP 规格测试必须带 `stage: mvp` / `stage = "mvp"`，并尽量带 `milestone`，让 `zeno test --stage mvp` 在开发初期就有可执行门禁。
 
 ## 1. P1 决策
 
@@ -51,6 +54,8 @@
 - 默认 Auto layout、`@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`。
 - `const` 项、局部 `const`、`static` CTFE 初始化、常量泛型参数和布局查询。
 - CTFE 必须能执行普通函数、方法、循环、`match`、泛型和静态接口派发；不能只实现字面量表达式。
+- `import` 不能执行代码；stage0 不生成隐式模块初始化函数、动态全局构造函数、全局析构函数或隐藏 `atexit` 链。
+- `static` 必须 CTFE 物化；运行期 I/O、FFI、默认 allocator 分配、线程启动、任务运行时创建或需要退出时全局析构的初始化必须被拒绝。
 - `val`、`var`、块、`if`、`while`、`for`、基础 `match`。
 - 基础 pattern、穷尽性检查、只读 / `mut` / `move` enum payload 访问。
 - 闭包语法：`(params) -> T { ... }` 和 `(params) => expr`。
@@ -164,6 +169,7 @@ stage0 MVP 的核心库先以编译器发行包的内建声明包为准。声明
 - `Zeno.lock` 本地 frozen 校验，第一批支持 `path` 和 `builtin` 来源。
 - registry、git fetch、版本范围求解和发布协议延后，遇到时给 staged diagnostic。
 - target triple、profile、allocator、panic/OOM 和 trust 字段。
+- profile 只表示能力可用；driver / linker 必须记录可达运行时需求，避免 hosted profile 自动链接线程池、任务运行时、反射元数据、符号化器或高级格式化器。
 - CLI 行为：`zeno check` 不 codegen，`zeno build` 生成产物，`zeno test` 默认运行 MVP 规格测试。
 - `--diagnostic-format human|json`，JSON 输出为一行一个 object。
 - application 输出 `bin/<package-name>`；library 输出 `lib/lib<package-name>.a` 和 `meta/<package-name>.zmeta`。
@@ -176,7 +182,7 @@ stage0 MVP 不要求实现：
 
 - 完整 `Shared<T>` runtime。
 - `Shared<Interface>` 动态接口对象。
-- async lowering、future 状态机、executor、task runtime 和 `TaskGroup<T>`。
+- async lowering、future 状态机、executor、任务运行时和 `TaskGroup<T>`。
 - `Thread.scope`、scoped thread、`splitDisjoint` 的不重叠证明。
 - 跨 package `pub fn -> Interface` opaque return metadata。
 - registry 解析、git fetch、发布协议。
@@ -216,13 +222,14 @@ tests/spec/codegen-pass/*/case.toml
 tests/spec/codegen-fail/*/case.toml
 ```
 
-现有测试文件如果覆盖延后能力，应保留为完整规格门禁，不删除。`.zn` 和真实 manifest TOML 用头部注释标记 `stage` / `feature` / `profile` / `target`；`codegen-*` 和 `incremental-*` 的 `case.toml` 用结构化字段标记。没有显式 `stage` 时，默认按完整规格测试处理；进入发布门禁前再批量补齐 `stage: mvp` 或 `stage = "mvp"`。
+现有测试文件如果覆盖延后能力，应保留为完整规格门禁，不删除。`.zn` 和真实 manifest TOML 用头部注释标记 `stage` / `milestone` / `feature` / `profile` / `target`；`codegen-*` 和 `incremental-*` 的 `case.toml` 用结构化字段标记。没有显式 `stage` 时，默认按完整规格测试处理。首批核心测试已经开始标记为 `stage: mvp` 或 `stage = "mvp"`；后续每完成一个里程碑，再把对应测试提升进 MVP 门禁。
 
 runner 命令：
 
 - `zeno test --stage mvp` 只跑 stage0 MVP 门禁。
 - `zeno test --stage full-spec` 跑完整规格门禁。
 - `zeno test --feature async` 按 feature 过滤。
+- `zeno test --milestone M4` 按实现里程碑过滤。
 - `zeno test --target x86_64-unknown-linux-gnu` 按目标过滤 codegen / ABI 相关测试。
 
 所有失败类测试必须包含 `expected-error`。runner 输出必须按 category、test path、package、source file、byte offset 和 error code 稳定排序；并行执行和缓存命中不能改变诊断顺序。

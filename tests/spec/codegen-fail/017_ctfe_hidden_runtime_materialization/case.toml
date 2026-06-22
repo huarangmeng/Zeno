@@ -1,6 +1,10 @@
 # category: codegen-fail
 # purpose: CTFE-owned data must not become runtime owned data through hidden allocation
 
+stage = "mvp"
+milestone = "M6"
+feature = "static-init"
+
 [source]
 file = "src/main.zn"
 text = '''
@@ -19,4 +23,5 @@ lowering = [
 ]
 
 [expect]
+code = "E0902"
 error = "const owned value requires explicit runtime materialization"

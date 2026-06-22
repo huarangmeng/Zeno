@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M7
 // profile: freestanding
 // trust.rawMemory: true
 // purpose: raw memory operations are allowed only inside explicit trust boundaries with manifest capability

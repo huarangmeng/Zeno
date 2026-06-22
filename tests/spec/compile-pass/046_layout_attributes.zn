@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: freestanding
 // purpose: layout attributes support Auto, Source, C, Packed, and zero-cost single-field wrappers
 

@@ -206,6 +206,8 @@ profile 基础含义：
 - `kernel`：freestanding 的更严格形态，允许硬件能力，但必须显式提供 panic/OOM handler。
 - `embedded`：freestanding 的资源受限形态，默认禁止 unwinding 和符号化调用栈。
 
+profile 只表示能力是否可用，不表示这些能力会被自动链接或初始化。Hosted profile 不会因为目标支持 OS 就自动引入线程池、任务运行时、反射元数据、格式化大模块、调用栈符号化器或动态全局初始化。编译器和 linker 必须按可达性链接实际使用的能力。
+
 ### allocator
 
 ```toml
@@ -353,6 +355,8 @@ manifest 只能允许某类底层能力；具体源码仍然必须写 `trust`。
 - `trust.dependencyTrust = false` 时，依赖包中的 `trust` 会让构建失败。
 - `trust.allowedPackages` 存在时，不在列表中的包不能包含 `trust`。
 - `trust.requireReport = true` 时，构建产物必须包含信任报告；发布包若包含任意 `trust` 边界，推荐强制开启。
+- `static` 初始化式必须通过 CTFE 物化；任何运行期 I/O、FFI、系统调用、线程或运行时创建、默认 allocator 分配或需要退出时全局析构的初始化都必须被拒绝。
+- manifest 不能启用隐式模块初始化函数、全局构造函数、全局析构函数或隐藏 `atexit` 链；需要运行期初始化时必须在源码中写显式初始化 API。
 
 ## 7. 对类型检查的影响
 
@@ -365,7 +369,9 @@ manifest 会影响这些规则：
 - `panic.stack` 决定 `PanicInfo.stack()` 能提供的最低诊断能力。
 - `oom.strategy = "panic"` 会让可能分配的 API 在 `@noPanic` 中被拒绝。
 - `trust` 字段决定 `trust` 边界内可使用的底层能力类别。
-- `target.profile` 决定 hosted `std`、OS 线程和文件系统是否可用。v1 不提供隐式动态 `static` 初始化；`static` 默认通过 CTFE 物化。
+- `target.profile` 决定 hosted `std`、OS 线程和文件系统是否可用，但不自动链接或初始化这些能力。
+- v1 不提供隐式动态 `static` 初始化；`static` 必须通过 CTFE 物化，且不能注册退出时全局析构。
+- 运行时需求由可达标准库声明和内建 intrinsic 汇总，例如默认 allocator、OS 线程、任务运行时、调用栈符号化、反射元数据或高级格式化器；未可达的需求不应进入产物。
 
 manifest 不会改变普通所有权、move、初始化、访问值和 `Send` / `Sync` 的核心规则。
 

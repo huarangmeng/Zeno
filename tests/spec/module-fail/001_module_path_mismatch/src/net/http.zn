@@ -1,4 +1,4 @@
-module net.client; // expected-error: module path does not match file path src/net/http.zn
+module net.client; // expected-error[E0101]: module path does not match file path src/net/http.zn
 
 pub fn connect() -> I32 {
     return 1;

@@ -22,6 +22,7 @@
 - CLI 冻结为 `zeno check`、`zeno build`、`zeno test`；application 输出 executable + `.zmeta`，library 输出 static archive + `.zmeta`；动态库、稳定 ABI 和发布包格式延后。
 - 诊断冻结为稳定错误码分段、human 格式和 JSON Lines；span 使用 UTF-8 byte offset 与 1-based 行列，staged diagnostic 使用 `E9000-E9099` 并携带 `isStaged` / `feature`。
 - stage0 实现目录冻结为 `compiler/stage0`、`lib/zeno/{core,alloc,std}` 和 `runtime/stage0`；实现里程碑冻结为 M0 scaffold 到 M9 performance gate，不能跳过 HIR/MIR 直接进入 LLVM。
+- 默认零基线运行时冻结：无强制全局 runtime，profile 只表示能力可用；`import` 不执行代码，`static` 必须 CTFE 物化，运行期初始化必须显式出现在源码可执行路径中。
 
 ## 1. 当前冻结结论
 
@@ -93,7 +94,21 @@
 
 审计结果：SPEC、STDLIB、MANIFEST、IR、TESTING 已一致。
 
-### 1.5 并发
+### 1.5 默认运行时与静态初始化
+
+状态：冻结。
+
+- Zeno 语言本身不要求全局 runtime、GC、executor、线程池、反射表、异常运行时、全局注册表或模块初始化函数。
+- profile 只表示 OS、线程、默认 allocator、hosted `std` 等能力是否可用，不表示它们自动链接、自动初始化或自动占用内存。
+- `import` 只影响名字解析和依赖可达性，不执行代码。
+- `static` 必须由 CTFE 物化为静态数据或目标支持的静态初始化记录。
+- v1 禁止隐式动态全局初始化、全局构造函数、全局析构函数和隐藏 `atexit` 链。
+- 运行期初始化必须显式出现在 `main`、`init` / `open` / `load` / `new` API、`Runtime.withWorkerCount`、`Once<T>` 或等价源码路径中。
+- 标准库声明记录运行时需求，driver / linker 只链接全程序可达需求。
+
+审计结果：SPEC、PERFORMANCE、MANIFEST、STDLIB、TESTING 已一致。
+
+### 1.6 并发
 
 状态：冻结核心模型，运行时 API 进入 v0.1 子集筛选。
 
@@ -108,7 +123,7 @@
 
 审计修复：`std.thread.scope` 命名已统一为 `std.thread.Thread.scope`。
 
-### 1.6 trust 与 FFI
+### 1.7 trust 与 FFI
 
 状态：冻结。
 
@@ -126,7 +141,7 @@
 
 审计结果：SPEC、SAFETY、FFI、MANIFEST、PACKAGE 已一致。
 
-### 1.7 布局与成本模型
+### 1.8 布局与成本模型
 
 状态：冻结。
 
@@ -153,7 +168,7 @@
 
 1. `Shared<T>` 完整 runtime 不进入第一批。语言规范保留 `Shared<T>` / `Shared<Interface>` 语义；stage0 MVP 先实现 `Box<T>`、`Box<Interface>` 和静态接口。
 
-2. async 不进入第一批 lowering。语法和安全规则保留；stage0 MVP 可以解析后拒绝 `async fn` / `await`，不实现 executor、task runtime 或 future 状态机。
+2. async 不进入第一批 lowering。语法和安全规则保留；stage0 MVP 可以解析后拒绝 `async fn` / `await`，不实现 executor、任务运行时或 future 状态机。
 
 3. scoped 并发不进入第一批。`Thread.spawn` 的 OS 线程所有权转移与 `Send` 检查进入第一批；`Thread.scope`、scoped thread 和 `splitDisjoint` 的不重叠证明进入第二批。
 

@@ -1,4 +1,6 @@
 # category: module-pass
+# stage: mvp
+# milestone: M2
 # purpose: same-package declarations are directly visible without imports
 
 [package]

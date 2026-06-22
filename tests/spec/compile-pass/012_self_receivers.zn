@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: self, mut self, and move self follow receiver access rules
 

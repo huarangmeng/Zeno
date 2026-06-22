@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: assignment overwrites by dropping the old value while replaceAt returns old ownership
 

@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: freestanding
 // purpose: match supports read, move, and mut ownership modes for enum payloads
 

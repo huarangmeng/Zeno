@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: non-Copy resource moves once and drops once
 

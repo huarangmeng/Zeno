@@ -1,4 +1,6 @@
 # category: module-fail
+# stage: mvp
+# milestone: M2
 # purpose: explicit module declarations must match src-relative file paths
 
 [package]

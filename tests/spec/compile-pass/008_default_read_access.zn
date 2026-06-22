@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: default non-Copy parameter access does not move ownership
 

@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: allocation must be explicit in no-allocation contexts
 
@@ -10,12 +12,12 @@ fn consume(text: String) {}
 
 @noAlloc
 fn tick(value: I32) {
-    val text = format("value={}", value); // expected-error: hidden heap allocation
+    val text = format("value={}", value); // expected-error[E0305]: hidden heap allocation
     consume(text);
 }
 
 @noAlloc
 fn ownLiteral() {
-    val text = String.from("literal"); // expected-error: String.from may allocate in no-allocation context
+    val text = String.from("literal"); // expected-error[E0305]: String.from may allocate in no-allocation context
     consume(text);
 }

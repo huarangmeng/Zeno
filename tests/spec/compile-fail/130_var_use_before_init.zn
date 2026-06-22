@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: var must be initialized before it can be read
 
@@ -10,5 +12,5 @@ struct Handle {
 
 fn bad() -> U32 {
     var handle: Handle;
-    return handle.id; // expected-error: handle is used before initialization
+    return handle.id; // expected-error[E0404]: handle is used before initialization
 }

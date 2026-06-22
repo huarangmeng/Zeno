@@ -1,8 +1,10 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M7
 // profile: hosted
 // purpose: raw C ABI declarations require an explicit trust boundary
 
 module tests.fail.rawFfi;
 
 extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
-// expected-error: raw FFI declaration requires trust
+// expected-error[E0701]: raw FFI declaration requires trust

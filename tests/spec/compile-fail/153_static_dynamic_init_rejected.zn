@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M5
 // profile: hosted
 // trust.ffi: true
 // purpose: v1 static initialization must be CTFE and cannot require runtime dynamic initialization
@@ -7,4 +9,4 @@ module tests.fail.staticDynamicInitRejected;
 
 trust extern "C" fn getpid() -> I32;
 
-static processId: I32 = trust { getpid() }; // expected-error: static initializer must be CTFE; implicit dynamic static initialization is not v1
+static processId: I32 = trust { getpid() }; // expected-error[E0801]: static initializer must be CTFE; implicit dynamic static initialization is not v1

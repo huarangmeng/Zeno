@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: hosted
 // purpose: Map and Set are standard owning hash collections with explicit capacity costs
 

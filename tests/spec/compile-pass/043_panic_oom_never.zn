@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: panic and oom return Never and can satisfy any expected return type
 

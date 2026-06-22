@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: move parameters require explicit call-site move for named non-Copy arguments
 
@@ -16,5 +18,5 @@ fn consume(move handle: Handle) {}
 
 fn main() {
     val handle = Handle { id: 1 };
-    consume(handle); // expected-error: move parameter requires explicit `move` at call site
+    consume(handle); // expected-error[E0402]: move parameter requires explicit `move` at call site
 }

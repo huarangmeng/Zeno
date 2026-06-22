@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: writable access cannot overlap active read-only access
 
@@ -11,6 +13,6 @@ fn readThenWrite(read: ArraySlice<U8>, mut write: ArraySlice<U8>) {}
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     var bytes = Array<U8>.filledIn(4, 0, mut allocator);
-    readThenWrite(bytes, mut bytes); // expected-error: writable access overlaps active read-only access
+    readThenWrite(bytes, mut bytes); // expected-error[E0501]: writable access overlaps active read-only access
     return Ok(());
 }

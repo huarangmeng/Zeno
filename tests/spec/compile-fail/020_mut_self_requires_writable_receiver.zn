@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: mut self methods require writable receivers
 
@@ -16,5 +18,5 @@ impl Counter {
 
 fn main() {
     val counter = Counter { value: 1 };
-    mut counter.bump(); // expected-error: mut self method requires writable receiver
+    mut counter.bump(); // expected-error[E0504]: mut self method requires writable receiver
 }

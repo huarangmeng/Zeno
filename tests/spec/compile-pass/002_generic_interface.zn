@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: freestanding
 // purpose: generic interface calls use static dispatch
 

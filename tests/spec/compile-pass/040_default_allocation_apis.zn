@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: hosted
 // purpose: hosted code can use profile default allocator through allocation APIs without In suffix
 

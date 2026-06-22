@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: hosted
 // purpose: full CTFE executes ordinary functions, loops, local consts, static initializers, and const generics
 

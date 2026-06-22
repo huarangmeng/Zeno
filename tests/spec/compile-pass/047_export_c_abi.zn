@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M7
 // profile: hosted
 // panic.strategy: abort
 // purpose: pub functions can be explicitly exported with C ABI symbols

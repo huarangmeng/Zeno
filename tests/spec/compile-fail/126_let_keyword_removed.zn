@@ -1,10 +1,12 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M1
 // profile: freestanding
 // purpose: Zeno uses val and var for local bindings; let is not a binding keyword
 
 module tests.fail.letKeywordRemoved;
 
 fn bad() -> U32 {
-    let x = 1; // expected-error: use val for immutable bindings or var for mutable bindings
+    let x = 1; // expected-error[E0004]: use val for immutable bindings or var for mutable bindings
     return x;
 }

@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: val cannot be reassigned after successful initialization
 
@@ -14,6 +16,6 @@ fn makeHandle(id: U32) -> Handle {
 
 fn bad() -> Handle {
     val handle = makeHandle(1);
-    handle = makeHandle(2); // expected-error: val binding cannot be reassigned after initialization
+    handle = makeHandle(2); // expected-error[E0403]: val binding cannot be reassigned after initialization
     return handle;
 }

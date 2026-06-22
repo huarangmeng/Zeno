@@ -1,4 +1,6 @@
 # category: manifest-pass
+# stage: mvp
+# milestone: M2
 # purpose: hosted application can use a default allocator and symbolized panic stack
 
 [package]

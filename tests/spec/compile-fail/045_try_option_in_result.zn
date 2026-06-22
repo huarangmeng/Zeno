@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: try does not implicitly convert Option into Result
 
@@ -12,6 +14,6 @@ enum ParseError {
 }
 
 fn bad(value: U32) -> Result<U8, ParseError> {
-    val byte = try U8.fromChecked(value); // expected-error: try on Option in Result function requires explicit okOr or okOrElse
+    val byte = try U8.fromChecked(value); // expected-error[E0301]: try on Option in Result function requires explicit okOr or okOrElse
     return Ok(byte);
 }

@@ -1,6 +1,10 @@
 # category: codegen-pass
 # purpose: non-escaping closures are stack/scalar values and allocate nothing
 
+stage = "mvp"
+milestone = "M6"
+feature = "closure-noalloc"
+
 [source]
 file = "src/main.zn"
 text = '''
@@ -34,4 +38,3 @@ forbid = [
     "zeno_alloc",
     "vtable.call",
 ]
-

@@ -1,9 +1,11 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: freestanding code without a default allocator must use In-suffix allocation APIs
 
 module tests.fail.defaultAllocatorUnavailableFreestanding;
 
 fn bad() -> Vector<U8> {
-    return Vector<U8>.withCapacity(16); // expected-error: no profile default allocator is available; use withCapacityIn
+    return Vector<U8>.withCapacity(16); // expected-error[E1002]: no profile default allocator is available; use withCapacityIn
 }

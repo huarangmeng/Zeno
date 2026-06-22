@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: overloads resolve by arity, parameter type, mut access mode, and generic specificity
 

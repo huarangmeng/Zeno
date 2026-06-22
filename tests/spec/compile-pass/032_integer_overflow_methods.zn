@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: integer arithmetic has wrapping defaults and explicit overflow methods
 

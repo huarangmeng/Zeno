@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M5
 // profile: freestanding
 // purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-val, and while-val
 

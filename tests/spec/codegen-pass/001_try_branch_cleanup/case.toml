@@ -1,6 +1,10 @@
 # category: codegen-pass
 # purpose: try lowers to ordinary branch plus RAII cleanup, not exceptions
 
+stage = "mvp"
+milestone = "M6"
+feature = "try-cleanup"
+
 [source]
 file = "src/main.zn"
 text = '''

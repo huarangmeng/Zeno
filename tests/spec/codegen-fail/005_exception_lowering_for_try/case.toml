@@ -1,6 +1,10 @@
 # category: codegen-fail
 # purpose: Result/Option try must not use exception lowering
 
+stage = "mvp"
+milestone = "M6"
+feature = "try-cleanup"
+
 [source]
 file = "src/main.zn"
 text = '''
@@ -17,5 +21,5 @@ llvm = [
 ]
 
 [expect]
+code = "E0902"
 error = "try must lower to branch and cleanup, not exception machinery"
-

@@ -11,7 +11,7 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 stage0 第一批采用 builtin + 声明文件策略：
 
 - 编译器发行包提供 `core` / `alloc` / 最小 `std` 的内建声明包。
-- 声明包记录类型、函数、方法、接口、泛型约束、布局事实、drop glue 事实、`Send` / `Sync` 事实、分配成本和 intrinsic 绑定。
+- 声明包记录类型、函数、方法、接口、泛型约束、布局事实、drop glue 事实、`Send` / `Sync` 事实、分配成本、运行时需求和 intrinsic 绑定。
 - 声明包可以由普通 `.zn` 风格声明、结构化 metadata 或 C++ 内建表承载；这不是新的用户源码语法。
 - 没有函数体的声明只参与解析、类型检查、接口求解、所有权检查、MIR 降级约束和 codegen 符号引用。
 - 需要编译器特殊降低的能力用编译器发行包专用 `@intrinsic` 绑定，例如基础整数运算、布局查询、panic/OOM 入口、原子操作、`ArraySlice` 构造检查和少量容器 primitive。
@@ -62,6 +62,15 @@ stage0 第一批采用 builtin + 声明文件策略：
 - 平台错误转换。
 
 Freestanding 程序可以只使用 `core`。
+
+库按需进入产物：
+
+- `core` 不引入 hosted 运行时。
+- `alloc` 只有在可达代码使用拥有分配类型、默认 allocator 或底层 allocator API 时进入产物。
+- `std` 模块被 `import` 不执行代码；只有可达函数、类型和 intrinsic 需求会进入产物。
+- `std.thread`、`std.task`、调用栈符号化、反射元数据、高级格式化和本地化数据必须是独立运行时需求，不能被普通 I/O 或基础字符串操作隐式拖入。
+- 每个可能引入运行期支撑的 API 必须在声明包 metadata 中记录需求，例如默认 allocator、OS 线程、任务运行时、调用栈符号化、反射元数据和高级格式化器。
+- 运行时 shim 只服务已可达需求；不能在程序启动时统一初始化全局线程池、全局注册表、格式化表或反射表。
 
 ## 2. Option 与 Result
 
@@ -880,6 +889,7 @@ Hosted 同步类型位于 `std.sync`。
 ```zn
 struct Mutex<T> { ... }
 struct MutexGuard<T> { ... }
+struct Once<T> { ... }
 
 impl<T> Mutex<T> {
     fn new(move value: T) -> Mutex<T>;
@@ -892,6 +902,8 @@ impl<T> MutexGuard<T> {
 ```
 
 锁获取在类型上可见。锁后的修改必须通过 guard。
+
+`Once<T>` 或等价同步容器用于显式全局懒初始化。它可以作为 `static` 项存在，但空状态初始化必须是 CTFE / 静态可物化的；真正的运行期初始化必须由调用点显式触发，并且同步、分配和失败路径成本由 `Once<T>` API 暴露。语言不提供隐藏模块初始化函数来替代 `Once<T>`。
 
 原子类型：
 

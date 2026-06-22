@@ -1,4 +1,6 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M4
 // profile: freestanding
 // purpose: moved non-Copy value cannot be used again
 
@@ -17,5 +19,5 @@ fn consume(move handle: Handle) {}
 fn main() {
     val handle = Handle { id: 1 };
     consume(move handle);
-    consume(move handle); // expected-error: use of moved value
+    consume(move handle); // expected-error[E0401]: use of moved value
 }

@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: non-escaping closure captures Copy value without allocation
 

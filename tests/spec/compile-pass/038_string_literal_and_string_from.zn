@@ -1,4 +1,6 @@
 // category: compile-pass
+// stage: mvp
+// milestone: M4
 // profile: hosted
 // purpose: string literals are StringSlice and owned strings use explicit String.from
 

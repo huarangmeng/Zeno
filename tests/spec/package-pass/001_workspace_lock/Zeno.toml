@@ -1,4 +1,6 @@
 # category: package-pass
+# stage: mvp
+# milestone: M2
 # purpose: workspace members share one lockfile and local member dependencies resolve first
 
 [workspace]

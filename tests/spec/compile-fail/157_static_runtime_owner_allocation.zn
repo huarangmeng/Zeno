@@ -1,0 +1,14 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// allocator.default: true
+// purpose: static initialization cannot hide runtime allocation or global destruction
+
+module tests.fail.staticRuntimeOwnerAllocation;
+
+struct User {
+    id: U64,
+}
+
+static Users: Map<String, User> = Map<String, User>.withCapacity(64); // expected-error[E0801]: static initializer must be CTFE-materialized data; runtime allocation and global destruction must be explicit

@@ -1,9 +1,11 @@
 // category: compile-fail
+// stage: mvp
+// milestone: M3
 // profile: freestanding
 // purpose: as cannot hide lossy integer conversions
 
 module tests.fail.lossyIntegerAs;
 
 fn bad(value: U32) -> U8 {
-    return value as U8; // expected-error: lossy integer conversion requires U8.fromChecked, U8.truncate, or U8.saturate
+    return value as U8; // expected-error[E0304]: lossy integer conversion requires U8.fromChecked, U8.truncate, or U8.saturate
 }
