@@ -4,12 +4,10 @@
 
 module tests.fail.taskContextReturn;
 
-async fn echoContext(ctx: TaskContext) -> TaskContext {
-    return ctx; // expected-error: TaskContext cannot escape the task body
-}
-
 fn bad(move runtime: Runtime) -> Result<Unit, SpawnError> {
-    val task = try runtime.spawnWithContext((ctx: TaskContext) => echoContext(ctx));
+    val task = try runtime.spawnWithContext((ctx: TaskContext) {
+        return ctx; // expected-error: TaskContext cannot escape the task body
+    });
 
     move task.detach();
     return Ok(());

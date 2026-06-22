@@ -2,6 +2,18 @@
 
 Zeno 的模块系统目标是：同包代码写起来轻，外部依赖边界清楚，构建仍然可以确定、可增量、可审计。
 
+stage0 冻结摘要：
+
+- `src/` 是固定源码根，不需要配置。
+- `kind = "application"` 的包默认入口是 `src/main.zn` 中的 `main`，即 `main.main`；也可以用 `package.entry` 显式指定。
+- `kind = "library"` 的包没有入口函数；`src/lib.zn` 是推荐的库根文件，但同包所有 `src/**/*.zn` 都参与编译。
+- 文件路径默认推导模块路径，`module` 声明可省略；若出现，只作为路径校验。
+- 同 package 内声明默认直接可见，不需要 `import`。
+- `import` 只用于外部 package 和内建包根。
+- `core` 始终自动可用，不需要依赖声明，也不要求日常 import。
+- `std` 是 hosted 标准库；只有 hosted 或显式支持 hosted 能力的 profile 可以使用。
+- stage0 只支持内建依赖、workspace member 和 path dependency；registry、git fetch 和发布协议延后。
+
 ## 1. 包与默认布局
 
 包是一个包含 `Zeno.toml` 的目录。v1 固定源码根目录为 `src/`，普通包不需要在 manifest 里配置源码路径。
@@ -22,9 +34,24 @@ src/
 ```toml
 [package]
 name = "app"
+version = "0.1.0"
+kind = "application"
 ```
 
 `package.name` 是包身份，用于依赖图、锁文件、诊断和信任报告。包名可以包含 `-`，因为它不直接进入源码模块路径。
+
+`package.kind` 是包形态：
+
+- `"application"`：有入口函数。若 `package.entry` 省略，默认寻找 `src/main.zn` 的 `main`，模块路径为 `main.main`。
+- `"library"`：没有入口函数。`src/lib.zn` 是推荐入口式组织文件，但不是特殊语法；同包所有源码文件都会参与声明收集和类型检查。
+
+stage0 构建产物：
+
+- application 构建为 `target/<triple>/<profile>/bin/<package-name>`，并生成 `meta/<package-name>.zmeta`。
+- library 构建为 `target/<triple>/<profile>/lib/lib<package-name>.a`，并生成 `meta/<package-name>.zmeta`。
+- 动态库、稳定 ABI、发布包格式和 binary artifact 依赖延后。
+
+如果 `kind` 省略，stage0 可以按是否存在 `src/main.zn` 推断；应用发布和工作区构建建议显式写出 `kind`，减少诊断歧义。
 
 ## 2. 文件路径与可选 module
 
@@ -229,7 +256,11 @@ v1 不提供 wildcard import，不提供 import alias，不提供 `pub import` r
 - `alloc`：编译器发行包提供，包含拥有式堆分配类型和构建器；能否使用无 `In` 后缀 API 由 manifest allocator 策略决定。
 - `std`：hosted 标准库；只有 hosted profile 或显式支持 hosted 功能的自定义 profile 可以解析。
 
-`core` 不需要写进 `[dependencies]`。`alloc` 和 `std` 可以写进 `[dependencies]` 用于审计和锁文件，但编译器发行包可以把它们识别为内建依赖。
+`core` 不需要写进 `[dependencies]`，也不要求普通源码显式 import。编译器可以把 `Option`、`Result`、`Never`、`panic`、`oom`、基础数值接口和少量核心 prelude 作为默认可见的语言底座。
+
+`std` 面向普通 hosted 应用，可以 re-export 常用 `core` 类型，让应用代码不需要理解底层分层。freestanding、kernel 和 embedded 包不能依赖 `std`，除非 profile 显式声明 hosted 能力。
+
+`alloc` 和 `std` 可以写进 `[dependencies]` 用于审计和锁文件，但编译器发行包可以把它们识别为内建依赖。
 
 ## 8. 依赖声明
 
@@ -246,7 +277,8 @@ std = "builtin"
 
 - dependency key 是当前包中的外部 import 根，必须是合法 Zeno 标识符。
 - dependency key 是本地别名，不要求等于依赖包的 `package.name`。
-- v1 支持 `"builtin"`、`{ path = "..." }`、`{ git = "...", rev = "..." }` 和 `{ version = "..." }`。
+- stage0 支持 `"builtin"`、`{ path = "..." }` 和 workspace member 解析。
+- 完整 v1 规格保留 `{ git = "...", rev = "..." }` 和 `{ version = "..." }`，但 registry、git fetch 和发布协议不进入第一批实现。
 - git、registry、workspace 和 lockfile 的完整解析规则见 [PACKAGE.md](PACKAGE.md)。
 - 依赖图以包为单位构建，不能出现包依赖环。
 - 同一个 import 根不能同时指向两个包。

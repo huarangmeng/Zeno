@@ -1,6 +1,6 @@
 # Zeno v0.1 / stage0 MVP 子集
 
-本文定义第一版 C++20 + LLVM stage0 编译器必须实现的最小语言与库边界。主语言规范仍然描述完整 v0.1 设计；本文只规定第一批实现门禁，防止 stage0 被运行时、包管理器和高级并发一次性拖住。
+本文定义第一版 C++20 + LLVM 21 stage0 编译器必须实现的最小语言与库边界。主语言规范仍然描述完整 v0.1 设计；本文只规定第一批实现门禁，防止 stage0 被运行时、包管理器和高级并发一次性拖住。
 
 原则：
 
@@ -9,16 +9,27 @@
 - 运行时成本较重、需要大量库工程或跨包元数据的能力可以保留在规范中，但从 stage0 MVP 门禁中移出。
 - 编译器可以先保留关键字、语法和标准库声明，再对未实现能力给出明确 staged diagnostic。
 
+开发输入：
+
+- C++20 + LLVM 21 + CMake/Ninja。
+- 首批 host：macOS arm64、Linux x86_64。
+- 首批 target：`aarch64-apple-darwin`、`x86_64-unknown-linux-gnu`。
+- 首批 CLI：`zeno check`、`zeno build`、`zeno test`。
+- 首批产物：application executable、library static archive、`.zmeta` 编译器元数据。
+- LLVM 22+ 只作为后续显式后端升级，不进入 stage0 MVP 基线。
+- 实现目录与里程碑见 [BOOTSTRAP.md](BOOTSTRAP.md)：`compiler/stage0`、`lib/zeno/{core,alloc,std}`、`runtime/stage0`，M0-M9 分批交付。
+
 ## 1. P1 决策
 
 | 问题 | stage0 MVP 决策 | 原因 |
 | --- | --- | --- |
 | `Shared<T>` 是否完整进入第一批 | 不进入完整 runtime；保留规范和类型语义，完整引用计数、`Shared<Interface>` 和跨线程释放进入第二批 | `Shared` 需要控制块、原子引用计数、allocator 绑定和并发释放，工程量高；先用 `Box<T>` 建立拥有式分配和接口对象模型 |
-| async 是否进入第一批 | 语法和安全规则保留；stage0 MVP 可以解析后拒绝 `async fn` / `await`，不实现 executor 和 future lowering | async 的正确实现需要 future 状态机、drop cleanup、跨 `await` 逃逸检查和 runtime 边界，不能半成品进入 |
+| async 是否进入第一批 | 语法和安全规则保留；stage0 MVP 可以解析后拒绝 `async fn`、`async { ... }` / `async move { ... }`、Future block 实参和 `await`，不实现 executor 和 future lowering | async 的正确实现需要 future 状态机、drop cleanup、跨 `await` 逃逸检查和 runtime 边界，不能半成品进入 |
 | `Thread.scope` / `splitDisjoint` 是否进入第一批 | 普通 `Thread.spawn` 类型检查进入第一批；scoped 并发和 disjoint API 证明进入第二批 | OS 线程所有权转移是核心模型；scoped 借入并发需要更复杂的访问证明 |
 | `pub fn -> Interface` 跨 package | 语言允许；stage0 MVP 先支持同 package 静态接口返回，跨 package opaque return metadata 进入第二批 | 同包可在编译单元内统一具体返回类型；跨包需要稳定公开元数据和增量失效规则 |
 | `Array<T>.clone` / `Vector<T>.clone` | 第一批只支持 `T: Copy`；非 `Copy` 深拷贝接口延后 | 避免在核心库早期引入复杂 `Clone` 语义；复制成本仍显式可见 |
 | package manager | 第一批只支持本地 package、workspace 和 builtin core；registry、git fetch、发布协议延后 | 自举编译器需要可复现本地构建，不需要一开始联网解析依赖 |
+| 标准库实现方式 | 第一批使用 builtin + 声明包；真实 `core` / `alloc` 实现逐步替换 | 避免标准库工程拖慢 parser、Sema、MIR 和 LLVM 降级；声明包仍能验证语言语义和成本模型 |
 
 这些决策不删除完整 v0.1 能力，只定义 stage0 第一批必须通过的范围。
 
@@ -58,6 +69,10 @@
 
 ### 2.4 核心库子集
 
+stage0 MVP 的核心库先以编译器发行包的内建声明包为准。声明包必须提供类型签名、接口约束、layout/drop 事实、`Send` / `Sync` 事实、intrinsic 绑定和必要 runtime symbol；它们可以没有完整 Zeno 函数体。第一批实现只需要足够支持类型检查、安全检查、MIR 降级、codegen 符号引用和少量基础 run-pass。
+
+第一批必须有声明和语义检查：
+
 - `Option<T>`、`Result<T, E>` 和 `try`。
 - `Array<T>`：拥有、连续、固定长度。
 - `Vector<T>`：拥有、连续、可增长。
@@ -89,11 +104,13 @@
 
 - `try` 降低为普通分支和 cleanup，不使用异常。
 - `panic(message) -> Never`。
-- `PanicInfo` 调用点注入和 profile 选择。
+- `PanicInfo` 调用点注入、`SourceLocation` 和无分配 stack frame 地址遍历。
 - `oom(layout) -> Never`。
 - 默认分配 API 失败进入 OOM 策略。
 - `tryReserve*` 失败返回 `Result<Unit, AllocError>`，不调用 `oom`。
-- `@noPanic` 和 `@noAlloc` 检查。
+- hosted 默认 `panic.strategy = "abort"`、`oom.strategy = "abort"`；freestanding 默认 `panic.strategy = "trap"`、`oom.strategy = "trap"`。
+- `panic.strategy = "unwind"` 第一批只解析并给 staged diagnostic，不生成半成品 unwind。
+- `@noPanic` 和 `@noAlloc` 使用保守可达调用图检查。
 
 ### 2.7 trust、FFI 和 ABI 边界
 
@@ -117,7 +134,14 @@
 
 ### 2.9 HIR、MIR 和 LLVM lowering
 
-- HIR 保留所有权、访问区域、布局、泛型约束、trust 边界和 profile 信息。
+- SourceManager、`FileId`、`Span` 和稳定诊断映射。
+- 诊断错误码分段、human 输出和 JSON Lines 输出。
+- staged diagnostic 使用 `E9000-E9099`，必须带 `isStaged` 和 `feature`。
+- Lexer、Parser、AST 和语法错误恢复。
+- Declaration Collection 收集顶层声明、模块路径、可见性、重载入口和 stable node id。
+- Name / Module Resolution 解析同包直接可见、外部 import、模块限定名和可见性。
+- HIR 保留所有权、访问区域、布局、泛型约束、trust 边界、profile 信息和源码 span。
+- Type / Interface / Ownership Sema 完成类型检查、重载、接口约束、初始化、move、RAII、访问逃逸和 `Send` / `Sync`。
 - MIR 使用显式 CFG、locals、places、operands、rvalues、drop flags 和 cleanup edges。
 - `try`、RAII、panic/OOM 终点都必须进入 MIR verifier。
 - 单态化后再进入 LLVM lowering。
@@ -127,12 +151,22 @@
 ### 2.10 包与构建
 
 - `Zeno.toml` 解析。
+- `[package]` 最小字段：`name`、可选 `version`、可选 `kind`、可选 `entry`。
+- `kind = "application"` 默认入口为 `src/main.zn` 中的 `main`；`kind = "library"` 没有入口，`src/lib.zn` 只是推荐组织文件。
+- 固定 `src/` 源码根，文件路径推导模块路径，`module` 声明只做路径校验。
+- 同 package 直接可见；外部 package 和内建包才需要 `import`。
 - 单包构建。
 - workspace member。
 - builtin core。
+- builtin `core` / `alloc` / 最小 `std` 声明包。
 - path dependency。
-- `Zeno.lock` frozen 校验。
+- `core` 自动可用，不需要依赖声明；`std` 只在 hosted 或支持 hosted 能力的 profile 中解析。
+- `Zeno.lock` 本地 frozen 校验，第一批支持 `path` 和 `builtin` 来源。
+- registry、git fetch、版本范围求解和发布协议延后，遇到时给 staged diagnostic。
 - target triple、profile、allocator、panic/OOM 和 trust 字段。
+- CLI 行为：`zeno check` 不 codegen，`zeno build` 生成产物，`zeno test` 默认运行 MVP 规格测试。
+- `--diagnostic-format human|json`，JSON 输出为一行一个 object。
+- application 输出 `bin/<package-name>`；library 输出 `lib/lib<package-name>.a` 和 `meta/<package-name>.zmeta`。
 - 并行 parse / body check / monomorphization / codegen 的调度结构。
 - package 级增量缓存 key、stable node id 和可重放诊断。
 
@@ -154,8 +188,9 @@ stage0 MVP 不要求实现：
 - 完整反射。
 - downcast。
 - 稳定外部二进制包 ABI。
+- 动态库和发布包格式。
 
-编译器遇到延后能力时应优先给出阶段性诊断，不能静默生成错误代码。比如解析到 `async fn` 后可以报“当前 stage0 MVP 尚未实现 async lowering”；解析到跨 package `pub fn -> Interface` 后可以报“当前 stage0 MVP 尚未生成跨包 opaque return metadata”。
+编译器遇到延后能力时应优先给出阶段性诊断，不能静默生成错误代码。比如解析到 `async fn`、`spawn({ ... })` Future block 实参或 `await` 后可以报“当前 stage0 MVP 尚未实现 async lowering”；解析到跨 package `pub fn -> Interface` 后可以报“当前 stage0 MVP 尚未生成跨包 opaque return metadata”。
 
 ## 4. 测试门禁
 
@@ -164,7 +199,33 @@ stage0 MVP 不要求实现：
 - MVP 门禁：stage0 第一批必须通过的测试。
 - 完整规格门禁：完整 v0.1 设计最终必须通过的测试。
 
-现有测试文件如果覆盖延后能力，应保留为完整规格门禁，不删除。测试 runner 出现后，可以通过测试头部注释或 `case.toml` 标记 `stage = "mvp"`、`stage = "full-spec"`、`feature = "async"` 等信息。没有标记时，默认按完整规格测试处理；进入发布门禁前再批量补齐标记。
+测试 runner 路径冻结为：
+
+```text
+tests/spec/compile-pass/*.zn
+tests/spec/compile-fail/*.zn
+tests/spec/manifest-pass/*.toml
+tests/spec/manifest-fail/*.toml
+tests/spec/module-pass/*/
+tests/spec/module-fail/*/
+tests/spec/package-pass/*/
+tests/spec/package-fail/*/
+tests/spec/incremental-pass/*/case.toml
+tests/spec/incremental-fail/*/case.toml
+tests/spec/codegen-pass/*/case.toml
+tests/spec/codegen-fail/*/case.toml
+```
+
+现有测试文件如果覆盖延后能力，应保留为完整规格门禁，不删除。`.zn` 和真实 manifest TOML 用头部注释标记 `stage` / `feature` / `profile` / `target`；`codegen-*` 和 `incremental-*` 的 `case.toml` 用结构化字段标记。没有显式 `stage` 时，默认按完整规格测试处理；进入发布门禁前再批量补齐 `stage: mvp` 或 `stage = "mvp"`。
+
+runner 命令：
+
+- `zeno test --stage mvp` 只跑 stage0 MVP 门禁。
+- `zeno test --stage full-spec` 跑完整规格门禁。
+- `zeno test --feature async` 按 feature 过滤。
+- `zeno test --target x86_64-unknown-linux-gnu` 按目标过滤 codegen / ABI 相关测试。
+
+所有失败类测试必须包含 `expected-error`。runner 输出必须按 category、test path、package、source file、byte offset 和 error code 稳定排序；并行执行和缓存命中不能改变诊断顺序。
 
 第一批 MVP 门禁的性能底线：
 

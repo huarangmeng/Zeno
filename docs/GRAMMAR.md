@@ -333,6 +333,7 @@ expr            = if_expr
                 | match_expr
                 | while_expr
                 | for_expr
+                | async_expr
                 | closure_expr
                 | await_expr
                 | try_expr
@@ -341,6 +342,7 @@ expr            = if_expr
                 | mut_expr
                 | assignment ;
 
+async_expr      = "async" capture_marker? block ;
 await_expr      = "await" expr ;
 try_expr        = "try" expr ;
 trust_expr      = "trust" block ;
@@ -415,6 +417,26 @@ unit_expr       = "(" ")" ;
 
 闭包使用函数形参数列表，而不是 `|...|`。块闭包写作 `(params) -> ReturnType { ... }`，返回类型可推断时可省略为 `(params) { ... }`；短表达式闭包写作 `(params) => expr`。解析器应通过 `=>`、`->` 或参数列表后的 `{` 识别闭包，和普通括号表达式区分。
 
+`async { ... }` 是 async block，产生 `Future<T>`，不会启动线程或任务。`async move { ... }` 是移动捕获的 async block，适合保存为命名 future 或返回 future。
+
+当调用参数的期望类型是 `Future<T>` 时，Zeno 允许直接写 block 实参作为 Future block 简写：
+
+```zn
+runtime.spawn({
+    return work();
+});
+
+runtime.spawn({
+    return process(move work);
+});
+```
+
+上面都是 Future block 实参。`spawn` 仍然是普通函数调用，括号不能省略。这个简写只在期望类型明确为 `Future<T>` 的参数位置生效；普通 block 仍然是立即求值的块表达式。
+
+这个 Future block 简写也适用于“期望返回类型是 `Future<T>`”的闭包体，例如 `runtime.spawnWithContext((ctx) { ... })`。Future block 的 `return` 返回 future 的输出，不返回外层函数。
+
+Future block 实参的捕获按逃逸 future 处理：`Copy` 值复制，非 `Copy` owner 自动移动进 future 状态。捕获后外层继续使用该 owner 是编译错误。编译器不会自动 clone、不会自动引用计数、不会自动装箱；需要共享时必须显式写 `Shared`、`Mutex`、原子类型或 `clone()`。
+
 `await` 只在 async 上下文中有效。语义阶段只允许等待 `Future<T>`、`Task<T>` 或立即等待的 async `mut self` 调用。`await future` 和 `await task` 会消费已有命名拥有者；等待后原绑定不可再用。
 
 `try` 的语法只表示提前返回请求。语义阶段只允许：
@@ -434,7 +456,7 @@ unit_expr       = "(" ")" ;
 
 ```text
 postfix:       call, index, field
-prefix:        ! - mut try trust
+prefix:        ! - async mut try trust
 cast:          as
 multiplicative:* / %
 additive:      + -

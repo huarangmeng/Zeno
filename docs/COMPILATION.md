@@ -10,6 +10,7 @@ Zeno 编译器目标是：前端可并行、增量失效精确、缓存安全、
 - `Zeno.lock` 内容 hash。
 - package 源码内容 hash。
 - compiler identity 和 compiler package hash。
+- backend identity，包括 LLVM major 版本、target data layout provider、linker flavor 和运行时内建包版本。
 - target triple、cpu、features。
 - profile、allocator、panic/OOM、trust 配置。
 - builtin/core/alloc/std 包 hash。
@@ -47,22 +48,35 @@ Zeno 的语义编译单元是 package。
 ```text
 package graph
   -> read manifests and lockfile
-  -> parse files
-  -> collect top-level declarations
+  -> SourceManager / FileId / Span
+  -> Lexer
+  -> Parser
+  -> AST
+  -> Declaration Collection
   -> build package symbol table
-  -> resolve imports and names
-  -> type/interface checking
-  -> ownership/init/access/escape checking
+  -> Name / Module Resolution
+  -> HIR
+  -> Type / Interface / Ownership Sema
   -> const evaluation
   -> layout computation
-  -> typed HIR
   -> monomorphization planning
   -> MIR
+  -> MIR verifier and optimization
+  -> monomorphization emission
   -> LLVM IR
   -> object/archive/link
 ```
 
-每一阶段输出都要有 fingerprint，用于增量复用和错误定位。
+每一阶段输出都要有 fingerprint，用于增量复用和错误定位。诊断必须携带稳定错误码、主 span、notes 和 help；缓存命中时也必须重放同一诊断。
+
+阶段职责：
+
+- SourceManager 是所有 span 的唯一来源；parser、HIR、MIR 和 LLVM diagnostic mapping 都不能自己重新解释路径和行列。
+- AST cache 只依赖源码 hash、lexer/parser 版本和语法配置。
+- HIR cache 依赖声明、名字解析、可见性、泛型和接口上下文。
+- Sema cache 依赖类型上下文、接口 impl 集、layout 摘要、profile、trust 和 staged feature 配置。
+- MIR cache 依赖 checked HIR、drop glue、layout、panic/OOM 策略和目标无关优化配置。
+- LLVM codegen cache 依赖 mono MIR、target triple、cpu/features、LLVM major 版本、data layout 和 codegen 配置。
 
 ## 4. 并行调度
 
@@ -123,6 +137,7 @@ stable node id
 ```text
 compiler identity
 compiler package hash
+backend identity
 target triple / cpu / features
 optimization level
 profile
@@ -145,7 +160,7 @@ public/package/body/codegen fingerprint
 - layout cache：type fingerprints + target -> layout result。
 - body-check cache：body fingerprint + type context -> checked HIR.
 - const-eval cache：CTFE dependency fingerprint + const args + target/profile -> const value / materialized data / diagnostics.
-- mono cache：generic item + concrete type args + constraints -> mono HIR/MIR.
+- mono cache：generic item + concrete type args + constraints + MIR verifier facts -> mono MIR / object.
 - codegen cache：MIR + target + opt config -> object/bitcode.
 - pgo cache：profile data hash + source mapping -> hot/cold and layout/codegen hints.
 
@@ -198,6 +213,74 @@ v1 默认策略：
 - 复用缓存时必须重放诊断。
 - 如果下游错误由上游缺失符号引起，应抑制级联噪音，优先报告根因。
 
+错误码分段冻结为：
+
+```text
+E0001-E0099  lexer/parser
+E0100-E0199  module/import/package graph
+E0200-E0299  name resolution / visibility
+E0300-E0399  type checking / overload
+E0400-E0499  ownership / move / initialization
+E0500-E0599  access / escape / view rules
+E0600-E0699  generics / interface / dispatch
+E0700-E0799  layout / ABI / FFI / trust
+E0800-E0899  const eval / static / compile-time
+E0900-E0999  MIR verifier / codegen invariant
+E1000-E1099  manifest / lockfile / package manager
+E9000-E9099  staged diagnostics
+```
+
+human 诊断格式：
+
+```text
+error[E0401]: use of moved value
+  --> src/main.zn:12:9
+   |
+10 |     consume(move data);
+   |                  ---- value moved here
+12 |     use(data);
+   |         ^^^^ value used after move
+help: clone explicitly if a second owner is required
+```
+
+`--diagnostic-format json` 使用 JSON Lines。每条诊断输出一行 JSON object，不能输出顶层数组，方便 IDE / CI 流式读取：
+
+```json
+{"schemaVersion":1,"severity":"error","code":"E0401","message":"use of moved value","stage":"sema","category":"ownership","primarySpan":{"file":"src/main.zn","startByte":118,"endByte":122,"startLine":12,"startColumn":9,"endLine":12,"endColumn":13},"labels":[{"span":{"file":"src/main.zn","startByte":72,"endByte":76,"startLine":10,"startColumn":18,"endLine":10,"endColumn":22},"message":"value moved here"}],"notes":[],"help":["clone explicitly if a second owner is required"],"isStaged":false}
+```
+
+字段规则：
+
+- `schemaVersion` 第一版固定为 `1`。
+- `severity` 取 `"error"`、`"warning"`、`"note"` 或 `"help"`。
+- `code` 必须稳定，例如 `"E0401"`。
+- `message` 是主诊断文案，不能依赖终端颜色或格式。
+- `stage` 使用实现阶段名，例如 `"lexer"`、`"parser"`、`"module"`、`"sema"`、`"mir"`、`"codegen"`、`"manifest"`、`"package"`、`"lowering"`。
+- `category` 使用错误码分段对应类别，例如 `"ownership"`、`"staged"`。
+- `primarySpan` 必须存在；无源码位置的 CLI 用法错误可以使用 manifest path 或 workspace root 作为 file，并把 byte/line/column 置为 `0`。
+- `labels` 是带 span 的辅助标注，按源码顺序稳定排序。
+- `notes` 和 `help` 是字符串数组，顺序稳定。
+- `isStaged` 标记 staged diagnostic。
+- staged diagnostic 必须额外包含 `feature` 字段，例如 `"async"`、`"panic-unwind"`、`"registry"`。
+
+span 规则：
+
+- `startByte` / `endByte` 是文件内 UTF-8 byte offset，`endByte` 为半开区间终点。
+- `startLine` / `startColumn` / `endLine` / `endColumn` 使用 1-based 行列。
+- stage0 的 column 按 UTF-8 byte column 计算。未来若支持 Unicode display width，可以新增字段，不能改变旧字段语义。
+
+staged diagnostic JSON 示例：
+
+```json
+{"schemaVersion":1,"severity":"error","code":"E9001","message":"async lowering is not implemented in stage0","stage":"lowering","category":"staged","feature":"async","primarySpan":{"file":"src/main.zn","startByte":118,"endByte":123,"startLine":12,"startColumn":5,"endLine":12,"endColumn":10},"labels":[],"notes":["async syntax is reserved for the full language"],"help":["use synchronous code in stage0 MVP"],"isStaged":true}
+```
+
+退出码规则：
+
+- 任何 `severity = "error"` 的诊断让命令退出 `1`。
+- warning / note / help 不影响退出码。
+- CLI 使用错误仍退出 `2`，并可输出诊断 code，但不进入源码测试匹配。
+
 ## 10. Watch / IDE 模式
 
 watch 模式复用同一编译数据库：
@@ -209,7 +292,135 @@ watch 模式复用同一编译数据库：
 
 这些是工程能力，不改变语言语义。
 
-## 11. Stage0 要求
+## 11. CLI 与产物
+
+stage0 CLI 固定为：
+
+```text
+zeno check
+zeno build
+zeno test
+```
+
+通用选项：
+
+```text
+--manifest <path>
+--workspace <path>
+--target <triple>
+--profile <hosted|freestanding|kernel|embedded>
+--release
+--emit mir|llvm-ir
+--frozen
+--update-lock
+--diagnostic-format human|json
+--color auto|always|never
+-v / --verbose
+```
+
+默认行为：
+
+- `--frozen` 默认开启。`--update-lock` 显式出现时才允许更新 `Zeno.lock`。
+- human 诊断用于终端；json 诊断用于 IDE / CI。
+- 并行执行、缓存命中和目标差异不能改变诊断排序。
+- 成功退出码为 `0`，编译/测试失败为 `1`，CLI 使用错误或无效参数为 `2`。
+
+`zeno check`：
+
+- 解析 manifest / lockfile，构建 package graph。
+- 执行 SourceManager、Lexer、Parser、AST、Declaration Collection、Name / Module Resolution、HIR、Type / Interface / Ownership Sema、MIR verifier。
+- 不执行 LLVM codegen，不生成 object。
+- 默认使用 frozen lockfile。
+- 遇到 async lowering、panic unwind、git/registry 等 stage0 延后能力时给 staged diagnostic。
+
+`zeno build`：
+
+- 包含 `zeno check` 的全部步骤。
+- 执行 monomorphization、MIR optimization、LLVM IR、object emission 和必要链接。
+- `--release` 使用 release 优化配置。
+- `--emit mir` 输出文本 MIR；`--emit llvm-ir` 输出 LLVM IR。二者用于调试和规格测试，不改变语义。
+- stage0 不支持的 codegen 能力必须报 staged diagnostic，不能生成半成品二进制。
+
+产物目录：
+
+```text
+target/<triple>/<profile>/
+  bin/
+  lib/
+  meta/
+  obj/
+  mir/
+  ir/
+```
+
+`kind = "application"` 产物：
+
+```text
+target/<triple>/<profile>/bin/<package-name>
+target/<triple>/<profile>/meta/<package-name>.zmeta
+```
+
+application 有入口函数，默认是 `src/main.zn` 的 `main`。构建时链接为可执行程序；如果请求 `--emit mir` / `--emit llvm-ir`，额外输出 MIR / LLVM IR 调试产物。
+
+`kind = "library"` 产物：
+
+```text
+target/<triple>/<profile>/lib/lib<package-name>.a
+target/<triple>/<profile>/meta/<package-name>.zmeta
+```
+
+library 没有入口函数，不链接为可执行程序。stage0 只要求静态 archive 和 `.zmeta` 编译器元数据；动态库、稳定外部 ABI、发布包格式和二进制 artifact 依赖延后。
+
+`.zmeta` 至少记录：
+
+- `pub` API、package-visible 摘要和可见性。
+- 类型 layout fingerprint、drop glue 摘要和 `Send` / `Sync` 证明。
+- 接口、impl、泛型签名、静态接口返回 identity。
+- `@export` 符号、C ABI / bridge 摘要和 trust 能力摘要。
+- 依赖摘要、builtin package hash、target/profile、panic/OOM/allocator 策略。
+
+library 中的 `@export(..., abi: C)` 或 `@export(..., bridge: C)` 会在 `.a` 中产生对应外部符号。application 也可以包含 `@export`，但符号唯一性和 ABI 边界规则仍然生效。
+
+`zeno test`：
+
+- stage0 默认运行 `tests/spec` 规格测试。
+- 默认 `zeno test` 等价于 `zeno test --stage mvp`。
+- `zeno test --stage full-spec` 运行完整规格测试。
+- `--feature`、`--target` 按测试元数据过滤。
+- compile-fail / manifest-fail / module-fail / package-fail / incremental-fail / codegen-fail 必须匹配 `expected-error`。
+- codegen / incremental 测试读取 `case.toml`。
+
+staged diagnostic 必须明确说明“语法或能力已保留，但当前 stage0 未实现”，并包含稳定错误码、主 span、notes/help。出现 staged diagnostic 后不能继续生成二进制产物。
+
+示例：
+
+```text
+error[E9001]: async lowering is not implemented in stage0
+  --> src/main.zn:12:5
+   |
+12 |     await task
+   |     ^^^^^
+help: async syntax is reserved; use synchronous code in stage0 MVP
+```
+
+## 12. Stage0 要求
+
+stage0 工具链基线：
+
+- C++20。
+- LLVM 21。
+- CMake + Ninja。
+- host：macOS arm64、Linux x86_64。
+- target：`aarch64-apple-darwin`、`x86_64-unknown-linux-gnu`。
+- CLI：`zeno check`、`zeno build`、`zeno test`。
+
+stage0 实现布局以 [BOOTSTRAP.md](BOOTSTRAP.md) 为准：
+
+- `compiler/stage0`：C++20 编译器实现，按 `base/source/diag/lex/parse/ast/package/names/hir/sema/mir/mono/codegen/driver` 分层。
+- `lib/zeno/core`、`lib/zeno/alloc`、`lib/zeno/std`：编译器发行包内建声明包。
+- `runtime/stage0`：panic/OOM、默认 allocator、线程、FFI/C bridge 等必要 C++ runtime shim。
+
+编译器内部依赖必须单向推进。`ast`、`hir` 和 `mir` 不依赖 LLVM；LLVM 只出现在 `codegen` 和必要的 driver glue 中。这样未来用 Zeno 重写前端时，可以复用 AST/HIR/MIR 概念和测试，不需要推翻后端边界。
 
 stage0 不需要做到最完美的细粒度增量，但必须按这个模型设计数据结构：
 

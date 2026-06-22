@@ -6,6 +6,22 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 
 本文不是完整标准库 API 清单。v0.1 设计阶段只定义足以验证语言语义和性能模型的最小库边界：基础 enum、拥有容器、分配显式性、同步/并发边界、FFI 安全包装和少量审计表。完整 I/O、网络、路径、时间、格式化、序列化和生态 API 应在语言设计冻结后单独设计。
 
+## 0. stage0 实现边界
+
+stage0 第一批采用 builtin + 声明文件策略：
+
+- 编译器发行包提供 `core` / `alloc` / 最小 `std` 的内建声明包。
+- 声明包记录类型、函数、方法、接口、泛型约束、布局事实、drop glue 事实、`Send` / `Sync` 事实、分配成本和 intrinsic 绑定。
+- 声明包可以由普通 `.zn` 风格声明、结构化 metadata 或 C++ 内建表承载；这不是新的用户源码语法。
+- 没有函数体的声明只参与解析、类型检查、接口求解、所有权检查、MIR 降级约束和 codegen 符号引用。
+- 需要编译器特殊降低的能力用编译器发行包专用 `@intrinsic` 绑定，例如基础整数运算、布局查询、panic/OOM 入口、原子操作、`ArraySlice` 构造检查和少量容器 primitive。
+- `Option`、`Result`、基础接口和纯语言可表达的 helper 应优先作为普通 Zeno 声明 / 实现逐步落地，减少可信内建面。
+- `Vector`、`String`、`Map`、`Set`、`Box`、allocator 和同步类型第一批可以先有声明与必要 runtime shim；完整高质量库实现不阻塞前端 MVP。
+- `Shared<T>`、`Shared<Interface>`、完整 async runtime、完整 hosted I/O 和高级集合实现不进入第一批真实 runtime。
+- 声明包和 runtime shim 的版本、hash、布局事实与 intrinsic 绑定必须进入编译缓存 key 和 lockfile 审计。
+
+这个策略只影响 stage0 实现顺序，不改变语言语义。最终目标仍然是逐步用 Zeno 自身实现 `core` / `alloc` 的大部分逻辑；编译器内建只保留必须由目标平台或后端提供的底层 primitive。
+
 ## 1. 库分层
 
 `core`：
@@ -386,12 +402,12 @@ impl<T: CopyHashKey> Set<T> {
 | `MutexGuard.get` | `mut self` | 无 | guard 内取得短期可写访问 | `val value = mut guard.get()` |
 | `Thread.spawn` | static | `move task` | 创建 OS 线程并拥有任务闭包 | `Thread.spawn(move task)` |
 | `JoinHandle.join` | `move self` | 无 | 消费 join handle，返回线程结果 | `try move handle.join()` |
-| `Runtime.spawn` | `self` | `move Future<T>` | 把 async future 放入 runtime worker，返回 `Task<T>` | `runtime.spawn(load(move path))` |
-| `Runtime.spawnWithContext` | `self` | `move OnceFn<TaskContext, Future<T>>` | 创建带取消上下文的 future，返回 `Task<T>` | `runtime.spawnWithContext(move (ctx) => run(ctx))` |
+| `Runtime.spawn` | `self` | `move Future<T>` | 把 async future 放入 runtime worker，返回 `Task<T>` | `runtime.spawn({ ... })` |
+| `Runtime.spawnWithContext` | `self` | `move OnceFn<TaskContext, Future<T>>` | 创建带取消上下文的 future，返回 `Task<T>` | `runtime.spawnWithContext((ctx) { ... })` |
 | `Runtime.spawnBlocking` | `self` | `move OnceFn<T>` | 把阻塞同步工作放入独立 blocking pool，返回 `Task<T>` | `runtime.spawnBlocking(move job)` |
 | `Runtime.spawnBlockingWithContext` | `self` | `move OnceFn<TaskContext, T>` | 把可协作检查取消的阻塞同步工作放入 blocking pool | `runtime.spawnBlockingWithContext(move job)` |
 | `TaskGroup.withCapacity` | static | capacity, `mut runtime` | 创建结构化任务拥有者并预留元数据容量 | `TaskGroup<Result<Page, Error>>.withCapacity(n, mut runtime)` |
-| `TaskGroup.spawn` | `mut self` | `move Future<T>` | 把 future 交给 group 拥有和收尾 | `try mut group.spawn(fetch(move job))` |
+| `TaskGroup.spawn` | `mut self` | `move Future<T>` | 把 future 交给 group 拥有和收尾 | `try mut group.spawn({ ... })` |
 | `TaskGroup.next` / `tryNext` | `mut self` | 无 | 按完成顺序取一个完成结果 | `try await mut group.tryNext()` |
 | `TaskGroup.joinAll` / `tryJoinAll` | `move self` | 无 | 消费 group，等待所有任务并返回完成顺序结果 | `try await move group.tryJoinAll()` |
 | `TaskGroup.joinAllOrdered` / `tryJoinAllOrdered` | `move self` | 无 | 消费 group，等待所有任务并返回 spawn 顺序结果 | `try await move group.tryJoinAllOrdered()` |
@@ -453,8 +469,11 @@ impl<T: Send, E: Send> TaskGroup<Result<T, E>> {
 
 - `get`、`contains`、`containsKey`、`remove`、`removeEntry` 和索引 lookup 都不能移动调用方的 key。需要支持 `String` / `StringSlice`、owned / slice、大小写折叠等查找形态时，用 `LookupKey<K>` 或专门 lookup API 表达。
 - `insert`、`push`、`Box.new`、`Shared.new`、`Mutex.new`、`Thread.spawn`、`Runtime.spawn` 和 `Runtime.spawnBlocking` 这类会长期保存或消费值的 API，命名 owner 实参必须写 `move`。
-- `Runtime.spawn` 只接收 `Future<T>`。普通 async 调用产生的临时 future 可以直接传入；已有命名 future 必须写 `move future`。
-- `Runtime.spawnWithContext` 只在任务需要显式取消检查时使用。它的闭包只负责用 `TaskContext` 构造 future，runtime 保存返回的 future，不保存闭包。
+- `Runtime.spawn` 只接收 `Future<T>`。普通 async 调用或 `spawn({ ... })` Future block 实参可以直接传入；已有命名 future 必须写 `move future`。
+- `spawn({ ... })` 和 `group.spawn({ ... })` 的 block 是 future block，不是同步闭包。它保留普通函数调用括号，同时提供内联任务体写法。
+- Future block 实参会按逃逸 future 捕获外层值：`Copy` 值复制，非 `Copy` owner 移动进 future。编译器禁止捕获后继续使用该 owner。
+- Future block 实参不会自动 clone、不会自动引用计数、不会自动装箱；需要共享时成本必须在源码中显式出现。
+- `Runtime.spawnWithContext` 只在任务需要显式取消检查时使用。它的闭包只负责用 `TaskContext` 构造 future，runtime 保存返回的 future，不保存闭包；闭包体可写成 Future block，不需要额外 `async`。
 - `Runtime.spawnBlocking` 是显式阻塞工作边界，必须使用独立且有上限的 blocking pool；捕获状态和返回值必须是 `Send`。
 - `Task<T>` 没有 `await` 方法；等待任务写成 `await task`，由语言操作消费句柄。
 - `blockOn` 是同步阻塞边界，不允许在 async 上下文调用；它必须显式写出 `mut runtime` / `mut executor` 和 `move task` / `move future`。
@@ -1038,6 +1057,7 @@ fn panicHandler(info: PanicInfo) -> Never;
 - `@noPanic` 拒绝直接或间接 `panic`，以及当前 profile 中会降低成 `panic` 的运行时检查。
 - 当前 profile 若把 OOM 配置成 `panic`，`@noPanic` 中可能分配的 API 也必须被拒绝，除非编译器能证明不会失败。
 - `@noAlloc` 拒绝堆分配，是排除分配触发 OOM 的主要工具。
+- stage0 对 `@noPanic` / `@noAlloc` 使用保守可达调用图检查；不能证明时拒绝。后续优化可以用 MIR facts 消除误报，但不能放宽语义。
 
 可恢复错误必须使用 `Result`。
 

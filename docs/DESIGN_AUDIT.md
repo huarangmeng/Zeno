@@ -8,6 +8,21 @@
 2. 标准库只保留验证语言设计所需的最小核心边界，例如 `Option` / `Result`、拥有容器、分配显式性、同步边界和任务句柄语义。
 3. 完整 `std` API 不进入 P0 设计冻结范围；I/O、网络、路径、时间、格式化、序列化和生态便利 API 在语言冻结后单独推进。
 
+当前开发输入：
+
+- stage0 使用 C++20 + LLVM 21 + CMake/Ninja。
+- 首批 host 是 macOS arm64 和 Linux x86_64。
+- 首批 target 是 `aarch64-apple-darwin` 和 `x86_64-unknown-linux-gnu`。
+- 首批 CLI 是 `zeno check`、`zeno build`、`zeno test`。
+- LLVM 22+ 不进入第一批默认实现，后续作为独立后端升级。
+- 前端 pipeline 冻结为 SourceManager / FileId / Span -> Lexer -> Parser -> AST -> Declaration Collection -> Name / Module Resolution -> HIR -> Type / Interface / Ownership Sema -> MIR -> Monomorphization -> LLVM IR。
+- 测试 runner 冻结为 `compile-*`、`manifest-*`、`module-*`、`package-*`、`incremental-*` 和 `codegen-*` 目录；`.zn` / 真实 TOML 用头部注释标记 `stage` 和 `feature`，`case.toml` 用结构化字段；无 `stage` 默认 `full-spec`，`zeno test --stage mvp` 只跑第一批 MVP 门禁。
+- 标准库最小实现边界冻结为 builtin + 声明包优先；stage0 先用内建声明、intrinsic 绑定和必要 runtime shim 验证语言语义，完整 `core` / `alloc` 实现逐步替换。
+- 包与模块 stage0 冻结为固定 `src/`、可选 `module` 校验、同 package 直接可见、外部包才 `import`、`core` 自动可用、`std` hosted 可选、path dependency + workspace + builtin、本地 frozen `Zeno.lock` 校验；registry/git/发布协议延后。
+- CLI 冻结为 `zeno check`、`zeno build`、`zeno test`；application 输出 executable + `.zmeta`，library 输出 static archive + `.zmeta`；动态库、稳定 ABI 和发布包格式延后。
+- 诊断冻结为稳定错误码分段、human 格式和 JSON Lines；span 使用 UTF-8 byte offset 与 1-based 行列，staged diagnostic 使用 `E9000-E9099` 并携带 `isStaged` / `feature`。
+- stage0 实现目录冻结为 `compiler/stage0`、`lib/zeno/{core,alloc,std}` 和 `runtime/stage0`；实现里程碑冻结为 M0 scaffold 到 M9 performance gate，不能跳过 HIR/MIR 直接进入 LLVM。
+
 ## 1. 当前冻结结论
 
 ### 1.1 所有权与访问
@@ -70,7 +85,10 @@
 - `try` 是普通分支和 cleanup，不是异常。
 - `panic` 只表示 bug 或不可恢复条件，不用于常规错误流。
 - 默认分配 API 失败进入 profile 的 `oom(layout) -> Never`。
-- 可恢复 OOM 只在容量预留 API 上提供：`Vector.tryReserve*` 和 `String.tryReserve*`。
+- 可恢复 OOM 只在容量预留 API 上提供：`Vector.tryReserve*`、`Map.tryReserve*`、`Set.tryReserve*` 和 `String.tryReserve*`。
+- hosted stage0 默认 panic/OOM abort；freestanding stage0 默认 panic/OOM trap；kernel / embedded 必须提供 handler。
+- `panic.strategy = "unwind"` 第一批只解析并给 staged diagnostic，等 MIR unwind cleanup 完整后再实现。
+- `PanicInfo.stack()` 第一版至少支持无分配地址遍历，符号化只是 profile 诊断能力。
 - `@noPanic` 和 `@noAlloc` 是成本/失败路径约束。
 
 审计结果：SPEC、STDLIB、MANIFEST、IR、TESTING 已一致。
@@ -83,7 +101,7 @@
 - `Thread.spawn` 是 OS 线程，显式消耗 `OnceFn<T>`。
 - `Runtime` 是可选任务运行时，不是语言强制运行时；日常入口是 `Runtime.spawn(future)`。
 - `TaskGroup<T>` 是结构化并发拥有者，用 `joinAll` / `tryJoinAll` 或完整 drain 保证收尾。
-- `async fn` 降低为 future 状态机，创建 future 不自动运行。
+- `async fn` 和 `spawn({ ... })` Future block 实参降低为 future 状态机，创建 future 不自动运行。
 - `Send` 表示所有权可跨线程/任务移动。
 - `Sync` 表示只读共享可跨线程使用。
 - 共享可变状态必须显式经过 `Mutex<T>`、原子类型或同步容器。

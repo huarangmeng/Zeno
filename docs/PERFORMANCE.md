@@ -234,7 +234,7 @@ Scoped concurrency 证明 join-before-exit 的结构化并发
 性能规则：
 
 - `Thread.spawn` 是 OS 线程能力，成本显式。
-- `Runtime.spawn` 是库调度能力，runtime 必须是显式值；它接收 `Future<T>`，不要求用户把异步任务包成同步闭包。
+- `Runtime.spawn` 是库调度能力，runtime 必须是显式值；它接收 `Future<T>`。用户可以写 `spawn({ ... })` 内联任务体，lowering 后仍是 future 状态机，不是隐藏同步闭包分配。
 - `Runtime.spawnBlocking` 是独立 blocking pool 能力，用于长时间同步工作；不能隐藏成普通 `spawn`，也不能无界创建 OS 线程。
 - `TaskGroup<T>` 是结构化并发拥有者，成本由类型显式出现；默认 `joinAll` / `tryJoinAll` 按完成顺序收集，避免不必要的有序结果槽位。
 - 需要保持 spawn 顺序时写 `joinAllOrdered` / `tryJoinAllOrdered`，额外索引和结果存储成本由方法名暴露。

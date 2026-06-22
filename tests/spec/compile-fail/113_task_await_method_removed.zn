@@ -4,12 +4,10 @@
 
 module tests.fail.taskAwaitMethodRemoved;
 
-async fn runWork(move work: Work) -> Result<Unit, WorkError> {
-    return process(move work);
-}
-
 async fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(runWork(move work));
+    val task = try runtime.spawn({
+        return process(move work);
+    });
 
     try move task.await(); // expected-error: Task<T> has no await method; use await task
     return Ok(());

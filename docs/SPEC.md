@@ -1881,6 +1881,19 @@ profile 默认策略由 manifest 决定：
 - `@noAlloc` 拒绝堆分配，因此同时排除由这些分配触发的 OOM 路径。
 - 需要硬实时或内核热路径时，推荐同时使用 `@noAlloc` 和 `@noPanic`，并避免目标 trap 的未证明运行时检查。
 
+stage0 冻结：
+
+- `panic(message)` 和 `oom(layout)` 都是 `Never` 终点，MIR 中必须是显式终止控制流。
+- `try` 只降低为普通分支和 cleanup edge，不使用异常。
+- 默认分配 API 和 `In` 后缀分配 API 失败时调用 `oom(layout)`，不返回 `Result`。
+- 可恢复 OOM 只通过 `tryReserve*` 和低层 allocator `allocate(...) -> Result<Allocation, AllocError>` 表达。
+- Hosted stage0 默认 `panic.strategy = "abort"`、`oom.strategy = "abort"`、`panic.stack = "addresses"` 或 `"symbols"` 由 debug 配置选择。
+- Freestanding stage0 默认 `panic.strategy = "trap"`、`oom.strategy = "trap"`、`panic.stack = "none"`。
+- Kernel / embedded stage0 必须要求 `panic.handler` 和 `oom.handler`，二者返回 `Never`。
+- stage0 可以先不实现 panic unwind；若 manifest 请求 `panic.strategy = "unwind"`，编译器应给 staged diagnostic，直到 unwind cleanup 通过 MIR verifier。
+- `PanicInfo.stack()` 第一版至少支持无分配地址遍历；符号化是 hosted debug profile 能力，不是语言语义依赖。
+- `@noPanic` 和 `@noAlloc` 第一版可以采用保守可达调用图检查；无法证明无 panic / 无分配时拒绝，而不是放行。
+
 ## 21. 并发
 
 Zeno 的普通代码目标是防止数据竞争。
@@ -1961,12 +1974,10 @@ try move handle.join();
 任务运行时是显式值：
 
 ```zn
-async fn runWork(move data: Data) -> Result<Unit, WorkError> {
-    return process(move data);
-}
-
 async fn runTask(move runtime: Runtime, move data: Data) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(runWork(move data));
+    val task = try runtime.spawn({
+        return process(move data);
+    });
 
     try await task;
     return Ok(());
@@ -1985,7 +1996,7 @@ async fn loadConfig(move runtime: Runtime, move path: Path) -> Result<Bytes, IoE
 }
 ```
 
-`async fn` 编译成 `Future` 状态机。创建 future 不会启动虚拟线程；执行它需要程序选择 executor 或 runtime。
+`async fn`、`async { ... }` / `async move { ... }` block，以及 `Future<T>` 参数位置的 Future block 实参都会编译成 `Future` 状态机。创建 future 不会启动虚拟线程；执行它需要程序选择 executor 或 runtime。
 
 future 取消和销毁规则：
 
@@ -1996,7 +2007,10 @@ future 取消和销毁规则：
 - `await mut receiver.method(...)` 只在“立即 await”的 async `mut self` 调用中允许，且 `receiver` 必须由当前 future 拥有。编译器把拥有者保存在 future 状态中，把可写访问限制在被等待调用内部；这个调用产生的 future 不能绑定到变量、返回、放入结构体、传给 `spawn` 或跨另一个 `await` 逃逸。
 - `await task` 是语言操作，不是 `Task.await()` 方法。它消费 `Task<T>` 句柄并返回任务结果；等待后原 task 绑定不可再用。同步阻塞等待必须由显式 blocking API 表达，不能伪装成普通方法调用。
 - 同步代码等待 future 或 task 必须使用显式 executor/runtime，例如 `mut runtime.blockOn(move task)` 或 `mut executor.blockOn(move future)`。`blockOn` 是阻塞当前线程的 `mut self` API，只能出现在同步上下文；async 上下文中必须使用 `await`。
-- `Runtime.spawn(future)` 是日常异步入口。它接收并消费 `Future<T>`，返回 `Task<T>`；临时 async 调用可以直接传入，已有命名 future 必须写 `move future`。
+- `Runtime.spawn(future)` 是日常异步入口。它接收并消费 `Future<T>`，返回 `Task<T>`；临时 async 调用和 `spawn({ ... })` Future block 实参可以直接传入，已有命名 future 必须写 `move future`。
+- `runtime.spawn({ ... })` 和 `mut group.spawn({ ... })` 是 Future block 实参。它们保留普通函数调用括号，但用户不需要写 `async` 或捕获 `move`。`Copy` 捕获复制，非 `Copy` owner 自动移动进 future；捕获后外层继续使用该 owner 是编译错误。
+- `Runtime.spawnWithContext((ctx) { ... })` 使用同一条 Future block 规则；闭包只负责接收 `TaskContext`，闭包体 lowered 为 future。
+- Future block 实参不会自动 clone、不会自动引用计数、不会自动装箱。需要共享时必须显式写 `Shared`、`Mutex`、原子类型或 `clone()`。
 - 普通 `Runtime.spawn` 不接收同步任务闭包。同步阻塞工作使用 `spawnBlocking`，需要底层 OS 线程时使用 `Thread.spawn`。
 - `Runtime.spawnWithContext(makeFuture)` 是高级取消入口，接收 `OnceFn<TaskContext, Future<T>>`。闭包只在启动时调用一次，runtime 保存它返回的 future，不保存闭包本身。
 - `Runtime.spawnBlocking(move job)` 用于同步文件 I/O、DNS、压缩、加密、阻塞 C API 和长时间不让出 worker 的 CPU 工作。它返回普通 `Task<T>`，但创建点必须写出 `spawnBlocking`。blocking pool 必须与普通 worker pool 分离且有上限；上限、队列策略和饱和行为必须由 runtime 构造参数或 profile 文档暴露，实现不能偷偷为每个 blocking job 创建无界 OS 线程。

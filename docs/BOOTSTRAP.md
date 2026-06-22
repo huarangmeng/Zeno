@@ -1,6 +1,126 @@
 # Zeno 自举计划
 
-完成规范里程碑后，第一版实现是基于 C++20 和 LLVM 的 stage0 编译器。
+完成规范里程碑后，第一版实现是基于 C++20 和 LLVM 21 的 stage0 编译器。
+
+## 0. 开发输入冻结
+
+stage0 第一批开发输入固定为：
+
+- 实现语言：C++20。
+- 后端：LLVM 21。
+- 构建系统：CMake + Ninja。
+- 首批 host：macOS arm64 和 Linux x86_64。
+- 首批 target：`aarch64-apple-darwin` 和 `x86_64-unknown-linux-gnu`。
+- 首批 CLI：`zeno check`、`zeno build`、`zeno test`。
+- 首批产物：application executable、library static archive 和 `.zmeta` 编译器元数据。
+
+LLVM 21 是 stage0 的稳定开发基线。LLVM 22+ 不作为第一批默认后端；后续升级必须作为独立后端升级任务处理，并重新跑 HIR/MIR/LLVM 降级、target data layout、ABI fingerprint、缓存 key 和 codegen 规格测试。
+
+### 0.1 仓库目录冻结
+
+stage0 实现目录冻结为：
+
+```text
+compiler/stage0/
+  CMakeLists.txt
+  cmake/
+  include/zeno/
+    base/
+    source/
+    diag/
+    lex/
+    parse/
+    ast/
+    package/
+    names/
+    hir/
+    sema/
+    mir/
+    mono/
+    codegen/
+    driver/
+  src/
+    base/
+    source/
+    diag/
+    lex/
+    parse/
+    ast/
+    package/
+    names/
+    hir/
+    sema/
+    mir/
+    mono/
+    codegen/
+    driver/
+    main.cpp
+  tests/unit/
+
+lib/zeno/
+  core/
+  alloc/
+  std/
+
+runtime/stage0/
+  panic/
+  alloc/
+  thread/
+  ffi/
+```
+
+目录职责：
+
+- `compiler/stage0` 是 C++20 stage0 编译器，不放语言标准库实现。
+- `compiler/stage0/include/zeno` 只放稳定的内部 C++ 头文件；`src` 放实现。
+- `base` 放 arena、intern、stable id、fingerprint、小型容器封装和通用工具。
+- `source` 放 SourceManager、FileId、Span、LineTable 和源码缓存。
+- `diag` 放错误码、DiagnosticEngine、human / JSON Lines emitter 和可重放诊断。
+- `lex` / `parse` / `ast` 只处理语法，不依赖 HIR、Sema、MIR 或 LLVM。
+- `package` 放 manifest、lockfile、workspace、builtin/path dependency 和 package graph。
+- `names` 放声明收集、模块路径、符号表、导入解析、可见性和重载入口。
+- `hir` 放源码语义 IR、HIR builder 和 HIR dump。
+- `sema` 放类型、接口、布局、CTFE、所有权、访问、RAII、`Send` / `Sync` 和 staged diagnostic。
+- `mir` 放 MIR 数据结构、builder、verifier、文本输出和目标无关优化。
+- `mono` 放单态化计划、实例 key、代码膨胀控制和 mono item 分区。
+- `codegen` 放 LLVM target 初始化、LLVM IR lowering、object/archive/link 和 `.zmeta` 输出。
+- `driver` 放 CLI、编译 pipeline、缓存调度、测试 runner 和 profile/target 配置。
+- `lib/zeno/core`、`lib/zeno/alloc`、`lib/zeno/std` 是编译器发行包里的内建声明包；它们看起来应尽量像普通 Zeno package。
+- `runtime/stage0` 只放必要 C++ runtime shim，例如 panic/OOM 入口、默认 allocator、线程启动桥和 C bridge helper，不承载语言语义。
+
+依赖方向冻结为：
+
+```text
+base
+  -> source
+  -> diag
+  -> lex -> parse -> ast
+  -> package -> names -> hir -> sema -> mir -> mono -> codegen
+  -> driver
+```
+
+实际 C++ 依赖可以让 `diag` 读取 `source` 的行列信息，`driver` 可以依赖所有模块。除此之外，低层模块不能反向依赖高层模块，`ast` / `hir` / `mir` 不能依赖 LLVM 头文件。
+
+stage0 C++ 实现不使用 C++ exception 作为编译流程控制；错误通过诊断、`Expected` / `Result` 风格返回值和显式状态传播。AST、HIR 和 MIR 节点使用 arena 分配；跨缓存、跨线程或跨 package 边界只保存稳定 id、fingerprint 和可序列化摘要。
+
+### 0.2 实现里程碑冻结
+
+第一批实现拆成以下里程碑：
+
+| 里程碑 | 目标 | 完成标准 |
+| --- | --- | --- |
+| M0 scaffold | CMake/Ninja、LLVM 21 探测、`zeno --version`、基础单元测试框架 | macOS arm64 和 Linux x86_64 可构建空编译器 |
+| M1 source/diag/lexer/parser | SourceManager、稳定错误码、human / JSON Lines 诊断、lexer、parser、AST dump | `zeno check --parse` 能解析语法测试并稳定报错 |
+| M2 package/names | `Zeno.toml`、`Zeno.lock`、固定 `src/`、workspace、builtin/path dependency、声明收集、模块和可见性 | module/package/manifest 测试可运行 |
+| M3 HIR/type/basic sema | HIR、基础类型、控制流、重载、接口骨架、布局骨架、内建声明包加载 | 基础 compile-pass/fail 能进入类型检查 |
+| M4 ownership/RAII/access | `val`/`var`、move、初始化、drop flags、`destroy`、访问逃逸、视图规则 | use-after-move、悬垂视图、非法可写共享等测试稳定失败 |
+| M5 generics/interface/CTFE | 单态化计划、接口求解、泛型接口参数、同包静态接口返回、完整 CTFE 第一版 | 泛型/接口/const-generic 规格测试可 check |
+| M6 MIR | MIR builder、verifier、cleanup edge、bounds check、alias/provenance/allocation region facts、文本 MIR | codegen-pass 的 MIR 不变量可检查 |
+| M7 LLVM/codegen | LLVM IR lowering、目标 data layout、object/archive/link、`.zmeta`、基础 runtime shim | `zeno build` 能产出 application / library 第一版产物 |
+| M8 spec runner | `zeno test --stage mvp`、expected-error、JSON diagnostic 消费、稳定排序 | MVP 门禁测试可自动跑并复现 |
+| M9 performance gate | no hidden allocation/dynamic dispatch/exception lowering、基础边界检查消除、缓存 key 验证 | 第一批 codegen / incremental 性能规格通过 |
+
+实现顺序不能跳过 M1-M6 直接进入 LLVM。Zeno 的性能和安全事实必须先在 HIR/MIR 里建立，再交给 LLVM。
 
 ## 1. stage0 目标
 
@@ -9,6 +129,7 @@ stage0 必须做到：
 - 解析 `.zn` 源文件。
 - 生成带源码 span 的可用诊断。
 - 解析模块、名字、类型和接口。
+- 加载编译器发行包提供的 builtin `core` / `alloc` / 最小 `std` 声明包。
 - 检查 `Copy`、move、初始化和访问规则。
 - 单态化泛型函数和类型。
 - 把检查后的 HIR 降低为 MIR，再把优化后的 MIR 降低到 LLVM IR。
@@ -20,27 +141,41 @@ stage0 暂不需要：
 - 最细粒度的高级增量编译；但数据结构必须支持 package 级增量、并行 parse/codegen 和安全缓存 key。
 - 完整 IDE 协议支持。
 - 稳定 ABI。
+- 动态库和发布包格式。
 - 宏展开。
 
 ## 2. 推荐架构
 
 ```text
-source
-  -> 词法器
-  -> 解析器
+source files
+  -> SourceManager / FileId / Span
+  -> Lexer
+  -> Parser
   -> AST
-  -> name resolution
-  -> type/interface checking
-  -> ownership + initialization checking
-  -> access + escape checking
-  -> typed HIR
-  -> monomorphization
+  -> Declaration Collection
+  -> Name / Module Resolution
+  -> HIR
+  -> Type / Interface / Ownership Sema
   -> MIR
+  -> Monomorphization
   -> LLVM IR
-  -> object / executable
+  -> object / link
 ```
 
 AST、HIR 和 MIR 应与 LLVM 解耦，方便未来自举前端复用同一套概念管线。
+
+职责冻结：
+
+- SourceManager 负责源码文件、字节偏移、行列映射、include/import 位置和诊断 span；所有后续节点都必须能追溯到稳定 `FileId + Span`。
+- Lexer 只产生 token、trivia 边界和 lexical diagnostic，不做名字或类型判断。
+- Parser 产生 AST。AST 只表达源码结构、token/span 和语法错误恢复结果，不做复杂语义。
+- Declaration Collection 收集顶层声明签名、模块路径、可见性、重载集合入口和 stable node id。
+- Name / Module Resolution 建立 package symbol table，解析同包直接可见、外部 import、模块限定名和可见性。
+- HIR 是源码语义 IR，保留名字解析结果、类型骨架、泛型、接口、`val` / `var`、`mut` / `move`、`trust`、属性和 span。
+- Type / Interface / Ownership Sema 完成类型检查、重载决议、接口约束、初始化、move、RAII、访问逃逸、`Send` / `Sync` 和 staged diagnostics。
+- MIR 是必须存在的中间层，负责显式 CFG、locals、places、operands、rvalues、drop flags、cleanup edge、`try` 降级、边界检查、别名事实和所有权事实。
+- Monomorphization 在 MIR 前后都可以有计划阶段，但 LLVM 降级只接收具体实例和已经证明的接口/布局事实。
+- LLVM IR 只接收 MIR verifier 已证明安全的事实，例如 `noalias`、`readonly`、`nocapture` 和 `noreturn`；不能把 Zeno 的语言安全语义交给 LLVM 猜。
 
 编译模型、并行调度、增量缓存和诊断稳定性见 [COMPILATION.md](COMPILATION.md)。
 HIR、MIR、LLVM 降级和 codegen 优化不变量见 [IR.md](IR.md)。
@@ -53,6 +188,7 @@ HIR、MIR、LLVM 降级和 codegen 优化不变量见 [IR.md](IR.md)。
 最小子集：
 
 - `Zeno.toml` manifest 解析和校验，至少支持单包构建、workspace、默认 `src/` 源码根、builtin core、path dependency、`Zeno.lock` frozen 校验、target triple、profile、allocator、panic/OOM 和 trust 字段。
+- 编译器发行包提供 builtin `core` / `alloc` / 最小 `std` 声明包；stage0 先依赖声明、intrinsic 绑定和必要 runtime shim，不要求完整标准库实现。
 - 模块与导入。
 - 文件路径到模块路径的推断、可选 `module` 校验、同包直接可见、包依赖图构建、外部导入解析和 `pub` / `private` 可见性检查。
 - 函数和编译期重载解析。

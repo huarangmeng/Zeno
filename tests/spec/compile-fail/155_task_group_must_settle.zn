@@ -4,13 +4,11 @@
 
 module tests.fail.taskGroupMustSettle;
 
-async fn fetchPage(move job: Job) -> Result<Page, FetchError> {
-    return fetch(move job);
-}
-
 async fn bad(move runtime: Runtime, move job: Job) -> Result<Unit, FetchError> {
     var group = TaskGroup<Result<Page, FetchError>>.withCapacity(1, mut runtime);
-    try mut group.spawn(fetchPage(move job));
+    try mut group.spawn({
+        return fetch(move job);
+    });
 
     return Ok(()); // expected-error: task group must be settled with joinAll, tryJoinAll, cancelRemaining, or drained to None
 }

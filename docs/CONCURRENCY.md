@@ -80,12 +80,10 @@ Thread.scope((mut scope) {
 示例：
 
 ```zn
-async fn runWork(move work: Work) -> Result<Unit, WorkError> {
-    return process(move work);
-}
-
 async fn run(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(runWork(move work));
+    val task = try runtime.spawn({
+        return process(move work);
+    });
 
     try await task;
     return Ok(());
@@ -98,16 +96,21 @@ async fn run(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> 
 - 没有程序选择的 runtime 或 executor，任务不能运行。
 - `Runtime.spawn` 接收并消费 `Future<T>`，返回 `Task<T>`。
 - `spawn` 可能分配 task control block，也可能因为 runtime 已关闭、队列饱和或 profile 定义的资源限制失败。
-- 临时 async 调用可以直接传给 `spawn`；已有命名 future 必须在调用点写 `move future`。
+- 临时 async 调用和 Future block 实参可以直接传给 `spawn`；已有命名 future 必须在调用点写 `move future`。
 - `await task` 是语言操作，会消费 `Task<T>` 句柄；等待后原 task 绑定不可再用。
 - 同步入口等待任务必须写成 `mut runtime.blockOn(move task)`；它阻塞当前线程，成本由 `Runtime` 和方法名共同暴露。
 - 可跨 worker 运行的 future 状态和返回值必须是 `Send`。
-- 普通 `spawn` 不接收同步闭包；同步工作要么写成 `async fn`，要么使用 `spawnBlocking`，要么显式使用底层 `Thread.spawn`。
+- 普通 `spawn` 不接收同步闭包；`spawn({ ... })` 中的 block 是 Future block，会 lowered 为 future 状态机。同步阻塞工作使用 `spawnBlocking`，底层 OS 线程使用 `Thread.spawn`。
+- `spawn({ ... })` 的非 `Copy` 捕获默认移动进任务。捕获后外层继续使用该 owner 是编译错误；需要共享时必须显式使用 `Shared`、`Mutex`、原子类型或手动 `clone()`。
 - 库 API 不得偷偷捕获全局 runtime。
 
 命名 future 示例：
 
 ```zn
+async fn runWork(move work: Work) -> Result<Unit, WorkError> {
+    return process(move work);
+}
+
 async fn runNamed(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
     val future = runWork(move work);
     val task = try runtime.spawn(move future);
@@ -140,13 +143,11 @@ async fn readConfig(move runtime: Runtime, move path: Path) -> Result<Bytes, IoE
 同步入口示例：
 
 ```zn
-async fn workAsync() -> Result<Unit, WorkError> {
-    return work();
-}
-
 fn main() -> Result<Unit, WorkError> {
     var runtime = try Runtime.withWorkerCount(8);
-    val task = try runtime.spawn(workAsync());
+    val task = try runtime.spawn({
+        return work();
+    });
 
     try mut runtime.blockOn(move task);
     return Ok(());
@@ -172,7 +173,9 @@ async fn loadAll(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Vector
     var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
 
     for move job in jobs {
-        try mut group.spawn(fetchPage(move job));
+        try mut group.spawn({
+            return fetch(move job);
+        });
     }
 
     return try await move group.tryJoinAll();
@@ -186,7 +189,9 @@ async fn loadStreaming(move runtime: Runtime, move jobs: Vector<Job>) -> Result<
     var group = TaskGroup<Result<Page, FetchError>>.withCapacity(jobs.len(), mut runtime);
 
     for move job in jobs {
-        try mut group.spawn(fetchPage(move job));
+        try mut group.spawn({
+            return fetch(move job);
+        });
     }
 
     while val Some(page) = try await mut group.tryNext() {
@@ -242,25 +247,27 @@ impl<T: Send, E: Send> TaskGroup<Result<T, E>> {
 示例：
 
 ```zn
-async fn runWork(move work: Work) -> Result<Unit, WorkError> {
-    return process(move work);
-}
-
 async fn runOrStop(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(runWork(move work));
+    val task = try runtime.spawn({
+        return process(move work);
+    });
 
     try await task;
     return Ok(());
 }
 
 fn cancelQueued(move runtime: Runtime, move work: Work) -> Result<TaskCancelStatus, WorkError> {
-    val task = try runtime.spawn(runWork(move work));
+    val task = try runtime.spawn({
+        return process(move work);
+    });
 
     return Ok(move task.cancel());
 }
 
 fn launchBackground(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
-    val task = try runtime.spawn(runWork(move work));
+    val task = try runtime.spawn({
+        return process(move work);
+    });
 
     move task.detach();
     return Ok(());
@@ -293,17 +300,15 @@ enum TaskCancelStatus {
 任务内部需要主动检查取消请求时，使用显式上下文入口。普通 `Runtime.spawn(future)` 不创建用户可见 `TaskContext`，因此没有额外参数和检查成本。
 
 ```zn
-async fn processCancellable(move work: Work, ctx: TaskContext) -> Result<Unit, WorkError> {
-    if ctx.isCancellationRequested() {
-        return Err(WorkError.Cancelled);
-    }
-
-    return process(move work);
-}
-
 async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
     val task = try runtime.spawnWithContext(
-        move (ctx: TaskContext) => processCancellable(move work, ctx)
+        (ctx: TaskContext) {
+            if ctx.isCancellationRequested() {
+                return Err(WorkError.Cancelled);
+            }
+
+            return process(move work);
+        }
     );
 
     return try await task;
@@ -329,7 +334,11 @@ fn launchBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelSt
 规则：
 
 - `Runtime.spawn(future)` 是日常异步入口，接收 `Future<T>`。
-- `Runtime.spawnWithContext(makeFuture)` 是高级入口，接收 `OnceFn<TaskContext, Future<T>>`。闭包只在启动时调用一次，runtime 保存它返回的 future，不保存闭包本身。
+- `Runtime.spawn({ ... })` 是 Future block 实参，会直接 lowered 为 future 状态机；用户不需要写 `async` 或捕获 `move`。`spawn` 仍然是普通函数调用，括号不能省略。
+- `TaskGroup.spawn({ ... })` 使用同样的 Future block 简写。
+- Future block 会捕获外层变量：`Copy` 值复制，非 `Copy` owner 移动进 future。编译器按 move 规则禁止捕获后继续使用该 owner。
+- Future block 不会自动 `clone`、不会自动 `Shared.clone()`、不会自动分配捕获盒子；需要共享时成本必须在源码中显式出现。
+- `Runtime.spawnWithContext(makeFuture)` 是高级入口，接收 `OnceFn<TaskContext, Future<T>>`。闭包只在启动时调用一次，runtime 保存它返回的 future，不保存闭包本身；闭包体可以直接写 Future block。
 - `Runtime.spawnBlocking(job)` 接收同步 `OnceFn<T>`。
 - `Runtime.spawnBlockingWithContext(job)` 接收同步 `OnceFn<TaskContext, T>`。
 - `TaskContext` 是 task-local 的轻量能力值，通常 lowered 为任务控制块中的取消位读取；`isCancellationRequested()` 不能分配、不能加锁、不能执行系统调用。

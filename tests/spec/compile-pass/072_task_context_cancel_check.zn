@@ -4,17 +4,15 @@
 
 module tests.pass.taskContextCancelCheck;
 
-async fn processCancellable(move work: Work, ctx: TaskContext) -> Result<Unit, WorkError> {
-    if ctx.isCancellationRequested() {
-        return Err(WorkError.Cancelled);
-    }
-
-    return process(move work);
-}
-
 async fn runCancellable(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
     val task = try runtime.spawnWithContext(
-        move (ctx: TaskContext) => processCancellable(move work, ctx)
+        (ctx: TaskContext) {
+            if ctx.isCancellationRequested() {
+                return Err(WorkError.Cancelled);
+            }
+
+            return process(move work);
+        }
     );
 
     return try await task;

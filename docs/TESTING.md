@@ -83,16 +83,84 @@
 
 覆盖延后能力的测试仍然保留，例如完整 `Shared<T>` runtime、`Shared<Interface>`、async lowering、scoped 并发、跨 package opaque return metadata、registry/git package manager。这些测试不应删除，只是不进入 stage0 MVP 发布门禁。
 
-测试 runner 出现后，测试可以用头部注释或 `case.toml` 标记：
+测试 runner 格式冻结为：
 
 ```text
-stage = "mvp"
-stage = "full-spec"
-feature = "async"
-feature = "shared"
+tests/spec/compile-pass/*.zn
+tests/spec/compile-fail/*.zn
+tests/spec/manifest-pass/*.toml
+tests/spec/manifest-fail/*.toml
+tests/spec/module-pass/*/
+tests/spec/module-fail/*/
+tests/spec/package-pass/*/
+tests/spec/package-fail/*/
+tests/spec/incremental-pass/*/case.toml
+tests/spec/incremental-fail/*/case.toml
+tests/spec/codegen-pass/*/case.toml
+tests/spec/codegen-fail/*/case.toml
 ```
 
-没有显式标记时，默认按完整规格测试处理。进入 stage0 发布门禁前，再把第一批必须通过的测试补充为 `stage = "mvp"`。
+`.zn` 源码测试使用文件头注释标记元信息：
+
+```zn
+// stage: mvp
+// feature: ownership
+// profile: hosted
+```
+
+manifest / package 里的真实 TOML 文件也使用注释标记，避免污染真实 manifest 语义：
+
+```toml
+# stage: mvp
+# feature: manifest
+```
+
+`incremental-*` 和 `codegen-*` 的 `case.toml` 是测试描述文件，可以使用结构化字段：
+
+```toml
+stage = "mvp"
+feature = "mir"
+target = "x86_64-unknown-linux-gnu"
+```
+
+多文件夹具可以在测试目录根部放可选 `case.toml` 记录 `stage`、`feature`、`profile`、`target` 和预期入口；没有 `case.toml` 时 runner 扫描夹具内的头部注释。
+
+没有显式 `stage` 的测试默认按 `full-spec` 处理，不进入第一批 MVP 门禁。进入 stage0 发布门禁前，再把第一批必须通过的测试补充为 `stage: mvp` 或 `stage = "mvp"`。
+
+runner 命令冻结为：
+
+```text
+zeno test
+zeno test --stage mvp
+zeno test --stage full-spec
+zeno test --feature async
+zeno test --target x86_64-unknown-linux-gnu
+```
+
+stage0 中，裸 `zeno test` 默认等价于 `zeno test --stage mvp`。完整规格必须显式写 `--stage full-spec`。
+
+失败测试规则：
+
+- `compile-fail`、`manifest-fail`、`module-fail`、`package-fail`、`incremental-fail` 和 `codegen-fail` 必须至少包含一个 `expected-error`。
+- `.zn` 使用 `// expected-error:`，TOML 使用 `# expected-error:`。
+- `expected-error` 可以写错误码、文案片段，或二者同时写；出现错误码时优先按 code 匹配，再验证可选文案片段。
+- v1 runner 对无错误码的旧测试使用错误文案 substring 匹配。
+- 如果出现未预期 error，或者缺少预期 error，测试失败。
+
+runner 输出必须稳定排序：
+
+```text
+category
+test path
+package name
+source file path
+byte offset
+error code
+```
+
+并行执行、缓存命中和目标平台差异不能改变诊断排序。codegen 测试第一版继续用 `case.toml` 描述 MIR / LLVM 不变量和禁止出现的隐藏成本；编译器成熟后可以增加文本 MIR、LLVM FileCheck 或目标汇编断言，但不能替代 `case.toml` 的高层规格描述。
+
+诊断 JSON 规则见 [COMPILATION.md](COMPILATION.md)。测试 runner 读取 `--diagnostic-format json` 时按 JSON Lines 逐条消费，每条诊断必须包含稳定 `code`、`primarySpan`、`severity` 和 `message`。staged diagnostic 必须设置 `isStaged = true` 并携带 `feature`。
 
 ## 3. 必要 compile-pass 覆盖
 
@@ -238,7 +306,9 @@ feature = "shared"
 - C bridge 的 `Result<T, E>` 错误类型必须显式映射为 C 错误码。
 - 导出函数在 abort / trap profile 下不会让 panic unwind 穿过 C ABI。
 - 可选任务运行时通过 `Runtime.spawn(future)` 消费 async future，并返回 `Task<T>`。
-- 命名 future 传给 `Runtime.spawn` 时必须写 `move future`；临时 async 调用可以直接传入。
+- `async { ... }` / `async move { ... }` block 能创建 future；`Runtime.spawn({ ... })` 和 `TaskGroup.spawn({ ... })` 支持 Future block 实参作为内联任务体。
+- Future block 实参会把非 `Copy` 捕获移动进 future，不要求用户额外写捕获 `move`。
+- 命名 future 传给 `Runtime.spawn` 时必须写 `move future`；临时 async 调用或 Future block 实参可以直接传入。
 - `Runtime.spawnBlocking` 把同步阻塞工作路由到独立 blocking pool，并返回 `Task<T>`。
 - `Runtime.spawnWithContext` 和 `Runtime.spawnBlockingWithContext` 能显式传入 `TaskContext`。
 - `TaskGroup<T>` 可以启动多个 future，并通过 `joinAll` / `tryJoinAll` 结构化收尾。
@@ -418,7 +488,7 @@ feature = "shared"
 
 ## 5. 诊断格式
 
-推荐诊断形状：
+human 诊断示例：
 
 ```text
 error[E0201]: 使用了已移动的值 `file`
@@ -431,7 +501,7 @@ error[E0201]: 使用了已移动的值 `file`
 help: 在移动前读取该值，或只移动一次
 ```
 
-编译器出现后，诊断应使用稳定错误码。
+稳定错误码、JSON Lines 字段和 span 规则以 [COMPILATION.md](COMPILATION.md) 为准。测试文档只保留 human 输出示例，runner 匹配必须使用稳定 code 和主 span。
 
 ## 6. 性能测试
 

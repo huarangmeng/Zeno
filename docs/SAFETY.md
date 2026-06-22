@@ -387,11 +387,14 @@ try move t.join();
 
 ## 11. Future 取消安全
 
-`async fn` 生成拥有状态机。future 被 drop 时表示取消。
+`async fn`、`async { ... }` / `async move { ... }` block，以及 `Future<T>` 参数位置的 Future block 实参生成拥有状态机。future 被 drop 时表示取消。
 
 规则：
 
 - future drop 必须根据当前状态销毁已经初始化且仍拥有的字段。
+- `spawn({ ... })` / `group.spawn({ ... })` 这类 Future block 实参会把捕获的非 `Copy` owner 移动进 future 状态；捕获后外层继续使用该 owner 是编译错误。
+- Future block 实参不会自动 clone、不会自动引用计数，也不会自动装箱。
+- 非 `move` async block 只能在当前作用域内使用；若 future 会逃逸，捕获的访问值和短期可写访问必须被拒绝。
 - 跨 `await` 存活的 RAII guard 和其他拥有资源必须进入 future 状态，并在完成、错误提前返回、panic-unwind 或取消 drop 时销毁。
 - future drop 不能 `await`；析构不能依赖异步清理完成。
 - 短期访问、`ArraySlice<T>`、`StringSlice` 和 scoped allocator owner 不能作为独立值跨 `await` 进入 future 状态。接口约束按具体类型处理；若具体类型需要跨 `await`，它必须由 future 拥有并满足对应所有权规则。

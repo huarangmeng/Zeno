@@ -10,11 +10,13 @@ Zeno 的包系统目标是：依赖解析确定、构建输入可复现、trust 
 [package]
 name = "net"
 version = "1.2.0"
+kind = "library"
 ```
 
 规则：
 
 - `package.name` 用于诊断、lockfile、发布和信任报告。
+- `package.kind` 区分应用和库；应用默认入口来自 `src/main.zn` 的 `main`，库没有入口。
 - dependency key 是当前包源码中的 import 根，可以不同于依赖包名。
 - `package.version` 使用 SemVer 格式，发布到 registry 的包必须提供。
 - path-only 私有包可以省略 version，但如果被 workspace 发布命令选中，必须补齐。
@@ -44,6 +46,13 @@ log = { version = "1.2.3" }
 
 后续可以加入版本范围，但 lockfile 仍必须记录解析出的精确版本和内容 hash。
 
+stage0 MVP 子集：
+
+- 支持 `"builtin"`、path dependency 和 workspace member。
+- `core` 始终隐式可用，不进入 `[dependencies]`；`alloc` / `std` 可以作为 builtin 依赖写入用于审计。
+- 不做 registry 下载、git fetch、版本范围求解或发布协议。
+- 如果 manifest 中出现 `{ git = ... }` 或 `{ version = ... }`，stage0 应给 staged diagnostic，而不是尝试联网解析。
+
 ## 3. Workspace
 
 多包仓库使用 workspace：
@@ -65,6 +74,14 @@ members = ["core", "compiler", "tools/*"]
 ## 4. Zeno.lock
 
 `Zeno.lock` 记录完整解析结果。应用、工具、内核、编译器和 workspace 必须提交 lockfile；纯库包可以不提交，但发布校验必须能生成 lockfile。
+
+stage0 必须实现 lockfile 的本地 frozen 校验：
+
+- 支持 `path:...` 和 `builtin:name` 来源。
+- 校验 manifest hash、源码内容 hash、依赖边、compiler identity、builtin package hash、target/profile 和 trust 能力摘要。
+- 默认构建使用 frozen lockfile；lockfile 缺失或过期时报错。
+- 开发命令可以后续提供 `--update-lock` 生成本地 lockfile；第一批不需要联网更新。
+- 纯库包本地检查可以没有 lockfile，但进入 workspace、CI、发布或编译器自举构建时必须生成并校验 lockfile。
 
 示例：
 
