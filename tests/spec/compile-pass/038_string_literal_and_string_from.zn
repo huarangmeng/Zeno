@@ -15,7 +15,7 @@ fn byteLen(text: StringSlice) -> USize {
 }
 
 fn owned() -> String {
-    let text = String.from("hello");
+    val text = String.from("hello");
     return text;
 }
 
@@ -27,22 +27,22 @@ fn append() -> String {
 
 fn countChars(text: StringSlice) -> USize {
     var count: USize = 0;
-    let chars = text.chars();
+    val chars = text.chars();
     for move ch in chars {
-        let ignored = ch;
+        val ignored = ch;
         count = count + 1;
     }
     return count;
 }
 
 fn main() {
-    let view = "literal";
-    let a = textLen(greeting) + textLen(view);
-    let b = byteLen("bytes");
-    let c = countChars("chars");
-    let ownedText = owned();
-    let appendedText = append();
-    let ignored = a + b + c;
-    let ignoredOwned = ownedText;
-    let ignoredAppended = appendedText;
+    val view = "literal";
+    val a = textLen(greeting) + textLen(view);
+    val b = byteLen("bytes");
+    val c = countChars("chars");
+    val ownedText = owned();
+    val appendedText = append();
+    val ignored = a + b + c;
+    val ignoredOwned = ownedText;
+    val ignoredAppended = appendedText;
 }

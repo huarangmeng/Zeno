@@ -15,8 +15,8 @@ impl LocalHandle {
 }
 
 fn bad() {
-    let handle = LocalHandle { raw: 1 };
+    val handle = LocalHandle { raw: 1 };
     Thread.spawn(move () {
-        let ignored = handle.raw; // expected-error: LocalHandle is not Send
+        val ignored = handle.raw; // expected-error: LocalHandle is not Send
     });
 }

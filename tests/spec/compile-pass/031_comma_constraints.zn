@@ -40,6 +40,6 @@ fn min<T: SortKey>(a: T, b: T) -> T {
 }
 
 fn select<K: SortKey, V>(key: K, value: V) -> V {
-    let ignored = key;
+    val ignored = key;
     return value;
 }

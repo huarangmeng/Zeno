@@ -21,6 +21,7 @@ strategy = "abort"
 
 [trust]
 ffi = false
+rawMemory = false
 hardware = true # expected-error: hosted profile cannot enable hardware trust capability
 inlineAsm = false
 interrupts = false

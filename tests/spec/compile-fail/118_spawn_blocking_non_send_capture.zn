@@ -1,0 +1,22 @@
+// category: compile-fail
+// profile: hosted
+// purpose: spawnBlocking jobs require Send captures because they run on blocking pool threads
+
+module tests.fail.spawnBlockingNonSendCapture;
+
+struct LocalHandle {
+    raw: I32,
+}
+
+impl LocalHandle {
+    destroy {}
+}
+
+fn bad(move runtime: Runtime) -> Result<Unit, Error> {
+    val handle = LocalHandle { raw: 1 };
+    val task = try runtime.spawnBlocking(move () -> Unit {
+        val ignored = handle.raw; // expected-error: LocalHandle is not Send for spawnBlocking
+    });
+    val ignored = task;
+    return Ok(());
+}

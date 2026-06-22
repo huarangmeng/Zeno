@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: val destructuring only accepts irrefutable patterns
+
+module tests.fail.refutableValPattern;
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+fn bad(maybe: Maybe<U32>) -> U32 {
+    val Maybe.Some(value) = maybe; // expected-error: refutable pattern is not allowed in val; use match or if val
+    return value;
+}

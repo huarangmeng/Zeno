@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: freestanding
+// trust.rawMemory: false
+// purpose: manifest rawMemory capability gates raw pointer operations inside trust blocks
+
+module tests.fail.trustRawMemoryDeniedByManifest;
+
+fn bad(address: USize) -> U8 {
+    return trust {
+        RawPointer<U8>.fromAddress(address).read() // expected-error: manifest does not allow rawMemory trust capability
+    };
+}

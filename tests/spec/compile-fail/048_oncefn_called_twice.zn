@@ -5,7 +5,7 @@
 module tests.fail.onceFnCalledTwice;
 
 fn bad(move f: OnceFn<U32>) -> U32 {
-    let first = f();
-    let second = f(); // expected-error: OnceFn callable was consumed by the first call
+    val first = f();
+    val second = f(); // expected-error: OnceFn callable was consumed by the first call
     return first + second;
 }

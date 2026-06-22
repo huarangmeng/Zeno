@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: destroy blocks cannot await asynchronous cleanup
+
+module tests.fail.destroyAwait;
+
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        await closeAsync(self.fd); // expected-error: destroy cannot use await
+    }
+}
+
+async fn closeAsync(fd: I32) -> Unit {
+    return;
+}

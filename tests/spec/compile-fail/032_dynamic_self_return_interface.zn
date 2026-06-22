@@ -9,5 +9,5 @@ interface Duplicable {
 }
 
 fn duplicateAny(value: Box<Duplicable>) {
-    let copy = value.duplicate(); // expected-error: method returning Self cannot be dynamically dispatched
+    val copy = value.duplicate(); // expected-error: method returning Self cannot be dynamically dispatched
 }

@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: hosted
+// purpose: Task handles are awaited with the await operator, not a Task.await method
+
+module tests.fail.taskAwaitMethodRemoved;
+
+async fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    try move task.await(); // expected-error: Task<T> has no await method; use await task
+    return Ok(());
+}

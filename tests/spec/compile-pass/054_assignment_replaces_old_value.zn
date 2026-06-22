@@ -44,8 +44,8 @@ fn replaceElement(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     mut handles.push(makeHandle(5));
     handles[0] = makeHandle(6);
 
-    let old = mut handles.replaceAt(0, makeHandle(7));
-    let removed = mut handles.removeAt(0);
+    val old = mut handles.replaceAt(0, makeHandle(7));
+    val removed = mut handles.removeAt(0);
 
     return Ok(consume(move old) + consume(move removed));
 }

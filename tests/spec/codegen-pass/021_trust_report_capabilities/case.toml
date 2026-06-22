@@ -1,0 +1,44 @@
+# category: codegen-pass
+# purpose: HIR records trust capability categories and manifest authorization for reports
+
+[source]
+file = "src/main.zn"
+text = '''
+trust extern "C" fn c_read(fd: I32, buffer: USize, length: USize) -> ISize;
+
+struct UartRegs {
+    status: U32,
+}
+
+fn read(fd: I32, mut out: ArraySlice<U8>) -> ISize {
+    return trust {
+        c_read(fd, out.rawAddress(), out.len)
+    };
+}
+
+fn map(base: USize) -> Mmio<UartRegs> {
+    return trust {
+        Mmio.mapRaw<UartRegs>(base, 4096)
+    };
+}
+'''
+
+[manifest.trust]
+ffi = true
+rawMemory = false
+hardware = true
+inlineAsm = false
+interrupts = false
+requireReport = true
+
+[expect.hir]
+contains = [
+    "trustSpan capability=ffi authorized=true",
+    "trustSpan capability=hardware authorized=true",
+    "trustReport publicImpact read",
+    "trustReport publicImpact map",
+]
+forbid = [
+    "trustSpan capability=rawMemory",
+    "trustSpan authorized=false",
+]

@@ -72,7 +72,7 @@
 
 - `run-pass`：能编译并产生预期输出的程序。
 - `perf`：微基准和 codegen 不变量。
-- `stdlib`：core 和 std API 一致性测试。
+- `stdlib`：最小 core 边界和语言语义所需库 API 的一致性测试；完整标准库 API 测试在语言冻结后单独扩展。
 
 ## 2. MVP 与完整规格门禁
 
@@ -134,6 +134,9 @@ feature = "shared"
 - 检查窄化使用 `T.fromChecked(value)`，明确截断使用 `T.truncate(value)`，钳制转换使用 `T.saturate(value)`。
 - 非 `Copy` 资源 move 后源绑定失效。
 - 非 `Copy` 拥有者普通赋值会移动右侧值；移动后继续使用源绑定必须被拒绝。
+- 延迟 `val` 可以在所有路径上恰好初始化一次，初始化后不可重写。
+- 延迟 `var` 可以在 move 后重新初始化，也可以覆盖 `maybe-init` 状态；覆盖时旧值条件销毁。
+- 聚合值可以通过字段逐步初始化；完整使用前必须所有字段都初始化。
 - 对已初始化位置重新赋值会销毁旧值；右侧先求值，失败时左侧保持不变。
 - `replaceAt` 返回旧值所有权，不销毁旧值；普通索引赋值销毁旧元素并写入新元素。
 - `Array<T>` / `Vector<T>` 的 `clone` 显式表达深拷贝；指定 allocator 时使用 `cloneIn`。
@@ -147,8 +150,8 @@ feature = "shared"
 - `match value` 只读匹配 enum payload，不移动非 `Copy` payload。
 - `match move value` 消耗 enum 并允许移动出被选中 payload。
 - `match mut value` 原地可写匹配 enum payload，不取得 payload 所有权。
-- `if let` / `while let` 支持只读、`move` 和 `mut` pattern 模式。
-- `let` 支持不可失败 tuple / struct 解构。
+- `if val` / `while val` 支持只读、`move` 和 `mut` pattern 模式。
+- `val` 支持不可失败 tuple / struct 解构。
 - pattern 支持 enum、struct、tuple、literal、range、or、guard 和 nested pattern。
 - guard 分支不参与穷尽证明。
 - `String.clone()` 显式复制拥有文本；`@noAlloc` 中必须被拒绝。
@@ -160,6 +163,8 @@ feature = "shared"
 - 从 `move self` 中移出字段后只销毁剩余字段。
 - 带 `destroy` 的类型可以用 `close`、`flush` 或 `finish` 这类 `move self` 方法显式完成资源，并通过状态让后续 `destroy` no-op。
 - `destroy` 不是 `move self` 方法，不能由用户直接调用。
+- `destroy` 先于字段销毁运行，字段按源码声明顺序的逆序销毁。
+- `destroy` 隐式满足 `@noPanic`、`@noAlloc`，并且不能 `await`。
 - 从参数派生的 `ArraySlice<T>` 可以返回。
 - 活跃视图结束后，`Vector<T>` 可以继续结构性修改或元素替换。
 - RAII 在所有正常退出路径上销毁。
@@ -193,7 +198,7 @@ feature = "shared"
 - 昂贵 fallback 通过 `unwrapOrElse` 延迟到 `None` 路径。
 - 错误类型转换必须显式使用 `mapErr` 或等价 API。
 - `mapErr` 只在 `Err` 路径执行转换。
-- `try` 提前返回会执行离开作用域的 `defer` 和 RAII 销毁。
+- `try` 提前返回会执行离开作用域的 RAII 销毁。
 - `panic(message) -> Never` 和 `oom(layout) -> Never` 可以出现在任意返回类型位置。
 - profile `panicHandler(info: PanicInfo) -> Never` 可以读取 panic 消息、调用点位置和惰性调用栈。
 - `PanicInfo.stack()` 可以通过 `for move frame in frames` 无分配遍历 `StackFrame`。
@@ -220,13 +225,21 @@ feature = "shared"
 - `Shared<SharedInterface>` 可以跨线程共享只读接口，其中 `SharedInterface` 继承目标接口、`Send` 和 `Sync`。
 - 带 `destroy` 的线程安全资源可以通过 `trust impl Send` 显式声明。
 - `trust extern` 和 `trust` 块可以表达显式底层边界。
+- `trust` 能力分类包括 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts` 和 `threadSafety`，并进入信任报告。
 - `@export("symbol", abi: C)` 可以把非泛型顶层 `pub fn` 导出为 C ABI 符号。
 - 重载函数可以通过不同 `@export` 符号分别导出。
 - C ABI 导入和导出的签名只接受 C-compatible 类型。
 - 导出函数在 abort / trap profile 下不会让 panic unwind 穿过 C ABI。
 - 可选任务运行时的所有权转移。
+- `Runtime.spawnBlocking` 把同步阻塞工作路由到独立 blocking pool，并返回 `Task<T>`。
+- `await task` 消费 `Task<T>` 句柄并返回任务结果。
+- 同步入口可以通过 `mut runtime.blockOn(move task)` 或 `mut executor.blockOn(move future)` 显式阻塞等待。
+- `Task.cancel` 和 `Task.detach` 显式消费并收尾任务句柄。
+- 对 `spawnBlocking` 返回的任务调用 `cancel` 只表达协作取消，不隐藏强杀或阻塞等待。
+- 声明 `TaskContext` 参数的任务可以调用 `ctx.isCancellationRequested()` 检查取消请求。
+- `spawnBlocking` 任务可以在阻塞调用之间检查 `TaskContext`，但不能把检查伪装成强杀阻塞调用。
 - async future 状态所有权。
-- future drop 会清理当前状态中已初始化字段和跨 `await` 的 `defer`。
+- future drop 会清理当前状态中已初始化字段和跨 `await` 的 RAII guard。
 - 立即 `await mut receiver.method()` 可以用于 future 拥有的接收者。
 - 共享可变状态只能通过同步类型访问。
 
@@ -283,9 +296,15 @@ feature = "shared"
 - 移出字段后继续读取该字段或把原对象当作完整值使用。
 - 直接调用 `destroy`。
 - `destroy` 中使用 `try`。
+- `destroy` 中使用 `await`。
+- `destroy` 中直接或间接调用 `panic`。
+- `destroy` 中调用会分配或可能 OOM 的 API。
 - `destroy` 调用返回 `Result` 的失败 API。
 - 命名非 `Copy` owner 传给 `move` 参数时漏写调用点 `move`。
 - 读取未初始化值。
+- `val` 在可能已初始化、已经初始化或移动后重新赋值。
+- `val` / `var` 只在部分控制流路径初始化后被读取或返回。
+- 部分初始化聚合在缺少字段时被读取、返回或移动。
 - 返回局部存储的访问值。
 - `ArraySlice<T>` 作为结构体字段。
 - `ArraySlice<T>` 进入 `Box<T>`、`Shared<T>`、`Array<T>`、`Vector<T>`、`static`、逃逸闭包、线程、任务或 async future。
@@ -300,7 +319,9 @@ feature = "shared"
 - `match move` 后继续使用原 enum。
 - `match mut` 作用于不可写 enum。
 - `match` 非穷尽且没有 `_` 分支。
-- `let` 使用可失败 pattern，例如多 variant enum 的 `Some(x)`。
+- 旧式 `let` 局部绑定语法；不可变绑定必须使用 `val`，可变绑定必须使用 `var`。
+- `defer` 语句；作用域清理必须使用 RAII guard 或 `destroy`。
+- `val` 使用可失败 pattern，例如多 variant enum 的 `Some(x)`。
 - or pattern 两侧绑定名字、类型或访问模式不同。
 - 带 guard 的分支被当成穷尽覆盖。
 - 明显不可达的无 guard pattern 分支。
@@ -312,7 +333,7 @@ feature = "shared"
 - 消耗遍历后继续使用被 `move` 的集合。
 - 对 `Iterator<T>` 使用非消耗 `for item in iterator` 遍历。
 - 命名非 `Copy` 迭代器作为 `for move` 源后继续使用原迭代器。
-- `let text: String = "literal"` 这类通过类型标注隐式构造拥有字符串。
+- `val text: String = "literal"` 这类通过类型标注隐式构造拥有字符串。
 - `StringSlice` 作为结构体字段、集合元素、`static`、逃逸闭包捕获、线程任务捕获或 async future 状态。
 - `@noAlloc` 中调用 `String.from`、`String.fromIn`、`String.push`、`String.reserve`、`String.tryReserve`、`String.clone`、`cloneIn`、集合/Box/Shared 分配 API 或会分配的格式化 API。
 - `@noPanic` 中直接或间接调用 `panic`。
@@ -333,6 +354,16 @@ feature = "shared"
 - 调用 `OnceFn` 后继续使用该闭包。
 - 通过 `Shared<Interface>` 调用 `mut self` 接口方法。
 - 把非 `Send` 类型移动进 `Thread.spawn`、多线程任务或可跨线程 future。
+- `spawnBlocking` 调用漏写 `move job`。
+- `spawnBlocking` 捕获或返回非 `Send` 类型。
+- `Task.await()` 方法调用；任务等待必须写成 `await task`。
+- `await task` 后继续使用同一个任务句柄。
+- `blockOn` 调用漏写 `move task` / `move future`。
+- async 上下文中调用 `blockOn`，应使用 `await`。
+- `Task<T>` 句柄离开作用域前没有通过 `await`、`blockOn`、`cancel` 或 `detach` 显式收尾。
+- `Task.cancel` 或 `Task.detach` 调用漏写 `move task`。
+- `TaskContext` 返回、保存进结构体/集合/`Box`/`Shared`/`static`，或被线程、子任务、逃逸闭包捕获。
+- 使用隐藏全局当前任务查询来检查取消，例如 `Task.isCancellationRequested()`。
 - `Box<Interface>` 在缺少 `Send` 能力时跨线程移动。
 - `Shared<T>` 在 `T` 不是 `Send, Sync` 时跨线程移动或共享。
 - 普通 `impl Send for T {}` 或 `impl Sync for T {}`，没有 `trust` 边界。
@@ -341,6 +372,8 @@ feature = "shared"
 - 通过 `Box<Interface>` / `Shared<Interface>` 动态调用 `move self` 方法。
 - 没有 `trust` 的裸 FFI 声明或底层操作。
 - manifest 未允许对应能力时使用 `trust extern`、硬件访问、inline asm 或中断入口。
+- manifest 未允许 `rawMemory` 时构造、偏移、解引用裸指针或执行按位重解释。
+- `trust extern` 声明后，在普通代码中直接调用 extern 函数。
 - `@export` 标在非 `pub` 函数、泛型函数、方法或非函数声明上。
 - 两个导出使用同一个外部符号名。
 - `@export(..., abi: C)` 签名包含非 C-compatible 类型，例如 `String`、`Vector<T>`、`ArraySlice<T>`、接口或闭包。
@@ -355,7 +388,7 @@ feature = "shared"
 - `trust` 边界中违反普通所有权、初始化或类型规则。
 - 非拥有访问值作为独立值跨 `await` 进入 future 状态。
 - async `mut self` 调用产生的访问 future 被保存、返回、传给 `spawn` 或跨另一个 `await`。
-- 跨 `await` 存活的 `defer` 中使用 `await`。
+- 析构或 future drop cleanup 中依赖 `await` 完成异步清理。
 
 ## 5. 诊断格式
 
@@ -365,7 +398,7 @@ feature = "shared"
 error[E0201]: 使用了已移动的值 `file`
   --> tests/spec/compile-fail/001_use_after_move.zn:8:5
    |
- 7 |     let owner = file;
+ 7 |     val owner = file;
    |                 ---- 值在这里被移动
  8 |     mut file.write("late");
    |     ^^^^ 移动后继续使用
@@ -391,11 +424,12 @@ help: 在移动前读取该值，或只移动一次
 - `U8.truncate(value)` 应降低为截断，不生成范围检查。
 - `U8.saturate(value)` 应降低为比较/选择或目标饱和指令，不分配、不 trap。
 - `try` 应降低为普通分支和清理边，不生成异常或堆分配。
-- `try` 的提前返回边必须执行离开作用域的 `defer` 和 RAII cleanup。
+- `try` 的提前返回边必须执行离开作用域的 RAII cleanup。
 - `panic` / `oom` 应降低为 `noreturn` 控制流终点；abort / trap profile 不应生成 unwind 清理路径。
 - `panic` 调用点位置应由编译器注入；调用栈采集应只出现在 panic 冷路径，正常路径不分配、不登记栈帧对象。
 - `StackFrames` 遍历应支持只输出 instruction pointer；符号化是 profile 诊断能力，不是语言运行时必需成本。
 - panic-unwind profile 只在显式启用时生成栈展开和 RAII 清理路径。
+- 完整对象 drop 必须先运行类型自己的 `destroy`，再按源码声明逆序 drop 字段；部分初始化失败路径不能运行外层完整对象的 `destroy`。
 - `tryReserve` 应降低为普通 `Result` 分支；普通 `push` 在容量已证明足够时不应重复生成分配慢路径。
 - `tryReserve` 成功后，在已证明容量范围内的循环 `push` 不应生成 per-iteration reserve / grow 慢路径。
 - `Map` / `Set` 默认实现不应为每个元素生成单独 allocator call。
@@ -403,10 +437,12 @@ help: 在移动前读取该值，或只移动一次
 - `Map.entry` 更新应只做一次查找 / 探测，不应降低为 `containsKey` 加 `insert` 的双重哈希。
 - `Map` / `Set` 遍历不应分配 iterator 对象，也不应承诺稳定顺序。
 - 已初始化非 `Copy` place 的赋值应先完成 RHS，再在成功边 drop 旧值并写入新值；RHS 失败边不能 drop 左侧旧值。
+- `maybe-init` 的 `var` 赋值应在 RHS 成功边条件 drop 旧值，RHS 失败边保持原 drop flag。
+- 延迟初始化聚合的字段 drop flag 应只清理已初始化字段；完整对象 `destroy` 不能在部分初始化失败边运行。
 - `replaceAt` 应移动出旧元素并返回，不能生成旧元素 drop。
 - `match` 应降低为 tag switch 或等价分支，不分配、不动态派发。
 - `match move` 中已移动 payload 的 drop flag 必须清除，未移动 payload 必须在分支 cleanup 中销毁。
-- `if let` / `while let` pattern 应降低为普通分支 / 循环头，不分配。
+- `if val` / `while val` pattern 应降低为普通分支 / 循环头，不分配。
 - literal、range 和 or pattern 应降低为比较、tag switch 或分支合并，不创建 pattern 对象。
 - guard 应降低为 pattern 成功后的条件分支，guard 失败继续尝试后续分支。
 - `okOrElse`、`unwrapOrElse` 和 `mapErr` 的 `OnceFn` 非逃逸闭包应内联成条件分支；成功路径不得构造失败路径值。
@@ -435,6 +471,7 @@ help: 在移动前读取该值，或只移动一次
 - `Shared<Interface>.clone` 应为一次引用计数增加，不深拷贝具体值。
 - `Send` / `Sync` 推导应在类型检查期完成，不需要运行时标记或查询。
 - `Box<ThreadWriter>` 与 `Box<Writer>` 的运行时布局成本相同，只是类型系统保留了额外能力证明。
+- `trust` 不能让优化器凭空推导 `noalias`、非空、对齐、初始化或生命周期事实；裸指针默认按未知 provenance / 未知别名关系处理。
 - `@export(..., abi: C)` 应按目标 C ABI 生成外部符号，不使用 Zeno 内部 mangling。
 - `@layout(Packed(N))` 字段读取应在 MIR/LLVM 中标记为 unaligned load，不能伪造成自然对齐字段访问。
 - 修改函数体的增量构建不应重新检查无关 package；修改 `pub` API 应只失效实际依赖该 API 的下游。
@@ -477,7 +514,7 @@ strategy = "handler" # expected-error: oom.handler is required
 module-fail 主错误：
 
 ```zn
-let client: Client = net.http.connect(); // expected-error: unqualified name Client is ambiguous
+val client: Client = net.http.connect(); // expected-error: unqualified name Client is ambiguous
 ```
 
 测试 harness 应把这些注释当作断言。

@@ -20,8 +20,8 @@ struct Pair {
 }
 
 fn openPair(pathA: StringSlice, pathB: StringSlice) -> Result<Pair, IoError> {
-    let left = try File.open(pathA);
-    let right = try File.open(pathB);
+    val left = try File.open(pathA);
+    val right = try File.open(pathB);
     return Ok(Pair { left: left, right: right });
 }
 '''

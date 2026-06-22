@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: hosted
+// purpose: detach consumes the task handle and requires move self
+
+module tests.fail.taskDetachRequiresMove;
+
+fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    task.detach(); // expected-error: detach consumes the task handle; use move task.detach()
+    return Ok(());
+}

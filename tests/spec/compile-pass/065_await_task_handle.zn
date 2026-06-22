@@ -1,0 +1,14 @@
+// category: compile-pass
+// profile: hosted
+// purpose: await task consumes a task handle and returns the task result
+
+module tests.pass.awaitTaskHandle;
+
+async fn run(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    try await task;
+    return Ok(());
+}

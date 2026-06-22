@@ -5,5 +5,5 @@
 module tests.fail.stringLiteralNotString;
 
 fn bad() {
-    let text: String = "hello"; // expected-error: string literal is StringSlice; use String.from("hello") for owned String
+    val text: String = "hello"; // expected-error: string literal is StringSlice; use String.from("hello") for owned String
 }

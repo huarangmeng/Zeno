@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: var must be initialized before it can be read
+
+module tests.fail.varUseBeforeInit;
+
+struct Handle {
+    id: U32,
+}
+
+fn bad() -> U32 {
+    var handle: Handle;
+    return handle.id; // expected-error: handle is used before initialization
+}

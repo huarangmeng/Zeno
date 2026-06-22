@@ -69,7 +69,8 @@ trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 - `trust extern` 只能出现在允许 FFI trust 能力的包中。
 - 裸 `extern` 没有 `trust` 必须被拒绝。
 - extern 函数的参数和返回类型必须是 C-compatible。
-- 调用 extern 函数本身是底层行为，应放在小的 `trust` 块或受信封装中。
+- 调用 extern 函数本身是底层行为，必须放在小的 `trust` 块或受信封装中。
+- 为立即 FFI 调用从 `ArraySlice<T>`、`StringSlice` 或句柄取出 ABI 地址属于 `ffi` 能力；构造任意地址、裸指针偏移或解引用属于 `rawMemory` 能力。
 - 受信封装对外应该暴露 `Result`、handle、slice 或普通值，而不是裸地址和平台错误码。
 
 ## 4. C-compatible 类型
@@ -96,7 +97,7 @@ trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 
 ```zn
 pub fn readInto(fd: FileDescriptor, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
-    let n = trust {
+    val n = trust {
         c_read(fd.value, out.rawAddress(), out.len)
     };
     return os.decodeReadResult(n);
@@ -157,3 +158,4 @@ pub fn init() -> I32 {
 - `@export` 签名包含非 C-compatible 类型时报错，并指出具体类型。
 - 导出函数可能 panic unwind 穿过 C ABI 时报错。
 - `trust extern` 被 manifest 禁止时报错，并指出缺少的 trust 能力。
+- extern 函数调用不在 `trust` 块中时报错。

@@ -5,7 +5,7 @@
 file = "src/main.zn"
 text = '''
 fn local(mut arena: ArenaAllocator) {
-    let out = Vector<U8>.withCapacityIn(128, mut arena);
+    val out = Vector<U8>.withCapacityIn(128, mut arena);
     use(out.asSlice());
 }
 '''

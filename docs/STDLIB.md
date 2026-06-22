@@ -4,6 +4,8 @@ Zeno 把始终可用的 `core` 库和依赖平台的 hosted 库分开。
 
 `core` 必须能在 freestanding 构建中工作。`std` 可以依赖 OS、分配器、文件系统、线程和 I/O。
 
+本文不是完整标准库 API 清单。v0.1 设计阶段只定义足以验证语言语义和性能模型的最小库边界：基础 enum、拥有容器、分配显式性、同步/并发边界、FFI 安全包装和少量审计表。完整 I/O、网络、路径、时间、格式化、序列化和生态 API 应在语言设计冻结后单独设计。
+
 ## 1. 库分层
 
 `core`：
@@ -130,10 +132,10 @@ impl T {
 `fromChecked` 表示检查转换；`truncate` 表示明确截断到目标类型的低位位模式；`saturate` 表示把数学值钳制到目标整数类型的最小值和最大值之间。普通 `as` 只用于无损转换。
 
 ```zn
-let wide: U32 = byte as U32;
-let maybeByte = U8.fromChecked(wide);
-let low = U8.truncate(wide);
-let clamped = U8.saturate(wide);
+val wide: U32 = byte as U32;
+val maybeByte = U8.fromChecked(wide);
+val low = U8.truncate(wide);
+val clamped = U8.saturate(wide);
 ```
 
 ## 4. 集合
@@ -341,36 +343,69 @@ impl<T: CopyHashKey> Set<T> {
 | `Array.replaceAt` | `mut self` | `index`, `move value` | 修改数组，存储新值，返回旧值 owner | `mut items.replaceAt(i, move value)` |
 | `Vector.push` | `mut self` | `move value` | 修改 vector，存储 value | `mut items.push(move value)` |
 | `Vector.push` with temporary | `mut self` | temporary value | 修改 vector，临时值直接进入容器 | `mut items.push(Item { id: 1 })` |
-| `Vector.pop` / `removeAt` / `swapRemove` | `mut self` | index | 修改 vector，返回被移出的 owner | `let item = mut items.removeAt(i)` |
+| `Vector.pop` / `removeAt` / `swapRemove` | `mut self` | index | 修改 vector，返回被移出的 owner | `val item = mut items.removeAt(i)` |
 | `Vector.reserve` / `tryReserve` | `mut self` | size | 修改容量，不移动元素 | `try mut items.tryReserve(n)` |
 | `Map.get` / `containsKey` | `self` | `LookupKey<K>` | 只读 lookup，不移动 key，不分配 | `users.get(name)` |
-| `Map.remove` | `mut self` | `LookupKey<K>` | 只读 lookup key，移除并销毁表内 key，返回表内 value | `let old = mut users.remove(name)` |
-| `Map.removeEntry` | `mut self` | `LookupKey<K>` | 只读 lookup key，返回表内 key/value owner | `let pair = mut users.removeEntry(name)` |
+| `Map.remove` | `mut self` | `LookupKey<K>` | 只读 lookup key，移除并销毁表内 key，返回表内 value | `val old = mut users.remove(name)` |
+| `Map.removeEntry` | `mut self` | `LookupKey<K>` | 只读 lookup key，返回表内 key/value owner | `val pair = mut users.removeEntry(name)` |
 | `Map.insert` | `mut self` | `move key`, `move value` | 修改 map，把 key/value 存入表 | `mut users.insert(move name, move user)` |
-| `Map.entry` | `mut self` | `move key` | 可能插入时拥有 key，返回短期 entry view | `let e = mut users.entry(move name)` |
+| `Map.entry` | `mut self` | `move key` | 可能插入时拥有 key，返回短期 entry view | `val e = mut users.entry(move name)` |
 | `Set.contains` | `self` | `LookupKey<T>` | 只读 lookup，不移动 value | `seen.contains(name)` |
-| `Set.remove` / `take` | `mut self` | `LookupKey<T>` | 只读 lookup value，移除表内 value | `let old = mut seen.take(name)` |
+| `Set.remove` / `take` | `mut self` | `LookupKey<T>` | 只读 lookup value，移除表内 value | `val old = mut seen.take(name)` |
 | `Set.insert` | `mut self` | `move value` | 修改 set，把 value 存入表 | `mut seen.insert(move name)` |
 | `String.push` | `mut self` | `StringSlice` | 修改 string，复制 text 字节，参数不移动 | `mut text.push(" suffix")` |
-| `String.clone` | `self` | 无 | 显式深拷贝，可能分配 | `let copy = text.clone()` |
+| `String.clone` | `self` | 无 | 显式深拷贝，可能分配 | `val copy = text.clone()` |
 | `Box.new` | static | `move value` | 分配并拥有 value | `Box.new(move value)` |
 | `Shared.new` | static | `move value` | 分配控制块并共享拥有 value | `Shared.new(move value)` |
 | `Shared.clone` | `self` | 无 | 增加引用计数，不深拷贝 | `shared.clone()` |
 | `Mutex.new` | static | `move value` | 构造同步容器并拥有 value | `Mutex.new(move value)` |
-| `Mutex.lock` | `self` | 无 | 只读访问 mutex，返回 guard；锁成本由类型可见 | `let guard = try mutex.lock()` |
-| `MutexGuard.get` | `mut self` | 无 | guard 内取得短期可写访问 | `let value = mut guard.get()` |
+| `Mutex.lock` | `self` | 无 | 只读访问 mutex，返回 guard；锁成本由类型可见 | `val guard = try mutex.lock()` |
+| `MutexGuard.get` | `mut self` | 无 | guard 内取得短期可写访问 | `val value = mut guard.get()` |
 | `Thread.spawn` | static | `move task` | 创建 OS 线程并拥有任务闭包 | `Thread.spawn(move task)` |
 | `JoinHandle.join` | `move self` | 无 | 消费 join handle，返回线程结果 | `try move handle.join()` |
-| `Task.await` | `move self` | 无 | 消费任务 handle，返回任务结果 | `try move task.await()` |
-| `Iterator.next` | `mut self` | 无 | 推进迭代器，可能返回一个 owner | `while let Some(x) = mut iter.next()` |
+| `Runtime.spawn` | `self` | `move OnceFn<T>` / `move OnceFn<TaskContext, T>` | 把普通任务放入 runtime worker，返回 `Task<T>` | `runtime.spawn(move task)` |
+| `Runtime.spawnBlocking` | `self` | `move OnceFn<T>` / `move OnceFn<TaskContext, T>` | 把阻塞同步工作放入独立 blocking pool，返回 `Task<T>` | `runtime.spawnBlocking(move job)` |
+| `await task` | 语言操作 | `Task<T>` 拥有者 | 消费任务句柄，返回任务结果 | `try await task` |
+| `Runtime.blockOn` / `Executor.blockOn` | `mut self` | `move Future<T>` / `move Task<T>` | 阻塞当前线程并返回输出 | `try mut runtime.blockOn(move task)` |
+| `Task.cancel` | `move self` | 无 | 消费任务句柄，请求协作式取消，丢弃输出 | `val status = move task.cancel()` |
+| `Task.detach` | `move self` | 无 | 消费任务句柄，让任务后台继续运行并丢弃输出 | `move task.detach()` |
+| `TaskContext.isCancellationRequested` | `self` | 无 | 显式检查当前任务是否收到取消请求 | `ctx.isCancellationRequested()` |
+| `Iterator.next` | `mut self` | 无 | 推进迭代器，可能返回一个 owner | `while val Some(x) = mut iter.next()` |
 | `File.read` / `write` | `mut self` | buffer | 推进文件状态或写入 OS 缓冲，不移动文件 | `try mut file.read(mut out)` |
-| async `File.readU32` | `mut self` | 无 | 立即 await 时可暂停并恢复文件拥有者 | `let x = try await mut file.readU32()` |
+| async `File.readU32` | `mut self` | 无 | 立即 await 时可暂停并恢复文件拥有者 | `val x = try await mut file.readU32()` |
 | `File.close` | `move self` | 无 | 显式结束资源生命周期，失败时仍触发兜底销毁 | `try move file.close()` |
+
+任务取消状态：
+
+```zn
+enum TaskCancelStatus {
+    QueuedCancelled,
+    Requested,
+    AlreadyFinished,
+}
+
+struct TaskContext: Copy {
+    // opaque task-local capability
+}
+
+impl TaskContext {
+    fn isCancellationRequested(self) -> Bool;
+}
+```
 
 规则：
 
 - `get`、`contains`、`containsKey`、`remove`、`removeEntry` 和索引 lookup 都不能移动调用方的 key。需要支持 `String` / `StringSlice`、owned / slice、大小写折叠等查找形态时，用 `LookupKey<K>` 或专门 lookup API 表达。
-- `insert`、`push`、`Box.new`、`Shared.new`、`Mutex.new`、`Thread.spawn` 这类会长期保存或消费值的 API，命名 owner 实参必须写 `move`。
+- `insert`、`push`、`Box.new`、`Shared.new`、`Mutex.new`、`Thread.spawn`、`Runtime.spawn` 和 `Runtime.spawnBlocking` 这类会长期保存或消费值的 API，命名 owner 实参必须写 `move`。
+- `Runtime.spawnBlocking` 是显式阻塞工作边界，必须使用独立且有上限的 blocking pool；捕获状态和返回值必须是 `Send`。
+- `Task<T>` 没有 `await` 方法；等待任务写成 `await task`，由语言操作消费句柄。
+- `blockOn` 是同步阻塞边界，不允许在 async 上下文调用；它必须显式写出 `mut runtime` / `mut executor` 和 `move task` / `move future`。
+- `Task<T>` 是必须显式收尾的资源。任务句柄可以移动或返回给调用方，但不能在作用域末尾隐式 drop；收尾方式只有 `await task`、`blockOn(move task)`、`move task.cancel()` 和 `move task.detach()`。
+- `Task.cancel(move self) -> TaskCancelStatus` 不阻塞等待任务真正停止。`QueuedCancelled` 表示任务尚未开始且已被跳过；`Requested` 表示运行时记录了协作取消请求；`AlreadyFinished` 表示任务已经完成且结果被丢弃。
+- `Task.detach(move self)` 不取消任务；它只显式表达 fire-and-forget，任务完成时丢弃输出并销毁捕获资源。
+- `TaskContext` 只由 `Runtime.spawn` / `Runtime.spawnBlocking` 传给声明了 `TaskContext` 参数的任务闭包。零参数任务闭包不会收到上下文，也不承担取消检查成本。
+- `TaskContext.isCancellationRequested()` 不能分配、加锁或执行系统调用；它只检查当前任务的取消位，不负责同步其他用户数据。
+- `TaskContext` 可以复制并传给当前任务内的普通 helper 函数，也可以作为当前任务 future 状态跨 `await` 存活；它不能返回、不能保存进长期拥有者，也不能被线程、子任务或逃逸闭包捕获。
 - async `mut self` 调用必须立即 `await`，且接收者由当前 future 拥有；这个调用产生的 future 不能保存、返回、放入容器、传给 `spawn` 或跨另一个 `await`。
 - `mut self` 方法调用已有命名接收者时必须写 `mut receiver.method(...)`；`move self` 方法必须写 `move receiver.method(...)`。
 - 临时值、字面量和函数返回值没有后续可用绑定，传入 `move` 参数时不需要额外 `move`。
@@ -450,7 +485,7 @@ fn body(bytes: ArraySlice<U8>) -> ArraySlice<U8> {
 
 ```zn
 fn bad(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let bytes = Array<U8>.filledIn(64, 0, mut allocator);
+    val bytes = Array<U8>.filledIn(64, 0, mut allocator);
     return Ok(bytes.asSlice()); // expected-error: view outlives local storage
 }
 ```
@@ -465,7 +500,7 @@ impl<T> ArraySlice<T> {
 }
 ```
 
-普通代码不能调用 `rawAddress`。需要把缓冲区传给 C ABI、DMA 或硬件寄存器时，应在很小的 `trust` 块中取出地址，并立即封装回安全 API。
+普通代码不能调用 `rawAddress`。需要把缓冲区传给 C ABI、DMA 或硬件寄存器时，应在很小的 `trust` 块中取出地址，并立即封装回安全 API。为立即 FFI 调用取出地址属于 `ffi` 能力；构造任意地址、裸指针偏移或解引用属于 `rawMemory` 能力；MMIO / DMA 设备访问属于 `hardware` 能力。
 
 ## 5. 字符串
 
@@ -479,8 +514,8 @@ StringSlice   // 不拥有、UTF-8、长度稳定
 字符串 literal 的类型是 `StringSlice`。它指向静态只读 UTF-8 数据，不分配。
 
 ```zn
-let view = "hello";                  // StringSlice
-let owned = String.from("hello"); // String
+val view = "hello";                  // StringSlice
+val owned = String.from("hello"); // String
 ```
 
 `String` 语义上等价于带 UTF-8 不变量的可增长字节缓冲区。它不是 `Copy`，move 是 O(1)，clone 必须显式。实现可以使用小字符串优化或静态字面量优化，但这些优化不能改变可观察语义。
@@ -521,8 +556,8 @@ impl Iterator<Char> for Utf8Chars {
 
 规则：
 
-- `let text = "hello";` 推断为 `StringSlice`，不分配。
-- `let text: String = "hello";` 不允许；拥有字符串必须显式写 `String.from("hello")`。
+- `val text = "hello";` 推断为 `StringSlice`，不分配。
+- `val text: String = "hello";` 不允许；拥有字符串必须显式写 `String.from("hello")`。
 - `String.from(text)` 是普通用户的拥有字符串构造入口，使用 profile 默认 allocator，并直接返回 `String`。
 - `String.fromIn(text, mut allocator)` 指定 allocator，并直接返回 `String`。
 - `String.reserve(additionalBytes)` 和 `reserveExact(additionalBytes)` 用于提前预留字节容量，失败时调用当前 profile 的 `oom(layout) -> Never`。
@@ -591,7 +626,7 @@ allocator 生命周期规则：
 
 ```zn
 fn buildLocal(mut arena: ArenaAllocator) {
-    let bytes = Vector<U8>.withCapacityIn(1024, mut arena);
+    val bytes = Vector<U8>.withCapacityIn(1024, mut arena);
     use(bytes.asSlice());
 } // ok: bytes 在 arena 前销毁
 
@@ -817,7 +852,7 @@ struct File {
 
 impl File {
     fn close(move self) -> Result<Unit, IoError> {
-        let rc = trust { close(self.handle.rawFd) };
+        val rc = trust { close(self.handle.rawFd) };
         if rc < 0 {
             return Err(IoError.LastOsError);
         }
@@ -833,7 +868,7 @@ impl File {
 }
 
 fn closeBestEffort(rawFd: I32) {
-    let ignored = trust { close(rawFd) };
+    val ignored = trust { close(rawFd) };
 }
 ```
 
@@ -900,7 +935,7 @@ fn panicHandler(info: PanicInfo) -> Never;
 
 清理规则：
 
-- panic-unwind profile 必须在展开经过的作用域执行 `defer` 和 RAII 销毁。
+- panic-unwind profile 必须在展开经过的作用域执行 RAII 销毁。
 - abort / trap / halt / reset profile 不展开栈，也不保证执行普通析构。
 - OOM 默认不 unwind；只有目标明确把 OOM 映射到 panic-unwind 时，才执行 panic-unwind 清理。
 

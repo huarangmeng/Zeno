@@ -25,7 +25,7 @@ fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
 }
 
 fn secondByte(bytes: ArraySlice<U8>) -> Option<U8> {
-    let first = try firstByte(bytes);
+    val first = try firstByte(bytes);
     if bytes.len < 2 {
         return None;
     }
@@ -33,12 +33,12 @@ fn secondByte(bytes: ArraySlice<U8>) -> Option<U8> {
 }
 
 fn parseByte(value: U32) -> Result<U8, ParseError> {
-    let byte = try U8.fromChecked(value).okOr(ParseError.OutOfRange);
+    val byte = try U8.fromChecked(value).okOr(ParseError.OutOfRange);
     return Ok(byte);
 }
 
 fn parseByteLazy(value: U32) -> Result<U8, ParseError> {
-    let byte = try U8.fromChecked(value).okOrElse(() => ParseError.OutOfRange);
+    val byte = try U8.fromChecked(value).okOrElse(() => ParseError.OutOfRange);
     return Ok(byte);
 }
 
@@ -51,6 +51,6 @@ fn readRaw() -> Result<U8, IoError> {
 }
 
 fn readMapped() -> Result<U8, ParseError> {
-    let byte = try readRaw().mapErr(ParseError.Io);
+    val byte = try readRaw().mapErr(ParseError.Io);
     return Ok(byte);
 }

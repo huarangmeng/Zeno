@@ -38,20 +38,20 @@ fn inspect(value: U16) -> U16 {
 }
 
 fn main() -> I32 {
-    let auto = AutoEntry { flag: true, id: 9, kind: 1 };
-    let source = SourceEntry { hotA: 1, hotB: 2, coldFlag: false };
-    let point = CPoint { x: 1.0, y: 2.0 };
+    val auto = AutoEntry { flag: true, id: 9, kind: 1 };
+    val source = SourceEntry { hotA: 1, hotB: 2, coldFlag: false };
+    val point = CPoint { x: 1.0, y: 2.0 };
     var header = Header { tag: 4, length: 20 };
-    let fd = FileDescriptor { value: 3 };
+    val fd = FileDescriptor { value: 3 };
 
-    let length = inspect(header.length);
+    val length = inspect(header.length);
     header.length = 24;
 
-    let ignoredAuto = auto.id;
-    let ignoredSource = source.hotA + source.hotB;
-    let ignoredPoint = point.x;
-    let ignoredLength = length;
-    let ignoredHeader = header.tag;
+    val ignoredAuto = auto.id;
+    val ignoredSource = source.hotA + source.hotB;
+    val ignoredPoint = point.x;
+    val ignoredLength = length;
+    val ignoredHeader = header.tag;
 
     return fd.value;
 }

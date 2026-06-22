@@ -22,9 +22,9 @@ impl OsHandle {
 trust impl Send for OsHandle {}
 
 fn main() -> Result<Unit, Error> {
-    let handle = OsHandle { raw: 3 };
-    let thread = try Thread.spawn(move () -> Result<Unit, Error> {
-        let ignored = handle.raw;
+    val handle = OsHandle { raw: 3 };
+    val thread = try Thread.spawn(move () -> Result<Unit, Error> {
+        val ignored = handle.raw;
         return Ok(());
     });
     try move thread.join();

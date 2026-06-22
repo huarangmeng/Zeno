@@ -1,0 +1,9 @@
+// category: compile-fail
+// profile: hosted
+// purpose: cancellation checks must use explicit TaskContext instead of a hidden current-task query
+
+module tests.fail.hiddenCurrentTaskCancelQuery;
+
+fn bad() -> Bool {
+    return Task.isCancellationRequested(); // expected-error: cancellation checks require an explicit TaskContext parameter
+}

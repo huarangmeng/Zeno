@@ -23,6 +23,7 @@ handler = "kernel.oomHandler"
 
 [trust]
 ffi = true
+rawMemory = true
 hardware = true
 inlineAsm = true
 interrupts = true

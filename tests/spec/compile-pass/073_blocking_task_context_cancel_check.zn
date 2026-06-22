@@ -1,0 +1,17 @@
+// category: compile-pass
+// profile: hosted
+// purpose: blocking tasks can check TaskContext between blocking operations
+
+module tests.pass.blockingTaskContextCancelCheck;
+
+fn cancelBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelStatus, IoError> {
+    val task = try runtime.spawnBlocking(move (ctx: TaskContext) -> Result<Bytes, IoError> {
+        if ctx.isCancellationRequested() {
+            return Err(IoError.Cancelled);
+        }
+
+        return readFileSync(move path);
+    });
+
+    return Ok(move task.cancel());
+}

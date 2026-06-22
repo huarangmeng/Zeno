@@ -7,29 +7,29 @@ module tests.pass.panicHandlerStackFrames;
 import core.panic.PanicInfo;
 
 fn countFrames(info: PanicInfo) -> USize {
-    let message = info.message();
-    let location = info.location();
-    let file = location.file();
-    let function = location.function();
-    let line = location.line();
-    let column = location.column();
+    val message = info.message();
+    val location = info.location();
+    val file = location.file();
+    val function = location.function();
+    val line = location.line();
+    val column = location.column();
 
-    let ignoredMessage = message;
-    let ignoredFile = file;
-    let ignoredFunction = function;
-    let ignoredLine = line;
-    let ignoredColumn = column;
+    val ignoredMessage = message;
+    val ignoredFile = file;
+    val ignoredFunction = function;
+    val ignoredLine = line;
+    val ignoredColumn = column;
 
     var frames = info.stack();
     var count: USize = 0;
 
     for move frame in frames {
-        let ip = frame.instructionPointer();
-        let ra = frame.returnAddress();
-        let symbol = frame.symbol();
-        let ignoredIp = ip;
-        let ignoredRa = ra;
-        let ignoredSymbol = symbol;
+        val ip = frame.instructionPointer();
+        val ra = frame.returnAddress();
+        val symbol = frame.symbol();
+        val ignoredIp = ip;
+        val ignoredRa = ra;
+        val ignoredSymbol = symbol;
         count = count + 1;
     }
 

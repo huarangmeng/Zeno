@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: spawnBlocking consumes named jobs and requires call-site move
+
+module tests.fail.spawnBlockingRequiresMoveJob;
+
+fn bad(move runtime: Runtime) -> Result<Unit, Error> {
+    val job = () -> Result<Unit, Error> {
+        return work();
+    };
+
+    val task = try runtime.spawnBlocking(job); // expected-error: spawnBlocking consumes the job; use move job
+    val ignored = task;
+    return Ok(());
+}

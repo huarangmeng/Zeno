@@ -9,6 +9,6 @@ fn withoutHeader(bytes: ArraySlice<U8>) -> ArraySlice<U8> {
 }
 
 fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
-    let body = withoutHeader(bytes);
+    val body = withoutHeader(bytes);
     return body.get(0);
 }

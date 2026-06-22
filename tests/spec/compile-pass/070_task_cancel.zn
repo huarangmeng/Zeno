@@ -1,0 +1,13 @@
+// category: compile-pass
+// profile: hosted
+// purpose: cancel explicitly settles a task handle by requesting cooperative cancellation
+
+module tests.pass.taskCancel;
+
+fn cancelQueued(move runtime: Runtime, move work: Work) -> Result<TaskCancelStatus, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    return Ok(move task.cancel());
+}

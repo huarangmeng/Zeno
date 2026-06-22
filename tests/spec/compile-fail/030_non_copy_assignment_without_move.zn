@@ -13,7 +13,7 @@ impl Handle {
 }
 
 fn bad() -> U32 {
-    let handle = Handle { id: 1 };
-    let copied = handle;
+    val handle = Handle { id: 1 };
+    val copied = handle;
     return handle.id + copied.id; // expected-error: use of moved value
 }

@@ -5,13 +5,12 @@
 module tests.pass.futureDropCleanupState;
 
 async fn readHeader(move file: File) -> Result<U32, IoError> {
-    defer mut file.closeBestEffort();
-    let value = try await mut file.readU32();
+    val value = try await mut file.readU32();
     return Ok(value);
 }
 
 fn createFuture(move file: File) {
     {
-        let future = readHeader(move file);
+        val future = readHeader(move file);
     } // future is dropped before completion
 }

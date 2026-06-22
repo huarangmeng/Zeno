@@ -28,6 +28,6 @@ fn feed<T>(mut consumer: Consumer<T>, move item: T) {
 
 fn main() {
     var counter = Counter { count: 0 };
-    let event = Event { id: 1 };
+    val event = Event { id: 1 };
     feed(mut counter, event);
 }

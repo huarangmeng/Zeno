@@ -20,7 +20,7 @@ fn bad(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     mut packets.push(Packet { value: 1 });
 
     for move packet in packets {
-        let ignored = packet.value;
+        val ignored = packet.value;
     }
 
     return Ok(packets.len); // expected-error: use of moved collection after consuming for iteration

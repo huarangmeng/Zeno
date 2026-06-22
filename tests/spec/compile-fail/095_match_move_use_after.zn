@@ -22,8 +22,8 @@ fn consume(move job: Job) -> U32 {
 }
 
 fn bad() -> U32 {
-    let state = State.Ready(Job { priority: 1 });
-    let value = match move state {
+    val state = State.Ready(Job { priority: 1 });
+    val value = match move state {
         Ready(job) => consume(move job),
         Done => 0,
     };

@@ -1,4 +1,4 @@
 pub fn main() -> USize {
-    let number: I32 = 7;
+    val number: I32 = 7;
     return describe("zeno") + describe(number);
 }

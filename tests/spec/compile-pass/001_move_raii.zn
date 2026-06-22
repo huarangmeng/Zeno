@@ -17,10 +17,10 @@ fn makeHandle() -> Handle {
 }
 
 fn consume(move handle: Handle) {
-    let ignoredId = handle.id;
+    val ignoredId = handle.id;
 }
 
 fn main() {
-    let handle = makeHandle();
+    val handle = makeHandle();
     consume(move handle);
 }

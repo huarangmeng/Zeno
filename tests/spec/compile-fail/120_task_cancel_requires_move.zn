@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: cancel consumes the task handle and requires move self
+
+module tests.fail.taskCancelRequiresMove;
+
+fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    val status = task.cancel(); // expected-error: cancel consumes the task handle; use move task.cancel()
+    val ignored = status;
+    return Ok(());
+}

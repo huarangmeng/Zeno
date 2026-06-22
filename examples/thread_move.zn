@@ -16,14 +16,14 @@ fn buildWork() -> WorkItem {
 }
 
 fn process(move work: WorkItem) -> Result<Unit, WorkError> {
-    let ignoredId = work.id;
+    val ignoredId = work.id;
     return Ok(());
 }
 
 pub fn demo() -> Result<Unit, WorkError> {
-    let work = buildWork();
+    val work = buildWork();
 
-    let handle = try Thread.spawn(move () -> Result<Unit, WorkError> {
+    val handle = try Thread.spawn(move () -> Result<Unit, WorkError> {
         return process(move work);
     });
 

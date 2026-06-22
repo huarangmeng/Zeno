@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: await task consumes the task handle
+
+module tests.fail.awaitTaskUseAfter;
+
+async fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    try await task;
+    try await task; // expected-error: task handle was consumed by await
+    return Ok(());
+}

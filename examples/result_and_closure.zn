@@ -23,8 +23,8 @@ fn mapCopy<T: Copy, U: Copy>(
 }
 
 pub fn demo(input: ArraySlice<I32>, mut output: ArraySlice<I32>) -> Result<Unit, MapError> {
-    let bias = 7;
-    let addBias = (x: I32) => x + bias;
+    val bias = 7;
+    val addBias = (x: I32) => x + bias;
     try mapCopy(input, mut output, addBias);
     return Ok(());
 }

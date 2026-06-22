@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: Zeno v1 uses RAII/destroy instead of a defer statement
+
+module tests.fail.deferKeywordRemoved;
+
+fn bad() -> Unit {
+    defer cleanup(); // expected-error: defer is not a Zeno keyword; use a RAII guard with destroy
+    return;
+}

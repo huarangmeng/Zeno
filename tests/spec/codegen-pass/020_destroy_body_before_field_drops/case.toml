@@ -1,0 +1,48 @@
+# category: codegen-pass
+# purpose: full object drop runs destroy before dropping fields in source reverse order
+
+[source]
+file = "src/main.zn"
+text = '''
+struct Resource {
+    id: U32,
+}
+
+impl Resource {
+    destroy {
+        traceResource(self.id);
+    }
+}
+
+struct Pair {
+    left: Resource,
+    right: Resource,
+}
+
+impl Pair {
+    destroy {
+        tracePair();
+    }
+}
+
+fn run() {
+    val pair = Pair {
+        left: Resource { id: 1 },
+        right: Resource { id: 2 },
+    };
+}
+'''
+
+[expect.mir]
+contains = [
+    "cleanup.drop pair",
+    "call Pair.destroy",
+    "cleanup.drop pair.right",
+    "cleanup.drop pair.left",
+    "call Resource.destroy pair.right",
+    "call Resource.destroy pair.left",
+]
+forbid = [
+    "cleanup.drop pair.right before Pair.destroy",
+    "cleanup.drop pair.left before pair.right",
+]

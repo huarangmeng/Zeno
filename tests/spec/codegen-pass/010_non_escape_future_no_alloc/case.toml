@@ -5,13 +5,13 @@
 file = "src/main.zn"
 text = '''
 async fn parse(move reader: Reader) -> Result<U32, IoError> {
-    let header = try await mut reader.readU32();
+    val header = try await mut reader.readU32();
     return Ok(header);
 }
 
 fn run(move reader: Reader, mut executor: InlineExecutor) -> Result<U32, IoError> {
-    let future = parse(move reader);
-    return executor.blockOn(move future);
+    val future = parse(move reader);
+    return mut executor.blockOn(move future);
 }
 '''
 

@@ -23,7 +23,7 @@ fn duplicateStatic<T: Duplicable>(value: T) -> T {
 }
 
 fn main() -> U32 {
-    let token = Token { id: 7 };
-    let copied = duplicateStatic(token);
+    val token = Token { id: 7 };
+    val copied = duplicateStatic(token);
     return copied.id;
 }

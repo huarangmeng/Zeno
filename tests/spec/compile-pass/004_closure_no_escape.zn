@@ -26,9 +26,9 @@ fn take(move token: Token) -> U64 {
 }
 
 fn main() {
-    let bias = 10;
-    let shortResult = apply(5, (x: I32) => x + bias);
-    let blockResult = apply(5, (x: I32) -> I32 {
+    val bias = 10;
+    val shortResult = apply(5, (x: I32) => x + bias);
+    val blockResult = apply(5, (x: I32) -> I32 {
         return x * 2;
     });
 
@@ -38,11 +38,11 @@ fn main() {
     };
     callTwice(mut inc);
 
-    let token = Token { value: 9 };
-    let movedValue = consumeOnce(move () -> U64 {
+    val token = Token { value: 9 };
+    val movedValue = consumeOnce(move () -> U64 {
         return take(move token);
     });
 
-    let ignoredCopy = shortResult + blockResult + count;
-    let ignoredMove = movedValue;
+    val ignoredCopy = shortResult + blockResult + count;
+    val ignoredMove = movedValue;
 }

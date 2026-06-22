@@ -22,6 +22,7 @@ strategy = "abort"
 
 [trust]
 ffi = false
+rawMemory = false
 hardware = false
 inlineAsm = false
 interrupts = false

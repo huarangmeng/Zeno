@@ -15,7 +15,7 @@ impl Handle {
 fn consume(move handle: Handle) {}
 
 fn main() {
-    let handle = Handle { id: 1 };
+    val handle = Handle { id: 1 };
     consume(move handle);
     consume(move handle); // expected-error: use of moved value
 }

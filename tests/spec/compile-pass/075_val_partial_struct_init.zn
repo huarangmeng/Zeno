@@ -1,0 +1,17 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: fields of a delayed val aggregate can be initialized before the full value is used
+
+module tests.pass.valPartialStructInit;
+
+struct Header {
+    magic: U32,
+    version: U16,
+}
+
+fn buildHeader() -> Header {
+    val header: Header;
+    header.magic = 0x5A5A;
+    header.version = 1;
+    return header;
+}

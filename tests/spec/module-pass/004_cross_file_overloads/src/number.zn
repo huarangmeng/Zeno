@@ -1,4 +1,4 @@
 fn describe(value: I32) -> USize {
-    let ignored = value;
+    val ignored = value;
     return 4;
 }

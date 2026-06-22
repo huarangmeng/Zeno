@@ -1,0 +1,15 @@
+// category: compile-fail
+// profile: hosted
+// purpose: blockOn consumes the task handle and requires call-site move for named tasks
+
+module tests.fail.blockOnRequiresMoveTask;
+
+fn bad() -> Result<Unit, WorkError> {
+    var runtime = try Runtime.withWorkerCount(8);
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return work();
+    });
+
+    try mut runtime.blockOn(task); // expected-error: blockOn consumes the task handle; use move task
+    return Ok(());
+}

@@ -1,6 +1,6 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: if-let and match support move and mut pattern modes for non-Copy payloads
+// purpose: if-val and match support move and mut pattern modes for non-Copy payloads
 
 module tests.pass.patternMoveAndMut;
 
@@ -27,14 +27,14 @@ fn consume(move job: Job) -> U32 {
 }
 
 fn takeOptional(maybe: Maybe<Job>) -> U32 {
-    if let move Maybe.Some(job) = maybe {
+    if val move Maybe.Some(job) = maybe {
         return consume(move job);
     }
     return 0;
 }
 
 fn bump(mut state: State) -> U32 {
-    if let mut State.Ready(job) = state {
+    if val mut State.Ready(job) = state {
         job.priority = job.priority + 1;
         return job.priority;
     }

@@ -1,0 +1,12 @@
+// category: compile-pass
+// profile: freestanding
+// trust.rawMemory: true
+// purpose: raw memory operations are allowed only inside explicit trust boundaries with manifest capability
+
+module tests.pass.trustRawMemory;
+
+fn readByte(address: USize) -> U8 {
+    return trust {
+        RawPointer<U8>.fromAddress(address).read()
+    };
+}

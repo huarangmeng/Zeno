@@ -1,5 +1,5 @@
 # category: codegen-pass
-# purpose: try lowers to ordinary branch plus RAII/defer cleanup, not exceptions
+# purpose: try lowers to ordinary branch plus RAII cleanup, not exceptions
 
 [source]
 file = "src/main.zn"
@@ -13,11 +13,19 @@ impl Buffer {
     }
 }
 
-fn parse(input: ArraySlice<U8>) -> Result<U32, ParseError> {
-    let buffer = Buffer { bytes: Vector<U8>.withCapacity(16) };
-    defer metrics.recordParseAttempt();
+struct ParseAttemptMetric {}
 
-    let value = try parseHeader(input);
+impl ParseAttemptMetric {
+    destroy {
+        metrics.recordParseAttempt();
+    }
+}
+
+fn parse(input: ArraySlice<U8>) -> Result<U32, ParseError> {
+    val buffer = Buffer { bytes: Vector<U8>.withCapacity(16) };
+    val attempt = ParseAttemptMetric {};
+
+    val value = try parseHeader(input);
     return Ok(value);
 }
 '''
@@ -25,7 +33,7 @@ fn parse(input: ArraySlice<U8>) -> Result<U32, ParseError> {
 [expect.mir]
 contains = [
     "switch discriminant(parseHeader.result)",
-    "cleanup.defer metrics.recordParseAttempt",
+    "cleanup.drop attempt",
     "cleanup.drop buffer",
     "return Err",
 ]

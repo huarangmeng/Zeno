@@ -9,7 +9,7 @@ async fn other() -> Result<Unit, IoError> {
 }
 
 async fn bad(move file: File) -> Result<U32, IoError> {
-    let pending = mut file.readU32(); // expected-error: async mut self call must be immediately awaited
+    val pending = mut file.readU32(); // expected-error: async mut self call must be immediately awaited
     try await other();
     return try await pending;
 }

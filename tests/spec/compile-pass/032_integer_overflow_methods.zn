@@ -5,14 +5,14 @@
 module tests.pass.integerOverflowMethods;
 
 fn wrappingAdd() -> U8 {
-    let a: U8 = 250;
-    let b: U8 = 10;
+    val a: U8 = 250;
+    val b: U8 = 10;
     return a + b;
 }
 
 fn checkedOverflow() -> Bool {
-    let a: U8 = 250;
-    let b: U8 = 10;
+    val a: U8 = 250;
+    val b: U8 = 10;
     return match a.checkedAdd(b) {
         Some(_) => false,
         None => true,
@@ -20,15 +20,15 @@ fn checkedOverflow() -> Bool {
 }
 
 fn saturatingAdd() -> U8 {
-    let a: U8 = 250;
-    let b: U8 = 10;
+    val a: U8 = 250;
+    val b: U8 = 10;
     return a.saturatingAdd(b);
 }
 
 fn overflowingAdd() -> Bool {
-    let a: U8 = 250;
-    let b: U8 = 10;
-    let (value, overflowed) = a.overflowingAdd(b);
-    let ignored = value;
+    val a: U8 = 250;
+    val b: U8 = 10;
+    val (value, overflowed) = a.overflowingAdd(b);
+    val ignored = value;
     return overflowed;
 }

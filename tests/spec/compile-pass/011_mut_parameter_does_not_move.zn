@@ -23,6 +23,6 @@ fn consume(move counter: Counter) -> U32 {
 fn main() {
     var counter = Counter { value: 1 };
     bump(mut counter);
-    let value = consume(move counter);
-    let ignoredValue = value;
+    val value = consume(move counter);
+    val ignoredValue = value;
 }

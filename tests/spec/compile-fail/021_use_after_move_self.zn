@@ -20,7 +20,7 @@ impl Counter {
 
 fn main() {
     var counter = Counter { value: 1 };
-    let done = move counter.finish();
-    let late = counter.get(); // expected-error: receiver used after move self call
-    let ignored = done + late;
+    val done = move counter.finish();
+    val late = counter.get(); // expected-error: receiver used after move self call
+    val ignored = done + late;
 }

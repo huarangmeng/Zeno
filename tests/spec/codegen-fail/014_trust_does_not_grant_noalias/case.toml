@@ -1,0 +1,23 @@
+# category: codegen-fail
+# purpose: trust blocks must not create alias facts that are not expressed by types or APIs
+
+[source]
+file = "src/main.zn"
+text = '''
+fn writeBoth(mut bytes: ArraySlice<U8>, address: USize) {
+    trust {
+        RawPointer<U8>.fromAddress(address).write(1);
+    };
+
+    bytes[0] = 2;
+}
+'''
+
+[bad_codegen]
+llvm = [
+    "bytes.ptr noalias because trust",
+    "assume noalias RawPointer address bytes.ptr",
+]
+
+[expect]
+error = "trust does not imply noalias or provenance facts"

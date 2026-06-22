@@ -1,0 +1,23 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: delayed val must be definitely initialized on every path before use
+
+module tests.fail.valMaybeUninitialized;
+
+struct Handle {
+    id: U32,
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn bad(flag: Bool) -> Handle {
+    val handle: Handle;
+
+    if flag {
+        handle = makeHandle(1);
+    }
+
+    return handle; // expected-error: handle is not definitely initialized on every path
+}

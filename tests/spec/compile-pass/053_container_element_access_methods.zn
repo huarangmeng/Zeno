@@ -28,14 +28,14 @@ fn demo(mut allocator: GlobalAllocator) -> Result<U32, AllocError> {
     mut packets.push(Packet { value: 1 });
     mut packets.push(Packet { value: 2 });
 
-    let firstValue = packets[0].value;
+    val firstValue = packets[0].value;
     normalize(mut packets[0]);
 
-    let old = mut packets.replaceAt(1, Packet { value: 10 });
-    let removed = mut packets.removeAt(0);
+    val old = mut packets.replaceAt(1, Packet { value: 10 });
+    val removed = mut packets.removeAt(0);
 
     mut packets.push(Packet { value: 20 });
-    let fast = mut packets.swapRemove(0);
+    val fast = mut packets.swapRemove(0);
 
     return Ok(firstValue + usePacket(move old) + usePacket(move removed) + usePacket(move fast));
 }

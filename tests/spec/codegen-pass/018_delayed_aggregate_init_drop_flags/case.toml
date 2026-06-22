@@ -1,0 +1,43 @@
+# category: codegen-pass
+# purpose: delayed aggregate initialization drops only initialized fields on failure
+
+[source]
+file = "src/main.zn"
+text = '''
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        os.close(self.fd);
+    }
+}
+
+struct Pair {
+    left: File,
+    right: File,
+}
+
+fn openPair(pathA: StringSlice, pathB: StringSlice) -> Result<Pair, IoError> {
+    val pair: Pair;
+    pair.left = try File.open(pathA);
+    pair.right = try File.open(pathB);
+    return Ok(pair);
+}
+'''
+
+[expect.mir]
+contains = [
+    "dropFlag pair.left",
+    "dropFlag pair.right",
+    "setDropFlag pair.left true",
+    "try File.open(pathB) err -> cleanup.drop pair.left",
+    "setDropFlag pair.right true",
+    "move pair -> clear pair.left pair.right",
+]
+forbid = [
+    "drop uninitialized pair.right",
+    "run Pair.destroy before full initialization",
+    "doubleDrop pair.left",
+]

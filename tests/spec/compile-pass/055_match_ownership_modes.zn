@@ -48,9 +48,9 @@ fn bump(mut state: State) -> U32 {
 }
 
 fn main() -> U32 {
-    let a = inspect(State.Ready(Job { priority: 1 }));
-    let b = finish(State.Ready(Job { priority: 2 }));
+    val a = inspect(State.Ready(Job { priority: 1 }));
+    val b = finish(State.Ready(Job { priority: 2 }));
     var state = State.Ready(Job { priority: 3 });
-    let c = bump(mut state);
+    val c = bump(mut state);
     return a + b + c;
 }

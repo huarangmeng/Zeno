@@ -5,7 +5,7 @@
 module tests.fail.scopedAllocatorOwnerFutureEscape;
 
 async fn bad(move arena: ArenaAllocator) -> USize {
-    let bytes = Vector<U8>.withCapacityIn(1024, mut arena);
+    val bytes = Vector<U8>.withCapacityIn(1024, mut arena);
     await tick();
     return bytes.len; // expected-error: scoped allocation cannot cross await into future state
 }

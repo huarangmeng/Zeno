@@ -1,0 +1,42 @@
+# category: codegen-fail
+# purpose: codegen must not drop fields before running the owner destroy body
+
+[source]
+file = "src/main.zn"
+text = '''
+struct Resource {
+    id: U32,
+}
+
+impl Resource {
+    destroy {
+        traceResource(self.id);
+    }
+}
+
+struct Pair {
+    left: Resource,
+    right: Resource,
+}
+
+impl Pair {
+    destroy {
+        tracePair();
+    }
+}
+
+fn run() {
+    val pair = Pair {
+        left: Resource { id: 1 },
+        right: Resource { id: 2 },
+    };
+}
+'''
+
+[bad_mir]
+contains = [
+    "cleanup.drop pair.right before Pair.destroy",
+]
+
+[expect]
+error = "destroy body must run before field drops"

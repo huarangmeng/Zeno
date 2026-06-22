@@ -19,7 +19,7 @@ fn inspect(handle: Handle) -> U32 {
 fn consume(move handle: Handle) {}
 
 fn main() {
-    let handle = Handle { id: 7 };
-    let id = inspect(handle);
+    val handle = Handle { id: 7 };
+    val id = inspect(handle);
     consume(move handle);
 }

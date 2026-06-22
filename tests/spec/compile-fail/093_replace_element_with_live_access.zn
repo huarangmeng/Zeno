@@ -14,7 +14,7 @@ fn bad(mut allocator: GlobalAllocator) -> USize {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
     mut bytes.push(1);
 
-    let view = bytes.asSlice();
-    let old = mut bytes.replaceAt(0, 2); // expected-error: cannot replace element while a dependent access is live
+    val view = bytes.asSlice();
+    val old = mut bytes.replaceAt(0, 2); // expected-error: cannot replace element while a dependent access is live
     return useSlice(view) + old as USize;
 }

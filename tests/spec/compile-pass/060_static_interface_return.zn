@@ -23,6 +23,6 @@ fn makeWriter() -> Writer {
 }
 
 fn read() -> USize {
-    let writer = makeWriter();
+    val writer = makeWriter();
     return writer.bytesWritten();
 }

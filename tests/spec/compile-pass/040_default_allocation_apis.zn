@@ -9,17 +9,17 @@ struct Packet {
 }
 
 fn main() {
-    let page = Array<U8>.filled(4, 0);
+    val page = Array<U8>.filled(4, 0);
     var bytes = Vector<U8>.withCapacity(4);
     mut bytes.push(1);
 
-    let boxed = Box.new(Packet { value: 2 });
-    let shared = Shared.new(Packet { value: 3 });
-    let text = String.from("hello");
+    val boxed = Box.new(Packet { value: 2 });
+    val shared = Shared.new(Packet { value: 3 });
+    val text = String.from("hello");
 
-    let ignoredPage = page;
-    let ignoredBytes = bytes;
-    let ignoredBox = boxed;
-    let ignoredShared = shared;
-    let ignoredText = text;
+    val ignoredPage = page;
+    val ignoredBytes = bytes;
+    val ignoredBox = boxed;
+    val ignoredShared = shared;
+    val ignoredText = text;
 }

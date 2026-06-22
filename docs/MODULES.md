@@ -80,7 +80,7 @@ fn connect() -> Client {
 
 ```zn
 pub fn main() -> U64 {
-    let client = connect();
+    val client = connect();
     return client.id;
 }
 ```
@@ -144,8 +144,8 @@ src/db/client.zn -> Client
 此时使用模块限定名：
 
 ```zn
-let http: net.http.Client = net.http.connect();
-let db: db.client.Client = db.client.connect();
+val http: net.http.Client = net.http.connect();
+val db: db.client.Client = db.client.connect();
 ```
 
 限定名只在歧义或表达 API 边界时需要，不是日常写法。

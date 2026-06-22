@@ -2,6 +2,8 @@
 
 Zeno 是一门规划中的高性能系统级语言。当前仓库是第一阶段交付物：语言规范、设计约束、示例程序和规格测试草案。
 
+当前优先级是先完成语言设计冻结：语法、类型系统、所有权与访问、错误模型、并发语义、FFI/trust、模块/编译模型、IR 降级约束和诊断规则。标准库文档只保留验证语言能力所需的最小核心边界；完整 `std` API 设计不作为当前阶段目标。
+
 Zeno 的核心目标：
 
 - 可自举：最终用 Zeno 实现 Zeno 编译器前端。
@@ -23,7 +25,7 @@ Zeno 的核心目标：
 - [docs/LAYOUT.md](docs/LAYOUT.md)：结构体布局、ABI 边界、packed 访问和 enum niche 优化。
 - [docs/FFI.md](docs/FFI.md)：外部 ABI、符号导出、C 互操作和 panic 边界。
 - [docs/SAFETY.md](docs/SAFETY.md)：内存安全、数据竞争安全和 `trust` 信任边界模型。
-- [docs/STDLIB.md](docs/STDLIB.md)：核心标准库边界。
+- [docs/STDLIB.md](docs/STDLIB.md)：用于验证语言语义的最小核心标准库边界，不是完整标准库 API 清单。
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md)：OS 线程、任务运行时和 async/Future 模型。
 - [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md)：C++20 + LLVM stage0 与自举路线。
 - [docs/V01_SUBSET.md](docs/V01_SUBSET.md)：v0.1 / stage0 MVP 第一批实现子集。

@@ -1,5 +1,5 @@
 pub fn main() -> I32 {
-    let http: net.http.Client = net.http.connect();
-    let db: db.client.Client = db.client.connect();
+    val http: net.http.Client = net.http.connect();
+    val db: db.client.Client = db.client.connect();
     return http.id + db.id;
 }

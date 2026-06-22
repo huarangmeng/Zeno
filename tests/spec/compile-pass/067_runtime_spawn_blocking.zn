@@ -1,0 +1,13 @@
+// category: compile-pass
+// profile: hosted
+// purpose: spawnBlocking routes synchronous blocking work through a blocking pool and returns a task
+
+module tests.pass.runtimeSpawnBlocking;
+
+async fn readConfig(move runtime: Runtime, move path: Path) -> Result<Bytes, IoError> {
+    val task = try runtime.spawnBlocking(move () -> Result<Bytes, IoError> {
+        return readFileSync(move path);
+    });
+
+    return try await task;
+}

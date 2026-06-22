@@ -9,8 +9,8 @@ async fn compute(value: U32) -> U32 {
 }
 
 fn run(mut executor: InlineExecutor) -> U32 {
-    let future = compute(41);
-    return executor.blockOn(move future);
+    val future = compute(41);
+    return mut executor.blockOn(move future);
 }
 '''
 

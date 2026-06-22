@@ -1,0 +1,14 @@
+// category: compile-pass
+// profile: hosted
+// purpose: detach explicitly settles a task handle without waiting for the result
+
+module tests.pass.taskDetach;
+
+fn launchBackground(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    move task.detach();
+    return Ok(());
+}

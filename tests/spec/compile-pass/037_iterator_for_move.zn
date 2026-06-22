@@ -20,7 +20,7 @@ impl Iterator<U32> for Counter {
         if self.current >= self.end {
             return None;
         }
-        let value = self.current;
+        val value = self.current;
         self.current = self.current + 1;
         return Some(value);
     }

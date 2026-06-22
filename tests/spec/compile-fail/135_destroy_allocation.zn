@@ -1,0 +1,16 @@
+// category: compile-fail
+// profile: hosted
+// purpose: destroy blocks are implicit noAlloc cleanup
+
+module tests.fail.destroyAllocation;
+
+struct Guard {}
+
+impl Guard {
+    destroy {
+        val message = String.from("closing"); // expected-error: destroy cannot allocate
+        consume(move message);
+    }
+}
+
+fn consume(move text: String) {}

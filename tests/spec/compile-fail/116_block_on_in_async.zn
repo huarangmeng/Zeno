@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: hosted
+// purpose: async code must await tasks instead of blocking the runtime thread
+
+module tests.fail.blockOnInAsync;
+
+async fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    try mut runtime.blockOn(move task); // expected-error: blockOn is only allowed in synchronous contexts; use await task
+    return Ok(());
+}

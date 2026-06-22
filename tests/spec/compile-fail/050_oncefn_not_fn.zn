@@ -17,7 +17,7 @@ fn readOnly(f: Fn<U32>) -> U32 {
 }
 
 fn bad() -> U32 {
-    let token = Token { value: 1 };
+    val token = Token { value: 1 };
     return readOnly(move () -> U32 {
         return take(move token); // expected-error: consuming closure implements OnceFn, not Fn
     });

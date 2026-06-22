@@ -5,14 +5,14 @@
 file = "src/main.zn"
 text = '''
 async fn readHeader(move file: File) -> Result<U32, IoError> {
-    defer metrics.endRead();
-    let header = try await mut file.readU32();
+    val readMetric = ReadMetric.start();
+    val header = try await mut file.readU32();
     return Ok(header);
 }
 
 fn cancel(move file: File) {
     {
-        let future = readHeader(move file);
+        val future = readHeader(move file);
     }
 }
 '''
@@ -21,8 +21,9 @@ fn cancel(move file: File) {
 contains = [
     "FutureState readHeader",
     "state beforeAwait initialized file",
+    "state beforeAwait initialized readMetric",
     "futureDrop switch state",
-    "cleanup.defer metrics.endRead",
+    "cleanup.drop readMetric",
     "cleanup.drop file",
 ]
 forbid = [

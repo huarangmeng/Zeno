@@ -16,7 +16,7 @@ fn main(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     var before: USize = 0;
 
     {
-        let slice = bytes.asSlice();
+        val slice = bytes.asSlice();
         before = readLen(slice);
     }
 

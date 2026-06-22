@@ -27,7 +27,7 @@ fn findUser(id: U64) -> Option<User> {
 }
 
 fn getUser(id: U64) -> Result<User, LookupError> {
-    let user = try findUser(id).okOrElse(() => LookupError.Missing(id));
+    val user = try findUser(id).okOrElse(() => LookupError.Missing(id));
     return Ok(user);
 }
 
@@ -36,6 +36,6 @@ fn userOrDefault(id: U64) -> User {
 }
 
 fn readUser(id: U64) -> Result<User, ConfigError> {
-    let user = try getUser(id).mapErr((error: LookupError) => ConfigError.Lookup(error));
+    val user = try getUser(id).mapErr((error: LookupError) => ConfigError.Lookup(error));
     return Ok(user);
 }

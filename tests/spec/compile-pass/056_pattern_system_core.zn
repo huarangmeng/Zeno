@@ -1,6 +1,6 @@
 // category: compile-pass
 // profile: freestanding
-// purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-let, and while-let
+// purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-val, and while-val
 
 module tests.pass.patternSystemCore;
 
@@ -32,7 +32,7 @@ impl Counter {
             return Maybe.None;
         }
 
-        let value = self.nextValue;
+        val value = self.nextValue;
         self.nextValue = self.nextValue - 1;
         return Maybe.Some(value);
     }
@@ -50,13 +50,13 @@ fn classify(event: Event) -> U32 {
 }
 
 fn destructure(point: Point, pair: (U32, U32)) -> U32 {
-    let Point { x, y } = point;
-    let (left, right) = pair;
+    val Point { x, y } = point;
+    val (left, right) = pair;
     return x + y + left + right;
 }
 
 fn optional(maybe: Maybe<U32>) -> U32 {
-    if let Maybe.Some(value) = maybe {
+    if val Maybe.Some(value) = maybe {
         return value;
     } else {
         return 0;
@@ -65,7 +65,7 @@ fn optional(maybe: Maybe<U32>) -> U32 {
 
 fn sumCounter(mut counter: Counter) -> U32 {
     var sum: U32 = 0;
-    while let Maybe.Some(value) = counter.next() {
+    while val Maybe.Some(value) = counter.next() {
         sum = sum + value;
     }
     return sum;

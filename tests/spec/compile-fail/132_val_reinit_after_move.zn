@@ -1,0 +1,30 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: val cannot be reinitialized after its value has been moved out
+
+module tests.fail.valReinitAfterMove;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn consume(move handle: Handle) -> Unit {
+    return;
+}
+
+fn bad() -> Handle {
+    val handle = makeHandle(1);
+    val old = handle;
+    consume(move old);
+
+    handle = makeHandle(2); // expected-error: val cannot be reinitialized after move
+    return handle;
+}

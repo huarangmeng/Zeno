@@ -27,15 +27,15 @@ impl Identified for Service {
 impl ThreadIdentified for Service {}
 
 fn makeService(mut allocator: GlobalAllocator) -> Box<ThreadIdentified> {
-    let service = Service { idValue: 9 };
+    val service = Service { idValue: 9 };
     return Box.newIn(move service, mut allocator);
 }
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let service = makeService(mut allocator);
-    let handle = try Thread.spawn(move () -> U32 {
+    val service = makeService(mut allocator);
+    val handle = try Thread.spawn(move () -> U32 {
         return service.id();
     });
-    let ignored = try move handle.join();
+    val ignored = try move handle.join();
     return Ok(());
 }

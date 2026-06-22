@@ -1,0 +1,44 @@
+# category: codegen-pass
+# purpose: assigning to maybe-initialized var conditionally drops the old value after RHS success
+
+[source]
+file = "src/main.zn"
+text = '''
+struct File {
+    fd: I32,
+}
+
+impl File {
+    destroy {
+        os.close(self.fd);
+    }
+}
+
+fn replaceMaybe(flag: Bool, pathA: StringSlice, pathB: StringSlice) -> Result<File, IoError> {
+    var file: File;
+
+    if flag {
+        file = try File.open(pathA);
+    }
+
+    file = try File.open(pathB);
+    return Ok(file);
+}
+'''
+
+[expect.mir]
+contains = [
+    "dropFlag file",
+    "if flag then setDropFlag file true",
+    "rhsTemp = try File.open(pathB)",
+    "try File.open(pathB) err -> cleanup.conditionalDrop file",
+    "rhs ok -> conditionalDrop old file",
+    "move rhsTemp -> file",
+    "setDropFlag file true",
+    "move file -> setDropFlag file false",
+]
+forbid = [
+    "drop old file before rhsTemp",
+    "drop uninitialized file",
+    "doubleDrop file",
+]

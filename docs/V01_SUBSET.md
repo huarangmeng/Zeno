@@ -38,7 +38,7 @@
 - 基础整数、浮点、`Bool`、`Char`、`Unit`、`Never`。
 - `struct`、`enum`、`interface`、`impl`。
 - 默认 Auto layout、`@layout(Source)`、`@layout(C)`、`@layout(Packed(N))`。
-- `let`、`var`、块、`if`、`while`、`for`、基础 `match`。
+- `val`、`var`、块、`if`、`while`、`for`、基础 `match`。
 - 基础 pattern、穷尽性检查、只读 / `mut` / `move` enum payload 访问。
 - 闭包语法：`(params) -> T { ... }` 和 `(params) => expr`。
 - `Fn` / `MutFn` / `OnceFn` 能力推导。
@@ -50,7 +50,7 @@
 - 默认只读访问、`mut` 唯一可写访问。
 - `self`、`mut self`、`move self` 接收者。
 - 初始化检查、move 后不可用、部分初始化 drop flags。
-- RAII 销毁 lowering、`defer` cleanup。
+- RAII 销毁 lowering。
 - `destroy` 语义：编译器调用、不可直接调用、不能 `try`、不能移出非 `Copy` 字段。
 - 访问逃逸检查，包括视图不能长期保存。
 
@@ -97,7 +97,7 @@
 
 - `trust` 块和 `trust impl`。
 - `trust extern`。
-- manifest trust 能力检查和 trust 报告基础记录。
+- manifest trust 能力检查和 trust 报告基础记录，包括 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts` 和 `threadSafety` 类别。
 - `@export("symbol", abi: C)`。
 - C-compatible 签名检查。
 - 导出符号唯一性。
@@ -115,7 +115,7 @@
 
 - HIR 保留所有权、访问区域、布局、泛型约束、trust 边界和 profile 信息。
 - MIR 使用显式 CFG、locals、places、operands、rvalues、drop flags 和 cleanup edges。
-- `try`、RAII、`defer`、panic/OOM 终点都必须进入 MIR verifier。
+- `try`、RAII、panic/OOM 终点都必须进入 MIR verifier。
 - 单态化后再进入 LLVM lowering。
 - `mut` / `move` 的别名事实必须由 MIR 证明后才能发 LLVM `noalias`、`nocapture`、`readonly`。
 - 连续集合遍历、非逃逸闭包、静态接口参数和静态接口返回不得生成隐藏堆分配或接口表派发。

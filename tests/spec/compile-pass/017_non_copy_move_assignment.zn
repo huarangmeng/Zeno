@@ -17,8 +17,8 @@ fn consume(move handle: Handle) -> U32 {
 }
 
 fn main() {
-    let handle = Handle { id: 1 };
-    let moved = handle;
-    let id = consume(move moved);
-    let ignored = id;
+    val handle = Handle { id: 1 };
+    val moved = handle;
+    val id = consume(move moved);
+    val ignored = id;
 }

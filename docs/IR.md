@@ -159,7 +159,7 @@ Rvalue  = use(operand)
 - `trap`
 - `unreachable`
 
-`try`、`match`、`if`、`for`、`defer` 和 RAII 都必须降低为普通控制流，不使用异常作为常规错误流。
+`try`、`match`、`if`、`for` 和 RAII 都必须降低为普通控制流，不使用异常作为常规错误流。
 
 ## 7. RAII 与清理边
 
@@ -171,8 +171,7 @@ MIR lowering 规则：
 - 完全初始化后设置 drop flag。
 - move 出去后清除 drop flag。
 - 部分初始化聚合为每个需要销毁的字段维护状态。
-- 正常离开作用域按源码声明逆序销毁。
-- `defer` 按注册逆序执行，并在 RAII 字段销毁前运行。
+- 正常离开作用域按源码声明逆序销毁；未初始化或已移动的 local 由 drop flag 跳过。
 - `try` 的提前返回边必须连接到当前作用域清理链。
 - `panic.strategy = "abort"` 或 `"trap"` 时，panic 冷路径不生成 unwind 清理。
 - `panic.strategy = "unwind"` 时，可能 panic 的 call 必须有 unwind cleanup edge。
@@ -181,18 +180,28 @@ MIR lowering 规则：
 
 - 对已经初始化的 place，先把右侧 lowering 成临时值；右侧所有失败边都跳到当前清理链，不能提前销毁左侧旧值。
 - 右侧成功后，若左侧旧值需要销毁，先运行旧值 drop，再把临时值 move/store 到左侧。
+- 对 `maybe-init` 的 `var` place，右侧成功后根据 drop flag 条件销毁旧值，再写入新值并设置 drop flag；右侧失败边保持原 drop flag。
 - 对未初始化 place，赋值只设置初始化状态，不运行旧值 drop。
+- 对 `val` place，HIR 必须证明赋值目标是确定未初始化且当前路径没有成功初始化过；`maybe-init`、`init` 或 `moved` 的 `val` 赋值必须在 HIR 阶段拒绝。
 - 对 `Copy` 或空 drop 类型，旧值 drop 可被消除，最终降低为 store、memcpy 或标量写入。
 - 赋值目标存在活动只读访问或可写访问时，HIR/MIR 访问检查必须拒绝，不能靠 codegen 猜测。
 - `replaceAt` 这类替换 API 在 MIR 中必须建模为移动出旧元素并返回，不能等价降低为“drop 旧元素再写新元素”。
+
+部分初始化 lowering：
+
+- `val object: Struct; object.field = expr;` / `var object: Struct; object.field = expr;` 在对象未完整初始化时是字段初始化写入。
+- 每个需要销毁的字段有独立 drop flag；字段初始化成功后设置该字段 flag。
+- 全部字段初始化后，对象变成完整初始化；若类型有 `destroy` 块，之后退出作用域按完整对象销毁。
+- 任何字段初始化失败边只清理已经初始化的字段，不运行完整对象的 `destroy` 块。
+- 完整对象被移动后，必须清除对象或字段 drop flag，避免部分字段 double drop。
 
 enum / match lowering：
 
 - `match value` 对 scrutinee 建立只读访问，根据 tag 分支。payload pattern binding 是 payload place 的只读 projection。
 - `match mut value` 对 scrutinee 建立唯一可写访问，根据 tag 分支。payload binding 是 payload place 的 mutable projection，但不是 owning move。
 - `match move value` 先消耗 scrutinee place，根据 tag 分支。被选中 payload binding 是 owning place；未选中 variants 不存在可销毁 payload。
-- `if let` 降低为 refutable pattern test 加 then / else 分支；`while let` 降低为循环头 pattern test 加 body / exit 分支。
-- `let pattern = expr` 只接受 irrefutable pattern；HIR 阶段应拒绝 refutable pattern。
+- `if val` 降低为 refutable pattern test 加 then / else 分支；`while val` 降低为循环头 pattern test 加 body / exit 分支。
+- `val pattern = expr` 只接受 irrefutable pattern；HIR 阶段应拒绝 refutable pattern。
 - struct pattern 降低为字段 projection；tuple pattern 降低为 index projection；嵌套 pattern 递归生成 projection。
 - literal pattern 降低为整数、bool、char 或 unit variant 比较。
 - range pattern 降低为边界比较，不创建 range 对象。
@@ -206,10 +215,13 @@ enum / match lowering：
 
 带 `destroy` 的类型：
 
-- `destroy` 本身不能 `try`。
+- `destroy` 本身不能 `try`、不能 `await`。
+- `destroy` 按隐式 `@noPanic` 和 `@noAlloc` 检查；可能 panic、可能 OOM 或会分配的可达调用必须在 HIR 阶段拒绝。
 - `destroy` 中不能调用返回 `Result` 的失败 API。
 - `destroy` 不是 `move self`，不能移动字段，不能创建逃逸访问。
-- `destroy` body 执行后，仍由编译器销毁字段。
+- 完整对象 drop 顺序必须是：运行该类型的 `destroy` body，然后按源码声明逆序销毁字段；Auto layout 的字段重排不能改变该顺序。
+- 通过 HIR 检查的 `destroy` body 可以在 LLVM 降级中标记为 no-unwind / no-allocation；字段 drop 是否 no-unwind 由字段类型的销毁事实决定。
+- 部分初始化失败路径只清理已经初始化的字段，不运行完整对象的 `destroy` body。
 - 带 `destroy` 的类型进入 `move self` 方法时，方法体中的 `self` 仍有普通 drop obligation；除非整个 `self` 被移动给另一个拥有者，否则退出方法时仍运行 `destroy` 和字段销毁。
 
 ## 8. 访问、别名与逃逸
@@ -343,17 +355,20 @@ switch discriminant(tmp):
 
 - future state enum。
 - 每个状态已初始化的 locals 和字段。
-- 跨 `await` 存活的 `defer`。
+- 跨 `await` 存活的 RAII guard 和其他拥有资源。
 - poll 入口、完成状态、取消 drop 状态。
 - 已经交给 runtime 的 escaped future。
 
 future drop lowering：
 
-- 丢弃未完成 future 时，按当前状态运行需要执行的 `defer`。
-- 然后销毁当前状态中已经初始化且仍拥有的字段。
+- 丢弃未完成 future 时，销毁当前状态中已经初始化且仍拥有的字段。
 - future drop 不能 `await`，不能调用异步清理。
 - 非拥有访问值不能作为独立字段跨 `await` 存入 future 状态。
 - 立即 `await mut receiver.method(...)` 的 async `mut self` 调用应在 MIR 中表示为“future 拥有者字段 + 暂停点内活动可写访问”，不能生成可逃逸的访问 future。
+- `blockOn(move future)` 在 future 不逃逸时应 lowered 为当前函数内的直接 poll 循环或等价内联状态机，不能引入隐藏 heap allocation。`blockOn(move task)` lowered 为显式 runtime wait/park 边界。
+- `Runtime.spawn` / `Runtime.spawnBlocking` 的 `OnceFn<TaskContext, T>` 任务应 lowered 为显式任务上下文参数；上下文指向 runtime 任务控制块中的取消状态。
+- `TaskContext.isCancellationRequested()` 应 lowered 为轻量取消状态读取，不能隐式调用全局当前任务查询、分配、加锁或执行系统调用。
+- `TaskContext` 可以保存在同一任务 future 状态中，但逃逸分析必须拒绝返回、长期存储、线程捕获、子任务捕获和其他逃逸闭包捕获。
 
 禁止访问值逃逸跨 `await` 后，v1 不需要用户可见 `Pin`。future 在未交给 runtime 前按普通 move 规则移动；交给 runtime 后，用户移动的是 task handle。
 
@@ -420,7 +435,7 @@ fn identity(value: Writer) -> Writer {
 接口拥有者：
 
 ```zn
-let writer: Box<Writer> = Box.from(FileWriter.open(path));
+val writer: Box<Writer> = Box.from(FileWriter.open(path));
 ```
 
 `Box<T>` 到 `Box<Interface>` 的擦除转换不能重新分配，也不能移动堆内值。MIR 应把它表示为指针加接口表元数据的重解释。
@@ -452,6 +467,11 @@ FFI lowering 规则：
 - C ABI 边界不能让 panic unwind 穿过。
 - `@layout(C)` 和 C-compatible 类型检查在 HIR 完成，MIR 不再接受不合法 C ABI。
 - 导出函数不能是泛型函数，不能是方法，不能是闭包。
+- extern 调用必须位于 `trust` 边界中，并且该边界必须记录 `ffi` 能力。
+- 裸地址 / 裸指针构造、偏移、解引用和按位重解释必须记录 `rawMemory` 能力。
+- MMIO、端口 I/O、volatile 硬件访问、物理地址映射和链接段控制必须记录 `hardware` 能力。
+- inline asm 必须记录 `inlineAsm` 能力；中断入口和裸调用约定必须记录 `interrupts` 能力。
+- `trust impl Send` / `trust impl Sync` 记录为 `threadSafety` 信任事实，但不能给普通内存访问添加 alias、lifetime 或 alignment 属性。
 
 ## 16. MIR 优化
 
@@ -487,7 +507,9 @@ stage0 至少要有一组简单但可靠的 MIR 优化，release 构建再交给
 - 不能把可能别名的 `mut` 访问错误标为 `noalias`。
 - 不能删除有副作用或可能 panic 的操作。
 - 不能跨 `trust` 边界假设未声明的内存事实。
-- 不能改变 RAII、`defer` 或 cleanup 顺序。
+- `trust` 边界本身不能产生 `noalias`、`nonnull`、`dereferenceable`、更强 alignment、初始化或线程安全事实。
+- 从 `rawMemory` 产生的指针默认具有未知 provenance 和未知别名关系；除非受信 API 明确建模，否则优化器必须保守处理。
+- 不能改变 RAII 或 cleanup 顺序。
 - 不能让 C ABI 边界出现 Zeno 内部异常或 unwinding。
 
 ## 17. LLVM 降级

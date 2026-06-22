@@ -268,6 +268,8 @@ receiver_param  = "self" | "mut" "self" | "move" "self" ;
 return_type     = "->" type ;
 ```
 
+`destroy` 只能写成 `destroy { ... }`，不能带参数、返回类型、泛型参数或 async 标记；它的 no-fail、no-alloc 和 no-panic 语义由语义阶段检查。
+
 参数模式语义：
 
 - 没有模式的参数是只读访问。
@@ -297,23 +299,23 @@ Zeno 块中包含语句。块的最后一个表达式可以作为块值。
 
 ```ebnf
 block           = "{" stmt* expr? "}" ;
-stmt            = let_stmt
+stmt            = val_stmt
                 | var_stmt
                 | return_stmt
                 | break_stmt
                 | continue_stmt
-                | defer_stmt
                 | expr_stmt ;
 
-let_stmt        = "let" pattern type_annotation? "=" expr ";" ;
-var_stmt        = "var" pattern type_annotation? "=" expr ";" ;
+val_stmt        = "val" pattern type_annotation? ("=" expr)? ";" ;
+var_stmt        = "var" pattern type_annotation? ("=" expr)? ";" ;
 type_annotation = ":" type ;
 return_stmt     = "return" expr? ";" ;
 break_stmt      = "break" expr? ";" ;
 continue_stmt   = "continue" ";" ;
-defer_stmt      = "defer" expr ";" ;
 expr_stmt       = expr ";" ;
 ```
+
+没有初始化表达式的 `val` / `var` 是延迟初始化声明，只允许单个名字 pattern，并且必须写类型标注；其他 pattern 必须立即初始化。
 
 ## 10. 表达式
 
@@ -341,10 +343,10 @@ method_receiver_part = call_args | index_args | "." ident ;
 mut_expr        = "mut" expr ;
 
 if_expr         = "if" if_condition block ("else" (if_expr | block))? ;
-if_condition    = let_condition | expr ;
-let_condition   = "let" pattern_mode? pattern "=" expr ;
+if_condition    = val_condition | expr ;
+val_condition   = "val" pattern_mode? pattern "=" expr ;
 while_expr      = "while" while_condition block ;
-while_condition = let_condition | expr ;
+while_condition = val_condition | expr ;
 for_expr        = "for" for_binding "in" expr block ;
 for_binding     = for_binding_mode? pattern ;
 for_binding_mode = pattern_mode ;
@@ -402,6 +404,8 @@ unit_expr       = "(" ")" ;
 
 闭包使用函数形参数列表，而不是 `|...|`。块闭包写作 `(params) -> ReturnType { ... }`，返回类型可推断时可省略为 `(params) { ... }`；短表达式闭包写作 `(params) => expr`。解析器应通过 `=>`、`->` 或参数列表后的 `{` 识别闭包，和普通括号表达式区分。
 
+`await` 只在 async 上下文中有效。语义阶段只允许等待 `Future<T>`、`Task<T>` 或立即等待的 async `mut self` 调用。`await future` 和 `await task` 会消费已有命名拥有者；等待后原绑定不可再用。
+
 `try` 的语法只表示提前返回请求。语义阶段只允许：
 
 - 在返回 `Result<U, E>` 的函数中对 `Result<T, E>` 使用 `try`。
@@ -409,9 +413,9 @@ unit_expr       = "(" ")" ;
 
 `try` 不触发隐式 `Option` 到 `Result` 转换，也不触发隐式错误类型转换。
 
-调用实参上的 `mut` / `move` 表示参数访问模式。`mut receiver.method(...)` 表示调用 `mut self` 方法并取得已有命名接收者的短期唯一可写访问；`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者。`await mut receiver.method(...)` 表示立即等待一次 async `mut self` 调用；这个调用产生的 future 不能被命名、保存或逃逸。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`return move value`、`let owner = move value` 和独立 `move value;` 无效。
+调用实参上的 `mut` / `move` 表示参数访问模式。`mut receiver.method(...)` 表示调用 `mut self` 方法并取得已有命名接收者的短期唯一可写访问；`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者。`await mut receiver.method(...)` 表示立即等待一次 async `mut self` 调用；这个调用产生的 future 不能被命名、保存或逃逸。`await task` 等待并消费 `Task<T>` 句柄，不使用 `Task.await()` 方法。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`return move value`、`val owner = move value` 和独立 `move value;` 无效。
 
-`match`、`if let`、`while let` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。
+`match`、`if val`、`while val` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。
 
 ## 11. 运算符
 
@@ -487,8 +491,9 @@ trust_extern_decl = "trust" "extern" string_literal "fn" ident fn_params return_
 规则：
 
 - 裸 `extern` 声明必须写成 `trust extern`。
-- 裸指针、裸地址、inline asm、volatile/MMIO 和中断入口等底层操作只能出现在 `trust` 边界内。
+- 裸指针、裸地址、inline asm、volatile/MMIO 和中断入口等底层操作只能出现在 `trust` 边界内，并且需要 manifest 对应能力。
 - `trust` 不关闭普通类型检查、move 检查、初始化检查或可证明的访问检查。
+- `trust impl` 只允许用于编译器认可的标记接口，例如 `Send` / `Sync` 这类需要人工证明的平台或线程安全不变量；普通接口实现不能写成 `trust impl`。
 - 编译器必须为 `trust` 边界保留源码 span，用于信任报告和构建策略。
 - `@noAlloc` 是普通用户属性，表示被标注函数不能直接或间接执行堆分配。
 - `@export("symbol", abi: C)` 是普通用户属性，表示把非泛型顶层 `pub fn` 导出为外部 C ABI 符号；语义阶段必须检查 C-compatible 签名和 panic 边界。

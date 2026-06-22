@@ -6,7 +6,7 @@ Zeno 的安全目标很直接，也很难实现：普通用户代码不应造成
 
 整数溢出不是未定义行为。普通 `+`、`-`、`*` 使用 wrapping 语义；需要检查时必须显式调用 `checked*` 方法。
 
-`try` 提前返回不是异常路径。它会按普通作用域退出路径执行 `defer` 和 RAII 销毁，然后返回 `Err` 或 `None`。
+`try` 提前返回不是异常路径。它会按普通作用域退出路径执行 RAII 销毁，然后返回 `Err` 或 `None`。
 
 ## 1. trust 信任边界
 
@@ -20,14 +20,24 @@ Zeno 不暴露用户 `unsafe` 模式。和原始地址、C ABI、硬件交互相
 
 允许出现在 `trust` 边界中的底层能力包括：
 
-- 裸 C ABI 声明和调用。
+- 裸 C ABI 声明和调用，以及为了立即调用 C ABI 从已有 slice、handle 或拥有者中取出 ABI 地址。
 - 从整数构造裸地址或裸指针。
 - 裸指针运算和解引用。
+- 按位重解释、手动对齐声明和 provenance 断言。
 - volatile、MMIO、端口 I/O。
 - inline asm。
 - 链接段、启动入口、中断入口等平台 ABI 约定。
 
 普通代码可以写驱动、内核模块和平台绑定，但底层操作必须被 `trust` 包住，并且包的 `Zeno.toml` manifest 必须允许对应能力。推荐把 `trust` 封装成安全 API，让调用方使用类型化句柄、能力对象和 `Result`。
+
+`trust` 不会关闭普通语言规则：
+
+- 不能读未初始化值。
+- 不能 use-after-move 或 double move。
+- 不能制造悬垂 `ArraySlice<T>` / `StringSlice`。
+- 不能让可写访问和其他活动访问重叠。
+- 不能绕过 `Send` / `Sync`，除非写出受审计的 `trust impl`。
+- 不能让优化器默认相信裸指针不别名、非空、对齐正确或生命周期足够长；这些事实必须由类型、参数模式、属性或受信 API 的显式契约表达。
 
 ## 2. 所有权不变量
 
@@ -45,8 +55,8 @@ Zeno 不暴露用户 `unsafe` 模式。和原始地址、C ABI、硬件交互相
 compile-fail 示例：
 
 ```zn
-let a = File.open("log.txt")?;
-let b = a;
+val a = File.open("log.txt")?;
+val b = a;
 mut a.write("bad"); // expected-error: use of moved value
 ```
 
@@ -66,16 +76,22 @@ header.version = 1;
 规则：
 
 - 读取未初始化值会被拒绝。
+- `val` 是单次初始化绑定。延迟 `val x: T;` 必须在所有使用路径前初始化一次；初始化后、移动后或控制流合流为 `maybe-init` 时都不能再写入。
+- `var` 是可重新赋值绑定。`var` 被移动后可以重新赋值；重新赋值前读取仍然是 use-before-init。
+- 控制流合流后，只有所有路径都已初始化的位置才能读取；某些路径初始化、某些路径未初始化的位置是 `maybe-init`。
+- 对 `maybe-init` 的 `var` 赋值允许存在，但右侧成功后必须条件销毁旧值；右侧失败时旧状态保持不变。对 `maybe-init` 的 `val` 赋值必须拒绝。
 - 销毁未初始化值是 no-op。
 - 销毁部分初始化聚合值时，只销毁已初始化字段。
+- 完整对象的 `destroy` 块只在整个对象已完整初始化时运行；部分初始化聚合退出作用域时不运行 `destroy` 块，只销毁已初始化字段。
+- 局部绑定按源码声明顺序的逆序销毁，延迟初始化和重新赋值不改变该 cleanup 位置。
 - 从拥有的结构体中移动字段会把该字段标记为未初始化，除非类型禁止字段移动。
 - 从只读访问或唯一可写访问中不能移动字段；只有拥有整个对象时才能移出字段。
 - 有自定义 `destroy` 块的类型在安全代码中禁止移出非 `Copy` 字段；类型自己的 `move self` 方法也只能完成资源状态，不能拆字段。
 - 对已初始化位置赋值会先求右侧，再销毁旧值，再写入新值；右侧失败时旧值保持不变。
 - 赋值不能覆盖当前存在活动访问的位置；需要取回旧值时使用 `replaceAt` 或类型提供的显式替换 API。
 - 只读 `match` 不移动 enum payload；`match move` 消耗整个 enum 并允许移动出被选中 payload；`match mut` 只给 payload 唯一可写访问，不给所有权。
-- `if let` 和 `while let` 遵守同样的只读 / `move` / `mut` pattern 规则。
-- `let` 解构只允许不可失败 pattern，避免在初始化语义中引入隐式失败路径。
+- `if val` 和 `while val` 遵守同样的只读 / `move` / `mut` pattern 规则。
+- `val` 解构只允许不可失败 pattern，避免在初始化语义中引入隐式失败路径。
 - or pattern 两侧必须绑定相同名字、类型和访问模式，防止某条分支中绑定不存在或所有权不同。
 - 带 guard 的 pattern 不参与穷尽证明，guard 中不能移动出只读绑定。
 - pattern 不能调用用户代码，不能隐藏分配、动态派发、反射、regex 或临时 collection slice。
@@ -122,8 +138,8 @@ header.version = 1;
 拒绝示例：
 
 ```zn
-let s = String.from("abc");
-let v = s;
+val s = String.from("abc");
+val v = s;
 drop(v);
 use(s); // expected-error: use after move
 ```
@@ -169,7 +185,7 @@ fn firstByte(data: ArraySlice<U8>) -> Option<U8> {
 
 ```zn
 fn bad(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let local = Array<U8>.filledIn(4, 0, mut allocator);
+    val local = Array<U8>.filledIn(4, 0, mut allocator);
     return Ok(local); // expected-error: returns slice to local storage
 }
 ```
@@ -190,7 +206,7 @@ fn packetBody(bytes: ArraySlice<U8>) -> ArraySlice<U8> {
 }
 
 fn parsePacket(bytes: ArraySlice<U8>) -> Result<Token, ParseError> {
-    let body = packetBody(bytes);
+    val body = packetBody(bytes);
     return parseHeader(body);
 }
 ```
@@ -209,7 +225,7 @@ struct BadPacket {
 
 ```zn
 fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError> {
-    let local = Array<U8>.filledIn(4, 0, mut allocator);
+    val local = Array<U8>.filledIn(4, 0, mut allocator);
     return Ok(local.asSlice()); // expected-error: view outlives local storage
 }
 ```
@@ -228,7 +244,7 @@ fn badView(mut allocator: GlobalAllocator) -> Result<ArraySlice<U8>, AllocError>
 ```zn
 fn badPush(mut allocator: GlobalAllocator) -> Result<USize, AllocError> {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
-    let view = bytes.asSlice();
+    val view = bytes.asSlice();
     mut bytes.push(1); // expected-error: vector structural mutation while view is live
     return Ok(view.len);
 }
@@ -241,7 +257,7 @@ fn pushAfterView(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
     var bytes = Vector<U8>.withCapacityIn(4, mut allocator);
 
     {
-        let view = bytes.asSlice();
+        val view = bytes.asSlice();
         parseHeader(view);
     }
 
@@ -306,12 +322,15 @@ fn bad(mut arena: ArenaAllocator) -> Vector<U8> {
 规则：
 
 - `destroy` 不返回值，不能使用 `try`，不能参与常规错误流。
+- `destroy` 不能使用 `await`，也不能依赖异步清理完成。
+- `destroy` 隐式满足 `@noPanic` 和 `@noAlloc`；直接 `panic`、可能 panic 的检查、可能 OOM 的分配和会分配的 API 都必须被拒绝。
 - `destroy` 不是 `move self` 方法，用户不能直接调用。
 - `destroy` 调用的清理 API 必须不可失败或 best-effort，返回 `Unit`。
 - 需要报告清理错误时，资源类型必须提供显式 `close`、`flush`、`finish` 等 `move self` 方法返回 `Result<T, E>`。
 - `destroy` 块以隐式 `self` 接收最终拥有者。
 - `destroy` 块运行时可以访问字段和更新本对象内部状态，但不能移动字段、返回字段或创建逃逸访问。
 - `destroy` 块之后，字段按源码声明顺序的逆序销毁；这属于语义顺序，不受 Auto layout 的内存字段重排影响。
+- 完整对象的 `destroy` 只在对象完整初始化后运行；部分初始化失败路径只销毁已经初始化的字段，不运行外层 `destroy`。
 - 如果对象被部分移动，只有仍初始化的字段会被销毁。
 - 带 `destroy` 的类型即使进入 `move self` 方法，方法体中的 `self` 在退出时仍然按普通 RAII 规则销毁；显式完成方法应通过状态位让 `destroy` no-op。
 - 析构逻辑不能移动出另一个字段析构所依赖的字段，除非类型显式建模该依赖。
@@ -358,9 +377,9 @@ Thread.scope((mut scope) {
 允许：
 
 ```zn
-let count = Atomic<U64>.new(0);
-let shared = Shared.new(count);
-let t = Thread.spawn(move () {
+val count = Atomic<U64>.new(0);
+val shared = Shared.new(count);
+val t = Thread.spawn(move () {
     shared.fetchAdd(1, Ordering.Relaxed);
 });
 try move t.join();
@@ -373,11 +392,18 @@ try move t.join();
 规则：
 
 - future drop 必须根据当前状态销毁已经初始化且仍拥有的字段。
-- 跨 `await` 存活的 `defer` 必须进入 future 状态，并在完成、错误提前返回、panic-unwind 或取消 drop 时执行。
-- future drop 不能 `await`；跨 `await` 的 `defer` 不能包含 `await`。
+- 跨 `await` 存活的 RAII guard 和其他拥有资源必须进入 future 状态，并在完成、错误提前返回、panic-unwind 或取消 drop 时销毁。
+- future drop 不能 `await`；析构不能依赖异步清理完成。
 - 短期访问、`ArraySlice<T>`、`StringSlice` 和 scoped allocator owner 不能作为独立值跨 `await` 进入 future 状态。接口约束按具体类型处理；若具体类型需要跨 `await`，它必须由 future 拥有并满足对应所有权规则。
 - `await mut receiver.method(...)` 允许立即等待 async `mut self` 调用，前提是 `receiver` 由当前 future 拥有；编译器把可写访问限制在被等待调用内部。把这个调用结果先保存、返回、放入结构体、传给 `spawn` 或跨另一个 `await` 使用都必须拒绝。
 - v1 通过禁止访问值逃逸跨 `await` 避免用户可见 `Pin`。
+
+任务取消检查使用 `TaskContext`：
+
+- `TaskContext` 由 runtime 传给声明了上下文参数的任务闭包，表示当前任务的取消检查能力。
+- `TaskContext` 可以作为当前任务 future 状态的一部分跨 `await`，因为任务控制块至少活到该任务完成。
+- `TaskContext` 不能返回、不能进入长期拥有者、不能被线程、子任务或逃逸闭包捕获；否则可能让取消检查能力超过原任务生命周期。
+- `TaskContext.isCancellationRequested()` 不同步用户数据。需要在取消请求和其他数据之间建立顺序时，必须使用 `Mutex`、atomic、channel 或其他同步原语。
 
 ## 12. FFI 与底层安全
 
@@ -393,7 +419,7 @@ trust extern "C" fn read(fd: I32, buffer: USize, length: USize) -> ISize;
 
 ```zn
 fn readFileRaw(fd: I32, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
-    let n = trust {
+    val n = trust {
         read(fd, out.rawAddress(), out.len)
     };
 
@@ -403,6 +429,20 @@ fn readFileRaw(fd: I32, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
     return Ok(n as USize);
 }
 ```
+
+能力分类：
+
+- `ffi`：`trust extern`、extern 调用、为立即 FFI 调用取出 ABI 地址。
+- `rawMemory`：裸地址 / 裸指针构造、偏移、解引用、按位重解释、手动对齐声明。
+- `hardware`：MMIO、端口 I/O、volatile 硬件访问、物理地址映射和链接段控制。
+- `inlineAsm`：内联汇编。
+- `interrupts`：中断入口、裸调用约定和目标特殊入口。
+
+每个底层操作必须同时满足：
+
+1. 源码处在 `trust` 边界内，或是 `trust extern` / `trust impl` 声明。
+2. 当前包 manifest 允许对应能力。
+3. 普通所有权、初始化、访问、layout 和 C-compatible 检查仍然通过。
 
 安全包装必须声明并维护：
 
@@ -418,7 +458,7 @@ fn readFileRaw(fd: I32, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
 普通代码：
 
 ```zn
-let bytes = try fs.readFile("config.zn");
+val bytes = try fs.readFile("config.zn");
 ```
 
 `trust` 边界应尽量小。公开 API 泄露裸指针、裸地址或平台 ABI 细节时，编译器应警告，构建策略可以拒绝。
@@ -427,7 +467,7 @@ let bytes = try fs.readFile("config.zn");
 
 - `Zeno.toml` 中启用的 `trust` 能力和 manifest hash。
 - `trust` 的源码位置。
-- 使用的能力类别，例如 `ffiC`、`rawMemory`、`mmio`、`inlineAsm`、`interrupt`。
+- 使用的能力类别，例如 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts`、`threadSafety`。
 - 是否从公开 API 泄露裸能力。
 - 调用链中哪些公开函数依赖该 `trust`。
 
@@ -444,6 +484,7 @@ let bytes = try fs.readFile("config.zn");
 - 可写访问与另一个活动访问重叠。
 - 在禁止分配的上下文中发生隐藏分配。
 - 没有 `trust` 的裸 FFI 声明或底层操作。
+- `trust` 边界使用了 manifest 未允许的底层能力。
 - `trust` 边界中违反普通所有权、初始化或类型规则。
 - 在要求静态派发的上下文中使用接口派发。
 

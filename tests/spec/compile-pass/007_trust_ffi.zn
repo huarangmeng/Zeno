@@ -12,7 +12,7 @@ enum IoError {
 }
 
 fn currentPid() -> Result<I32, IoError> {
-    let pid = trust {
+    val pid = trust {
         getpid()
     };
 

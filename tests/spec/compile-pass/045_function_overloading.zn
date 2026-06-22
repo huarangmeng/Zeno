@@ -46,18 +46,18 @@ fn identity(value: I32) -> I32 {
 }
 
 fn main() -> I32 {
-    let small: I32 = 1;
-    let wide: I64 = 2;
+    val small: I32 = 1;
+    val wide: I64 = 2;
     var packet = Packet { value: 7 };
 
-    let exact = code(small);
-    let ignoredWide = code(wide);
-    let arity = code(1, 2);
-    let read = inspect(packet);
-    let written = inspect(mut packet);
-    let owned = archive(move packet);
-    let specific = identity(small);
-    let generic = identity(true);
+    val exact = code(small);
+    val ignoredWide = code(wide);
+    val arity = code(1, 2);
+    val read = inspect(packet);
+    val written = inspect(mut packet);
+    val owned = archive(move packet);
+    val specific = identity(small);
+    val generic = identity(true);
 
     if generic {
         return exact + arity + read + written + owned + specific;

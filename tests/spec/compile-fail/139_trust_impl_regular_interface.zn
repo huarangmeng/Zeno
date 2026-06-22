@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: trust impl is reserved for compiler-recognized marker interfaces such as Send and Sync
+
+module tests.fail.trustImplRegularInterface;
+
+interface Writer {
+    fn write(self) -> USize;
+}
+
+struct Device {
+    id: U32,
+}
+
+trust impl Writer for Device { // expected-error: trust impl is only allowed for compiler-recognized marker interfaces
+    fn write(self) -> USize {
+        return self.id;
+    }
+}

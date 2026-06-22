@@ -58,6 +58,7 @@ LLVM 属性规则：
 - 只有类型和 layout 都保证非空时可以发 `nonnull`。
 - 只有对齐事实来自 layout 或 allocation contract 时可以发 `align(N)`。
 - 不能因为源码写了 `mut` 就无条件发 `noalias`。
+- 不能因为源码写了 `trust` 就产生额外别名、非空、对齐、初始化、生命周期或线程安全事实；裸指针默认按未知 provenance 和未知别名关系处理。
 
 最佳效果：
 
@@ -154,7 +155,7 @@ for i in 0..data.len {
 ```
 
 ```zn
-let tail = data.dropPrefix(4);
+val tail = data.dropPrefix(4);
 for i in 0..tail.len {
     use(tail[i]);
 }
@@ -187,17 +188,17 @@ PageAllocator         OS 或内核页级分配
 普通构造使用默认 allocator：
 
 ```zn
-let text = String.from("hello");
-let values = Vector<U32>.withCapacity(128);
-let counts = Map<U64, USize>.withCapacity(128);
+val text = String.from("hello");
+val values = Vector<U32>.withCapacity(128);
+val counts = Map<U64, USize>.withCapacity(128);
 ```
 
 高性能或 freestanding 代码使用 `In` 后缀：
 
 ```zn
-let text = String.fromIn("hello", mut arena);
-let values = Vector<U32>.withCapacityIn(128, mut arena);
-let counts = Map<U64, USize>.withCapacityIn(128, mut arena);
+val text = String.fromIn("hello", mut arena);
+val values = Vector<U32>.withCapacityIn(128, mut arena);
+val counts = Map<U64, USize>.withCapacityIn(128, mut arena);
 ```
 
 优化规则：
@@ -234,6 +235,10 @@ Scoped concurrency 证明 join-before-exit 的结构化并发
 
 - `Thread.spawn` 是 OS 线程能力，成本显式。
 - `Runtime.spawn` 是库调度能力，runtime 必须是显式值。
+- `Runtime.spawnBlocking` 是独立 blocking pool 能力，用于长时间同步工作；不能隐藏成普通 `spawn`，也不能无界创建 OS 线程。
+- `Runtime.blockOn` / `Executor.blockOn` 是同步阻塞边界，必须显式写出 runtime/executor 和被消费的 future/task。
+- `Task<T>` 必须显式收尾；`await`、`blockOn`、`cancel` 和 `detach` 都会消费句柄，析构不能隐藏阻塞、取消或后台运行。
+- `TaskContext.isCancellationRequested()` 是显式取消检查，目标实现应降低为任务控制块中的轻量标志读取；不能隐藏 heap allocation、锁、系统调用或线程局部全局查询。
 - `async fn` 创建 future 状态机，不自动启动，不自动分配。
 - 非逃逸 future 可以栈上或内联 poll。
 - 逃逸 future 必须通过显式拥有者，例如 `Box<Future<...>>`、task handle 或 runtime spawn。
@@ -261,7 +266,7 @@ Thread.scope((mut scope) {
 拥有字符串必须显式：
 
 ```zn
-let name = String.from("zeno");
+val name = String.from("zeno");
 ```
 
 优化允许但不可改变语义：

@@ -10,12 +10,12 @@ fn consume(text: String) {}
 
 @noAlloc
 fn tick(value: I32) {
-    let text = format("value={}", value); // expected-error: hidden heap allocation
+    val text = format("value={}", value); // expected-error: hidden heap allocation
     consume(text);
 }
 
 @noAlloc
 fn ownLiteral() {
-    let text = String.from("literal"); // expected-error: String.from may allocate in no-allocation context
+    val text = String.from("literal"); // expected-error: String.from may allocate in no-allocation context
     consume(text);
 }

@@ -14,12 +14,12 @@ struct Counter {
 }
 
 fn main(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let mutex = Mutex.new(Counter { value: 0 });
-    let shared = Shared.newIn(mutex, mut allocator);
-    let forThread = shared.clone();
-    let handle = try Thread.spawn(move () -> USize {
+    val mutex = Mutex.new(Counter { value: 0 });
+    val shared = Shared.newIn(mutex, mut allocator);
+    val forThread = shared.clone();
+    val handle = try Thread.spawn(move () -> USize {
         return forThread.strongCount();
     });
-    let ignored = try move handle.join();
+    val ignored = try move handle.join();
     return Ok(());
 }

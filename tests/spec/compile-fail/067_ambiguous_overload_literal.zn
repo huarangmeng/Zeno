@@ -13,6 +13,6 @@ fn pick(value: U32) -> U32 {
 }
 
 fn main() {
-    let value = pick(1); // expected-error: ambiguous overload; annotate the literal or variable type
-    let ignored = value;
+    val value = pick(1); // expected-error: ambiguous overload; annotate the literal or variable type
+    val ignored = value;
 }

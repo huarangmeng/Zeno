@@ -21,7 +21,7 @@ fn countOccurrences(ids: ArraySlice<U64>) -> Map<U64, USize> {
     var counts = Map<U64, USize>.withCapacity(ids.len());
 
     for id in ids {
-        let old = counts.get(id).unwrapOr(0);
+        val old = counts.get(id).unwrapOr(0);
         mut counts.insert(id, old + 1);
     }
 

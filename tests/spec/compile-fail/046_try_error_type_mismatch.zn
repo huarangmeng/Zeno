@@ -19,6 +19,6 @@ fn readRaw() -> Result<U8, IoError> {
 }
 
 fn bad() -> Result<U8, ParseError> {
-    let byte = try readRaw(); // expected-error: try does not implicitly convert IoError to ParseError; use mapErr
+    val byte = try readRaw(); // expected-error: try does not implicitly convert IoError to ParseError; use mapErr
     return Ok(byte);
 }

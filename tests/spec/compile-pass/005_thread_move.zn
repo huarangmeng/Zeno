@@ -16,13 +16,13 @@ struct Job {
 }
 
 fn run(move job: Job) -> Result<Unit, Error> {
-    let ignoredId = job.id;
+    val ignoredId = job.id;
     return Ok(());
 }
 
 fn main() -> Result<Unit, Error> {
-    let job = Job { id: 42 };
-    let handle = try Thread.spawn(move () -> Result<Unit, Error> {
+    val job = Job { id: 42 };
+    val handle = try Thread.spawn(move () -> Result<Unit, Error> {
         return run(move job);
     });
     try move handle.join();

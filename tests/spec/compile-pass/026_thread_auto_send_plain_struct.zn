@@ -17,9 +17,9 @@ struct Job {
 }
 
 fn main() -> Result<Unit, Error> {
-    let job = Job { id: 42, priority: 7 };
-    let handle = try Thread.spawn(move () -> Result<Unit, Error> {
-        let ignored = job.id + job.priority as U64;
+    val job = Job { id: 42, priority: 7 };
+    val handle = try Thread.spawn(move () -> Result<Unit, Error> {
+        val ignored = job.id + job.priority as U64;
         return Ok(());
     });
     try move handle.join();

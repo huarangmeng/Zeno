@@ -13,6 +13,6 @@ impl Packet {
 }
 
 fn bad(move packet: Packet) -> Array<U8> {
-    let Packet { bytes } = packet; // expected-error: cannot move field from type with destroy block through pattern
+    val Packet { bytes } = packet; // expected-error: cannot move field from type with destroy block through pattern
     return bytes;
 }

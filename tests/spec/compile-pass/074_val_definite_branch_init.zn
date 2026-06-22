@@ -1,0 +1,29 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: delayed val can be initialized exactly once on every control-flow path
+
+module tests.pass.valDefiniteBranchInit;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn choose(flag: Bool) -> Handle {
+    val handle: Handle;
+
+    if flag {
+        handle = makeHandle(1);
+    } else {
+        handle = makeHandle(2);
+    }
+
+    return handle;
+}

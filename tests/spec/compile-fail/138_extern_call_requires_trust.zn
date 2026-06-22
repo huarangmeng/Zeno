@@ -1,0 +1,12 @@
+// category: compile-fail
+// profile: hosted
+// trust.ffi: true
+// purpose: trust extern declarations do not make extern calls safe outside trust blocks
+
+module tests.fail.externCallRequiresTrust;
+
+trust extern "C" fn getpid() -> I32;
+
+fn bad() -> I32 {
+    return getpid(); // expected-error: extern function call requires trust
+}

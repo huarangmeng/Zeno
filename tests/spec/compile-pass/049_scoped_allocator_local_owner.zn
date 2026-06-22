@@ -5,11 +5,11 @@
 module tests.pass.scopedAllocatorLocalOwner;
 
 fn buildLocal(mut arena: ArenaAllocator) {
-    let bytes = Vector<U8>.withCapacityIn(1024, mut arena);
+    val bytes = Vector<U8>.withCapacityIn(1024, mut arena);
     consume(bytes.asSlice());
 }
 
 fn consume(bytes: ArraySlice<U8>) {
-    let _ = bytes.len;
+    val _ = bytes.len;
 }
 

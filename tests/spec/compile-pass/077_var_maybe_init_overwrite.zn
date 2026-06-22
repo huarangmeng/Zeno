@@ -1,0 +1,28 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: assigning to a maybe-initialized var conditionally drops the old value after RHS success
+
+module tests.pass.varMaybeInitOverwrite;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn overwrite(flag: Bool) -> Handle {
+    var slot: Handle;
+
+    if flag {
+        slot = makeHandle(1);
+    }
+
+    slot = makeHandle(2);
+    return slot;
+}

@@ -17,11 +17,11 @@ impl LocalHandle {
 }
 
 fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let handle = LocalHandle { raw: 1 };
-    let shared = Shared.newIn(handle, mut allocator);
-    let thread = try Thread.spawn(move () -> USize {
+    val handle = LocalHandle { raw: 1 };
+    val shared = Shared.newIn(handle, mut allocator);
+    val thread = try Thread.spawn(move () -> USize {
         return shared.strongCount(); // expected-error: Shared<LocalHandle> requires LocalHandle: Send, Sync
     });
-    let ignored = thread;
+    val ignored = thread;
     return Ok(());
 }

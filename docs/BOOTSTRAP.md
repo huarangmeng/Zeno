@@ -56,7 +56,7 @@ HIR、MIR、LLVM 降级和 codegen 优化不变量见 [IR.md](IR.md)。
 - 模块与导入。
 - 文件路径到模块路径的推断、可选 `module` 校验、同包直接可见、包依赖图构建、外部导入解析和 `pub` / `private` 可见性检查。
 - 函数和编译期重载解析。
-- `let`、`var`、块、`if`、`while`、`for`。
+- `val`、`var`、块、`if`、`while`、`for`。
 - `for` 的只读、可写、消耗遍历、整数半开区间 lowering，以及具体 `Iterator<T>` 拥有式遍历。
 - 基础 `match`、pattern 穷尽性、只读 / `mut` / `move` enum payload 访问。
 - 基础类型。
@@ -127,7 +127,7 @@ HIR 应保留语言语义：
 - 泛型约束。
 - `Send` / `Sync` 自动推导结果和 `trust impl` 来源。
 - 模式穷尽性。
-- `trust` 边界、manifest 能力授权和公开 API 影响范围。
+- `trust` 边界、manifest 能力授权、能力类别和公开 API 影响范围。
 - `@noAlloc`、`@noPanic` 和 profile 影响。
 
 MIR 应显式化 lowering 细节：
@@ -184,7 +184,7 @@ LLVM 属性只能来自 MIR 中已证明的事实，例如唯一 `mut` 访问才
 - allocator 泛型调用可以静态派发并内联，零大小 allocator 不增加拥有者大小。
 - scoped allocator owner 不能逃逸 allocator region。
 - 非逃逸 future 不分配；逃逸 future 的分配必须由 task handle、runtime spawn 或 `Box<Future<...>>` 显式表达。
-- future drop 必须按当前状态执行 `defer` 和 RAII cleanup。
+- future drop 必须按当前状态执行 RAII cleanup。
 - `CachePadded<T>` 提供显式 cache line padding，普通 Auto layout 不偷偷插入同级 padding。
 - 普通整数 `+`、`-`、`*` 不生成隐藏溢出检查。
 - `checkedAdd` 等方法使用目标支持的 overflow intrinsic 或等价高效 lowering。

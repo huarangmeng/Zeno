@@ -135,7 +135,7 @@ struct NativeRecord {
     count: U16,
 }
 
-let count = native.count; // unaligned load into a value
+val count = native.count; // unaligned load into a value
 inspect(native.count);    // ok: unaligned load into a temporary value
 native.count = 20;        // unaligned store for a native integer field
 ```
@@ -149,7 +149,7 @@ normalize(mut native.count); // error: packed field cannot escape as mut access
 如果函数签名或上下文需要长期访问，先显式加载到局部值：
 
 ```zn
-let count = native.count;
+val count = native.count;
 inspect(count);
 ```
 

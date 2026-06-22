@@ -1,0 +1,14 @@
+// category: compile-pass
+// profile: hosted
+// purpose: synchronous code can block on a blocking task through an explicit runtime
+
+module tests.pass.blockOnSpawnBlocking;
+
+fn readConfig(move path: Path) -> Result<Bytes, IoError> {
+    var runtime = try Runtime.withWorkerCount(8);
+    val task = try runtime.spawnBlocking(move () -> Result<Bytes, IoError> {
+        return readFileSync(move path);
+    });
+
+    return mut runtime.blockOn(move task);
+}

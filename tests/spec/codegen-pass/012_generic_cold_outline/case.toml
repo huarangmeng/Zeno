@@ -12,8 +12,8 @@ fn unwrapOrPanic<T>(value: Option<T>, message: StringSlice) -> T {
 }
 
 fn useIt(a: Option<U32>, b: Option<U64>) -> U64 {
-    let x = unwrapOrPanic<U32>(a, "missing");
-    let y = unwrapOrPanic<U64>(b, "missing");
+    val x = unwrapOrPanic<U32>(a, "missing");
+    val y = unwrapOrPanic<U64>(b, "missing");
     return (x as U64) + y;
 }
 '''

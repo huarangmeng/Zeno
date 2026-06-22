@@ -5,7 +5,7 @@
 module tests.fail.viewAcrossAwait;
 
 async fn bad(bytes: ArraySlice<U8>) -> U8 {
-    let head = bytes.dropPrefix(1);
+    val head = bytes.dropPrefix(1);
     await tick();
     return head[0]; // expected-error: ArraySlice cannot cross await into future state
 }

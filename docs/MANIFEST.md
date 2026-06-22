@@ -52,6 +52,7 @@ strategy = "abort"
 
 [trust]
 ffi = false
+rawMemory = false
 hardware = false
 inlineAsm = false
 interrupts = false
@@ -89,6 +90,7 @@ strategy = "trap"
 
 [trust]
 ffi = false
+rawMemory = false
 hardware = false
 inlineAsm = false
 interrupts = false
@@ -129,6 +131,7 @@ handler = "kernel.oomHandler"
 
 [trust]
 ffi = true
+rawMemory = true
 hardware = true
 inlineAsm = true
 interrupts = true
@@ -229,7 +232,7 @@ handler = "kernel.panicHandler"
 
 - `"abort"`：调用 panic 后终止进程或程序，不展开栈。
 - `"trap"`：降低为目标 trap，不展开栈。
-- `"unwind"`：启用栈展开，经过的作用域执行 `defer` 和 RAII 销毁。
+- `"unwind"`：启用栈展开，经过的作用域执行 RAII 销毁。
 - `"handler"`：调用 manifest 指定的 `panic.handler`，handler 必须返回 `Never`。
 
 `stack` 可选值：
@@ -274,6 +277,7 @@ handler = "kernel.oomHandler"
 ```toml
 [trust]
 ffi = true
+rawMemory = false
 hardware = true
 inlineAsm = false
 interrupts = false
@@ -285,7 +289,8 @@ allowedPackages = ["kernel", "platform"]
 字段含义：
 
 - `ffi`：允许 `trust extern` 和裸 ABI 绑定。
-- `hardware`：允许裸硬件地址、MMIO、端口 I/O 和链接段控制。
+- `rawMemory`：允许裸地址 / 裸指针构造、偏移、解引用、按位重解释和手动对齐声明。
+- `hardware`：允许 MMIO、端口 I/O、volatile 硬件访问、物理地址映射和链接段控制。
 - `inlineAsm`：允许 inline asm。
 - `interrupts`：允许中断入口、裸调用约定和目标特殊入口。
 - `dependencyTrust`：允许依赖包包含 `trust` 边界。
@@ -294,8 +299,8 @@ allowedPackages = ["kernel", "platform"]
 
 默认值：
 
-- hosted：全部底层能力默认 `false`；可以显式开启 `ffi` 写平台绑定，但不能直接开启 `hardware`、`inlineAsm` 或 `interrupts`。
-- freestanding：`ffi` 可由目标打开；硬件、inline asm 和中断默认 `false`。
+- hosted：全部底层能力默认 `false`；可以显式开启 `ffi` 和 `rawMemory` 写平台绑定，但不能直接开启 `hardware`、`inlineAsm` 或 `interrupts`。
+- freestanding：`ffi` / `rawMemory` 可由目标打开；硬件、inline asm 和中断默认 `false`。
 - kernel / embedded：可以打开硬件能力，但必须启用 `requireReport`。
 
 manifest 只能允许某类底层能力；具体源码仍然必须写 `trust`。没有 `trust` 的裸底层操作永远非法。
@@ -317,6 +322,7 @@ manifest 只能允许某类底层能力；具体源码仍然必须写 `trust`。
 - `kernel` / `embedded` 必须使用 handler panic/OOM 策略，且不能默认开启 unwinding。
 - `trust.dependencyTrust = false` 时，依赖包中的 `trust` 会让构建失败。
 - `trust.allowedPackages` 存在时，不在列表中的包不能包含 `trust`。
+- `trust.requireReport = true` 时，构建产物必须包含信任报告；发布包若包含任意 `trust` 边界，推荐强制开启。
 
 ## 7. 对类型检查的影响
 

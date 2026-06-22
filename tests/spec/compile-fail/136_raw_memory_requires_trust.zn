@@ -1,0 +1,10 @@
+// category: compile-fail
+// profile: freestanding
+// trust.rawMemory: true
+// purpose: raw memory operations require a trust block even when manifest capability is enabled
+
+module tests.fail.rawMemoryRequiresTrust;
+
+fn bad(address: USize) -> U8 {
+    return RawPointer<U8>.fromAddress(address).read(); // expected-error: raw memory operation requires trust
+}

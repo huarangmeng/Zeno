@@ -23,11 +23,11 @@ impl Identified for Service {
 }
 
 fn bad(mut allocator: GlobalAllocator) -> Result<Unit, AllocError> {
-    let service = Service { idValue: 9 };
-    let boxed: Box<Identified> = Box.newIn(move service, mut allocator);
-    let handle = try Thread.spawn(move () -> U32 {
+    val service = Service { idValue: 9 };
+    val boxed: Box<Identified> = Box.newIn(move service, mut allocator);
+    val handle = try Thread.spawn(move () -> U32 {
         return boxed.id(); // expected-error: Box<Identified> is not Send; use a named interface that includes Send
     });
-    let ignored = handle;
+    val ignored = handle;
     return Ok(());
 }

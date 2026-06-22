@@ -5,7 +5,7 @@
 file = "src/main.zn"
 text = '''
 async fn task(move file: File) -> Result<Unit, IoError> {
-    defer audit.finish();
+    val auditGuard = AuditGuard.start();
     try await mut file.readU32();
     return Ok(());
 }
@@ -16,7 +16,7 @@ contains = [
     "futureDrop return",
 ]
 forbid = [
-    "cleanup.defer audit.finish",
+    "cleanup.drop auditGuard",
     "cleanup.drop file",
 ]
 

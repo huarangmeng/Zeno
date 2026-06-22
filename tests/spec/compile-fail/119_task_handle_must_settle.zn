@@ -1,0 +1,13 @@
+// category: compile-fail
+// profile: hosted
+// purpose: task handles must be awaited, blocked on, cancelled, or detached before leaving scope
+
+module tests.fail.taskHandleMustSettle;
+
+fn bad(move runtime: Runtime, move work: Work) -> Result<Unit, WorkError> {
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return process(move work);
+    });
+
+    return Ok(()); // expected-error: task handle must be settled with await, blockOn, cancel, or detach
+}

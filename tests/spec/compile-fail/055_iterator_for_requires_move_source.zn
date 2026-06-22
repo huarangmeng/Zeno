@@ -22,7 +22,7 @@ impl Iterator<U32> for Counter {
 }
 
 fn bad() -> U32 {
-    let counter = Counter { current: 0, end: 1 };
+    val counter = Counter { current: 0, end: 1 };
     var total: U32 = 0;
     for move value in counter {
         total = total + value;

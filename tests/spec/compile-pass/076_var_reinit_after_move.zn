@@ -1,0 +1,30 @@
+// category: compile-pass
+// profile: freestanding
+// purpose: var can be reinitialized after its owned value has been moved out
+
+module tests.pass.varReinitAfterMove;
+
+struct Handle {
+    id: U32,
+}
+
+impl Handle {
+    destroy {}
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn consume(move handle: Handle) -> Unit {
+    return;
+}
+
+fn rebuild() -> Handle {
+    var slot = makeHandle(1);
+    val old = slot;
+    consume(move old);
+
+    slot = makeHandle(2);
+    return slot;
+}

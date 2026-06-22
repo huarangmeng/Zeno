@@ -1,0 +1,14 @@
+// category: compile-fail
+// profile: hosted
+// purpose: TaskContext cannot escape by becoming a task output
+
+module tests.fail.taskContextReturn;
+
+fn bad(move runtime: Runtime) -> Result<Unit, SpawnError> {
+    val task = try runtime.spawn(move (ctx: TaskContext) -> TaskContext {
+        return ctx; // expected-error: TaskContext cannot escape the task body
+    });
+
+    move task.detach();
+    return Ok(());
+}

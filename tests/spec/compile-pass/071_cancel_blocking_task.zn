@@ -1,0 +1,13 @@
+// category: compile-pass
+// profile: hosted
+// purpose: cancelling a blocking task is cooperative and explicitly settles the handle
+
+module tests.pass.cancelBlockingTask;
+
+fn cancelBlocking(move runtime: Runtime, move path: Path) -> Result<TaskCancelStatus, IoError> {
+    val task = try runtime.spawnBlocking(move () -> Result<Bytes, IoError> {
+        return readFileSync(move path);
+    });
+
+    return Ok(move task.cancel());
+}

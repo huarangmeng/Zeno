@@ -1,0 +1,24 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: val assignment is rejected when the binding may already be initialized
+
+module tests.fail.valMaybeInitializedAssignment;
+
+struct Handle {
+    id: U32,
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn bad(flag: Bool) -> Handle {
+    val handle: Handle;
+
+    if flag {
+        handle = makeHandle(1);
+    }
+
+    handle = makeHandle(2); // expected-error: val may already be initialized on some path
+    return handle;
+}

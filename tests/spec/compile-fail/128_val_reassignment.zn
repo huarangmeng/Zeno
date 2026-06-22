@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: val cannot be reassigned after successful initialization
+
+module tests.fail.valReassignment;
+
+struct Handle {
+    id: U32,
+}
+
+fn makeHandle(id: U32) -> Handle {
+    return Handle { id: id };
+}
+
+fn bad() -> Handle {
+    val handle = makeHandle(1);
+    handle = makeHandle(2); // expected-error: val binding cannot be reassigned after initialization
+    return handle;
+}

@@ -8,7 +8,7 @@ struct Page {
 
 impl Page {
     fn new(mut allocator: GlobalAllocator) -> Page {
-        let bytes = Array<U8>.filledIn(4096, 0, mut allocator);
+        val bytes = Array<U8>.filledIn(4096, 0, mut allocator);
         return Page { bytes: bytes };
     }
 }
@@ -18,6 +18,6 @@ fn consumePage(move page: Page) {
 }
 
 pub fn demo(mut allocator: GlobalAllocator) {
-    let page = Page.new(mut allocator);
+    val page = Page.new(mut allocator);
     consumePage(move page);
 }

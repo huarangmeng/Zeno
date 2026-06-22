@@ -90,7 +90,7 @@ version = "0.1.0"
 source = "path:../platform"
 manifestHash = "sha256:..."
 contentHash = "sha256:..."
-trust = ["ffi"]
+trust = ["ffi", "rawMemory"]
 
 [[package]]
 name = "std"
@@ -107,7 +107,7 @@ trust = []
 - `manifestHash`。
 - `contentHash`：源码和构建相关文件的内容 hash。
 - 依赖边：源码 import key 到解析后 package 的映射。
-- trust 能力摘要：例如 `ffi`、`hardware`、`inlineAsm`、`interrupts`。
+- trust 能力摘要：例如 `ffi`、`rawMemory`、`hardware`、`inlineAsm`、`interrupts`、`threadSafety`。
 - 对 registry 包，还要记录 registry URL、包内容 hash 和签名/校验信息。
 - 对 git 包，必须记录 commit hash，不能记录 branch 作为最终来源。
 

@@ -1,0 +1,15 @@
+// category: compile-pass
+// profile: hosted
+// purpose: synchronous entry points can explicitly block on a task through a runtime
+
+module tests.pass.runtimeBlockOnTask;
+
+fn main() -> Result<Unit, WorkError> {
+    var runtime = try Runtime.withWorkerCount(8);
+    val task = try runtime.spawn(move () -> Result<Unit, WorkError> {
+        return work();
+    });
+
+    try mut runtime.blockOn(move task);
+    return Ok(());
+}

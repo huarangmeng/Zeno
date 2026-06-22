@@ -20,6 +20,6 @@ fn failWithString() -> String {
 }
 
 fn failAllocation() -> Vector<U8> {
-    let layout = Layout { size: 64, align: 8 };
+    val layout = Layout { size: 64, align: 8 };
     oom(layout);
 }

@@ -1,0 +1,19 @@
+// category: compile-fail
+// profile: freestanding
+// purpose: destroy blocks are implicit noPanic cleanup
+
+module tests.fail.destroyPanic;
+
+import core.panic.panic;
+
+struct Guard {
+    armed: Bool,
+}
+
+impl Guard {
+    destroy {
+        if self.armed {
+            panic("cleanup failed"); // expected-error: destroy cannot call panic
+        }
+    }
+}
