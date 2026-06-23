@@ -1,0 +1,9 @@
+module raw;
+
+trust extern "C" fn platform_read(fd: I32) -> I32; // expected-error[E1006]: dependency package platform contains trust boundaries but dependencyTrust is false
+
+pub fn read(fd: I32) -> I32 {
+    return trust { // expected-error[E1006]: dependency package platform contains trust boundaries but dependencyTrust is false
+        platform_read(fd)
+    };
+}

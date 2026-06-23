@@ -1,0 +1,17 @@
+module alloc.box;
+
+// runtime: allocator
+pub struct Box<T> {}
+pub struct Shared<T> {}
+
+impl<T> Box<T> {
+    fn new(move value: T) -> Box<T>;
+    fn newIn<A: Allocator>(move value: T, mut allocator: A) -> Box<T>;
+}
+
+impl<T> Shared<T> {
+    fn new(move value: T) -> Shared<T>;
+    fn newIn<A: Allocator>(move value: T, mut allocator: A) -> Shared<T>;
+    fn clone(self) -> Shared<T>;
+    fn strongCount(self) -> USize;
+}

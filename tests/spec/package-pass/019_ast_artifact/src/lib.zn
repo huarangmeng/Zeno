@@ -1,0 +1,37 @@
+module lib;
+
+import core.traits.{Copy, Send};
+
+@layout(C)
+pub struct Packet {
+    pub value: I32,
+}
+
+pub interface Driver {
+    fn read(self) -> I32;
+}
+
+trust extern "C" fn host_read(value: I32) -> I32;
+
+pub fn readHost(packet: Packet) -> I32 {
+    return trust {
+        host_read(packet.value)
+    };
+}
+
+pub fn observe(value: I32) -> I32 {
+    return value;
+}
+
+pub fn compute(value: I32) -> I32 {
+    val next: I32 = value + 1;
+    var total = next;
+    observe(total);
+    return total;
+}
+
+impl Driver for Packet {
+    fn read(self) -> I32 {
+        return self.value;
+    }
+}

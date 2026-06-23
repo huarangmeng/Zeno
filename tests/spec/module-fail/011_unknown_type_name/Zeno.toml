@@ -1,0 +1,21 @@
+# category: module-fail
+# stage: mvp
+# milestone: M2
+# purpose: named types in fields and function signatures must resolve
+
+[package]
+name = "unknownTypeName"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

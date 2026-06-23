@@ -1,0 +1,23 @@
+version = 1
+root = "trustedSendSync"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "trustedSendSync"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:cc52a28a6b8455c4"
+contentHash = "fnv1a64:5fef0d19f5a8fee5"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

@@ -1,0 +1,38 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: assignments to known local variables must match their declared type
+
+module tests.fail.assignmentTypeMismatch;
+
+struct Packet {
+    value: U32,
+}
+
+struct Header {
+    value: U32,
+}
+
+enum Maybe {
+    None,
+}
+
+enum State {
+    Ready,
+}
+
+fn badAssignments(flag: Bool, count: U32, header: Header) -> U32 {
+    var numeric: U32 = 0;
+    numeric = flag; // expected-error[E0302]: assignment type U32 does not match Bool expression
+
+    var boolean: Bool = false;
+    boolean = count; // expected-error[E0302]: assignment type Bool does not match U32 expression
+
+    var packet: Packet = Packet { value: 1 };
+    packet = header; // expected-error[E0302]: assignment type Packet does not match Header expression
+
+    var state: State = State.Ready;
+    state = Maybe.None; // expected-error[E0302]: assignment type State does not match Maybe expression
+
+    return 0;
+}

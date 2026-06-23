@@ -1,0 +1,15 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: struct literals must initialize every declared field
+
+module tests.fail.missingStructFieldInitializer;
+
+struct Header {
+    tag: U8,
+    length: U16,
+}
+
+fn badHeader() -> Header {
+    return Header { tag: 1 }; // expected-error[E0404]: field length is not initialized in struct Header
+}

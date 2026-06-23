@@ -1,0 +1,41 @@
+module core.alloc;
+
+pub struct Layout {
+    size: USize,
+    align: USize,
+}
+
+pub enum AllocError {
+    OutOfMemory,
+    InvalidLayout,
+    TooLarge,
+}
+
+pub struct Allocation {}
+
+pub interface Allocator {
+    fn allocate(mut self, layout: Layout) -> Result<Allocation, AllocError>;
+    fn deallocate(mut self, allocation: Allocation, layout: Layout);
+}
+
+pub interface EscapingAllocator {
+    fn allocate(mut self, layout: Layout) -> Result<Allocation, AllocError>;
+    fn deallocate(mut self, allocation: Allocation, layout: Layout);
+}
+
+pub struct GlobalAllocator {}
+pub struct ThreadLocalAllocator {}
+pub struct ArenaAllocator {}
+pub struct BumpAllocator {}
+pub struct FixedBufferAllocator {}
+pub struct PageAllocator {}
+
+impl Allocator for GlobalAllocator {}
+impl Allocator for ThreadLocalAllocator {}
+impl Allocator for ArenaAllocator {}
+impl Allocator for BumpAllocator {}
+impl Allocator for FixedBufferAllocator {}
+impl Allocator for PageAllocator {}
+impl EscapingAllocator for GlobalAllocator {}
+impl EscapingAllocator for ThreadLocalAllocator {}
+impl EscapingAllocator for PageAllocator {}

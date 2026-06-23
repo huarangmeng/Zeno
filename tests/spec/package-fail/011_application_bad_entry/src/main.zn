@@ -1,0 +1,5 @@
+module main;
+
+pub fn main() -> I32 {
+    return 0;
+}

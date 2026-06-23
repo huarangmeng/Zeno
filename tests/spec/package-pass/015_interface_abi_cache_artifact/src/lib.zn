@@ -1,0 +1,46 @@
+trust extern "C" fn host_tick() -> I32;
+
+interface Writer {
+    fn write(self) -> I32;
+}
+
+interface ThreadWriter: Writer, Send {}
+
+pub struct Service {
+    pub value: I32,
+}
+
+impl Writer for Service {
+    fn write(self) -> I32 {
+        return self.value;
+    }
+}
+
+impl ThreadWriter for Service {}
+
+pub fn identity<T>(value: T) -> T {
+    return value;
+}
+
+pub fn makeWriter() -> Writer {
+    return Service { value: 7 };
+}
+
+pub fn useBox(boxed: Box<Writer>) -> I32 {
+    return boxed.write();
+}
+
+pub fn useCallback(slice: ArraySlice<I32>, callback: Fn<I32, I32>) -> I32 {
+    return callback.call(slice[0]);
+}
+
+@export("zeno_service_id", abi: C)
+pub fn serviceId(value: I32) -> I32 {
+    return value;
+}
+
+pub fn callHost() -> I32 {
+    return trust {
+        host_tick()
+    };
+}

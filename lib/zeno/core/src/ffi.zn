@@ -1,0 +1,9 @@
+module core.ffi;
+
+pub interface CErrorCode {
+    fn toCCode(self) -> I32;
+}
+
+pub struct CStr {}
+pub struct CHandle<T> {}
+pub struct CBuffer<T> {}

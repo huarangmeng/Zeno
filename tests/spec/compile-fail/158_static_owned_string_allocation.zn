@@ -1,0 +1,10 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// allocator.default: true
+// purpose: static initialization cannot materialize an owned String through hidden runtime allocation
+
+module tests.fail.staticOwnedStringAllocation;
+
+static Name: String = String.from("zeno"); // expected-error[E0801]: static initializer must be CTFE-materialized data; runtime allocation and global destruction must be explicit

@@ -1,0 +1,38 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: struct constructor field initializers must match declared field types
+
+module tests.fail.structFieldInitializerTypeMismatch;
+
+struct Header {
+    value: U32,
+}
+
+struct Footer {
+    value: U32,
+}
+
+struct Packet {
+    count: U32,
+    enabled: Bool,
+    header: Header,
+    state: State,
+}
+
+enum Maybe {
+    None,
+}
+
+enum State {
+    Ready,
+}
+
+fn badPacket(flag: Bool, count: U32, footer: Footer) -> Packet {
+    return Packet {
+        count: flag, // expected-error[E0302]: field count type U32 does not match Bool expression
+        enabled: count, // expected-error[E0302]: field enabled type Bool does not match U32 expression
+        header: footer, // expected-error[E0302]: field header type Header does not match Footer expression
+        state: Maybe.None, // expected-error[E0302]: field state type State does not match Maybe expression
+    };
+}

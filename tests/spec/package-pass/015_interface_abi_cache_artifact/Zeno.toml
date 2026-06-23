@@ -1,0 +1,52 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# zmeta-contains: sendSyncFingerprint = "fnv1a64:
+# zmeta-contains: interfaceFingerprint = "fnv1a64:
+# zmeta-contains: abiFingerprint = "fnv1a64:
+# zmeta-contains: trustFingerprint = "fnv1a64:
+# zmeta-contains: dependencyFingerprint = "fnv1a64:
+# zmeta-contains: costFingerprint = "fnv1a64:
+# zmeta-contains: sendSync=fnv1a64:
+# zmeta-contains: interfaces=fnv1a64:
+# zmeta-contains: abi=fnv1a64:
+# zmeta-contains: trust=fnv1a64:
+# zmeta-contains: dependencies=fnv1a64:
+# zmeta-contains: cost=fnv1a64:
+# zmeta-contains: interfaces = ["ThreadWriter", "Writer"]
+# zmeta-contains: impls = ["ThreadWriter for Service", "Writer for Service"]
+# zmeta-contains: genericSignatures = ["fn identity<T>"]
+# zmeta-contains: staticInterfaceReturns = ["identity->T", "makeWriter->Writer"]
+# zmeta-contains: exports = ["zeno_service_id:abi=C"]
+# zmeta-contains: trustCapabilities = ["ffi", "manifest:dependencyTrust=false", "manifest:ffi=true", "manifest:hardware=false", "manifest:inlineAsm=false", "manifest:interrupts=false", "manifest:rawMemory=false", "trust-block"]
+# zmeta-contains: costInputs = ["box-interface", "closure-dispatch", "slice-provenance"]
+# purpose: interface, ABI, trust, dependency, Send/Sync, and cost facts contribute cache fingerprints
+
+[package]
+name = "interfaceAbiCache"
+version = "0.1.0"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = true
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

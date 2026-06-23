@@ -1,0 +1,34 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# purpose: explicit builtin std dependency opts a freestanding package into std imports
+
+[package]
+name = "stdFreestandingBuiltin"
+version = "0.1.0"
+kind = "library"
+
+[dependencies]
+std = "builtin"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

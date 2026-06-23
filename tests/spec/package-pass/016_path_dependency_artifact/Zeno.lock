@@ -1,0 +1,45 @@
+version = 1
+root = "pathDepArtifact"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "pathDepArtifact"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:ac11cdbe83e1d28a"
+contentHash = "fnv1a64:eaff5047542505a3"
+trust = []
+dependencies = [
+  { key = "platform", package = "platform" },
+]
+
+[[package]]
+name = "platform"
+version = "0.1.0"
+source = "path:platform"
+manifestHash = "fnv1a64:e618947faa5e5701"
+contentHash = "fnv1a64:2aedd138bc31dd61"
+trust = []
+dependencies = [
+  { key = "driver", package = "driver" },
+]
+
+[[package]]
+name = "driver"
+version = "0.1.0"
+source = "path:platform/driver"
+manifestHash = "fnv1a64:da0fd1aa3113bafb"
+contentHash = "fnv1a64:8f945f29f3b6379f"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

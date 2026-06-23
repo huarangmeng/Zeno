@@ -20,4 +20,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: tryReserve capacity fact must remove push grow slow path inside proven loop
 error = "tryReserve capacity fact must remove push grow slow path inside proven loop"

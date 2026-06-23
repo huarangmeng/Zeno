@@ -1,0 +1,43 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: obvious local function call result types flow into local type checks
+
+module tests.fail.functionCallResultTypeMismatch;
+
+struct Packet {
+    header: Header,
+}
+
+struct Header {
+    value: U32,
+}
+
+fn makeFlag() -> Bool {
+    return false;
+}
+
+fn makeCount() -> U32 {
+    return 1;
+}
+
+fn makePacket() -> Packet {
+    return Packet { header: Header { value: 1 } };
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn badCallResults(mut packet: Packet) -> U32 {
+    val count: U32 = makeFlag(); // expected-error[E0302]: initializer type U32 does not match Bool expression
+
+    var flag: Bool = false;
+    flag = makeCount(); // expected-error[E0302]: assignment type Bool does not match U32 expression
+
+    packet.header = makePacket(); // expected-error[E0302]: field assignment header type Header does not match Packet expression
+
+    val arg = needCount(makeFlag()); // expected-error[E0302]: argument 1 of needCount expects U32 but got Bool
+
+    return makeFlag(); // expected-error[E0302]: return type U32 does not match Bool expression
+}

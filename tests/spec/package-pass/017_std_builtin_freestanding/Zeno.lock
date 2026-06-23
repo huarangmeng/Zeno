@@ -1,0 +1,33 @@
+version = 1
+root = "stdFreestandingBuiltin"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "stdFreestandingBuiltin"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:ed804ac85273d760"
+contentHash = "fnv1a64:14e5762e5f9f385b"
+trust = []
+dependencies = [
+  { key = "std", package = "std" },
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "std"
+version = "builtin"
+source = "builtin:std"
+compilerPackageHash = "fnv1a64:803180c8ce4dc26c"
+trust = []
+dependencies = [
+]
+

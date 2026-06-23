@@ -1,0 +1,33 @@
+version = 1
+root = "hostedRuntime"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "hostedRuntime"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:44b5821ab656df11"
+contentHash = "fnv1a64:8261bc28ab55da32"
+trust = []
+dependencies = [
+  { key = "alloc", package = "alloc" },
+]
+
+[[package]]
+name = "alloc"
+version = "builtin"
+source = "builtin:alloc"
+compilerPackageHash = "fnv1a64:8946d6a103a9105d"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

@@ -1,0 +1,30 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: package source hardware, inline asm, and interrupt trust boundaries require matching manifest capabilities
+
+[package]
+name = "lowLevelDenied"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = true
+rawMemory = true
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

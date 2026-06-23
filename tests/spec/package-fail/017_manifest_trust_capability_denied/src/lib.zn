@@ -1,0 +1,9 @@
+module lib;
+
+trust extern "C" fn getpid() -> I32; // expected-error[E0714]: manifest does not allow FFI trust capability
+
+pub fn readByte(address: USize) -> U8 {
+    return trust {
+        RawPointer<U8>.fromAddress(address).read() // expected-error[E0711]: manifest does not allow rawMemory trust capability
+    };
+}

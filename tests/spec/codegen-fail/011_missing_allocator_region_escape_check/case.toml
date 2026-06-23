@@ -16,5 +16,5 @@ forbid = [
 ]
 
 [expect]
+# expected-error: scoped allocator owner cannot escape allocator region
 error = "scoped allocator owner cannot escape allocator region"
-

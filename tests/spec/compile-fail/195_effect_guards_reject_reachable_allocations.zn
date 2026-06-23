@@ -1,0 +1,50 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M4
+// profile: hosted
+// oom: panic
+// purpose: effect guards reject reachable local helpers that panic or allocate
+
+module tests.fail.effectGuardsRejectReachableAllocations;
+
+fn allocateText() -> String {
+    return String.from("owned");
+}
+
+fn allocateThroughHelper() -> String {
+    return allocateText();
+}
+
+fn panicCleanup() {
+    panic("cleanup failed");
+}
+
+fn allocateCleanup() {
+    val text = String.from("closing");
+}
+
+@noAlloc
+fn badNoAllocDirect() {
+    val text = allocateText(); // expected-error[E0305]: noAlloc function cannot call function that may allocate
+}
+
+@noAlloc
+fn badNoAllocTransitive() {
+    val text = allocateThroughHelper(); // expected-error[E0305]: noAlloc function cannot call function that may allocate
+}
+
+@noPanic
+fn badNoPanicAllocation() {
+    val text = allocateThroughHelper(); // expected-error[E0807]: allocation failure would call panic in this profile
+}
+
+struct Handle {
+    fd: I32,
+}
+
+impl Handle {
+    destroy {
+        panicCleanup(); // expected-error[E0405]: destroy cannot call panic
+        allocateCleanup(); // expected-error[E0405]: destroy cannot allocate
+    }
+}

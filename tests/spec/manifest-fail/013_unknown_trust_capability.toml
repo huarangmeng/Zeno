@@ -1,0 +1,30 @@
+# stage: mvp
+# milestone: M2
+# purpose: manifest trust capabilities are limited to V01 trust categories
+
+[package]
+name = "badTrustCapability"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+sandbox = true # expected-error[E1001]: unknown trust capability field
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

@@ -1,0 +1,25 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M2
+// purpose: Char literals flow through simple local bindings, fields, calls, comparisons, and returns
+
+module tests.pass.charLiterals;
+
+struct Token {
+    kind: Char,
+}
+
+fn accept(ch: Char) -> Char {
+    return ch;
+}
+
+fn main() -> Char {
+    val inferred = 'z';
+    val explicit: Char = inferred;
+    var token: Token = Token { kind: explicit };
+    token.kind = accept('a');
+    if token.kind == 'a' {
+        return token.kind;
+    }
+    return '\n';
+}

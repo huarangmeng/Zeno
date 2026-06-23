@@ -1,0 +1,15 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: struct literals cannot initialize the same field more than once
+
+module tests.fail.duplicateStructFieldInitializer;
+
+struct Header {
+    tag: U8,
+    length: U16,
+}
+
+fn badHeader() -> Header {
+    return Header { tag: 1, length: 2, tag: 3 }; // expected-error[E0404]: field tag is initialized more than once in struct Header
+}

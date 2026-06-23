@@ -1,0 +1,23 @@
+version = 1
+root = "trustReport"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "trustReport"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:e285491c764e5046"
+contentHash = "fnv1a64:99259016de307ace"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

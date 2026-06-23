@@ -1,0 +1,25 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: Map and Set accept local key types with an explicit HashKey implementation
+
+module tests.pass.mapSetHashKeyBounds;
+
+struct UserId: Copy {
+    raw: U64,
+}
+
+impl HashKey for UserId {}
+
+fn makeMap() -> Map<UserId, USize> {
+    var counts = Map<UserId, USize>.empty();
+    mut counts.insert(UserId { raw: 7 }, 1);
+    return counts;
+}
+
+fn makeSet() -> Set<UserId> {
+    var ids = Set<UserId>.withCapacity(4);
+    mut ids.insert(UserId { raw: 7 });
+    return ids;
+}

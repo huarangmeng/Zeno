@@ -1,0 +1,34 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# zmeta-contains: declarationFingerprint = "fnv1a64:
+# zmeta-contains: struct Job stableNodeId=fnv1a64:
+# zmeta-contains: interface Worker stableNodeId=fnv1a64:
+# zmeta-contains: fn makeJob stableNodeId=fnv1a64:
+# zmeta-contains: impls = ["Worker for Job"]
+# zmeta-forbid: fn run stableNodeId=
+# zmeta-forbid: fn helper stableNodeId=
+# purpose: declaration collection records only top-level declarations for artifact metadata
+
+[package]
+name = "declarationCollection"
+version = "0.1.0"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

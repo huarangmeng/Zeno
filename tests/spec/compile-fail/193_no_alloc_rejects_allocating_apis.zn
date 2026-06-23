@@ -1,0 +1,40 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M4
+// profile: hosted
+// purpose: @noAlloc rejects known allocating APIs beyond format and String.from
+
+module tests.fail.noAllocRejectsAllocatingApis;
+
+import core.alloc.GlobalAllocator;
+
+struct Packet: Copy {
+    value: U8,
+}
+
+struct UserId: Copy {
+    raw: U64,
+}
+
+impl HashKey for UserId {}
+
+@noAlloc
+fn badStringApis(mut text: String, mut allocator: GlobalAllocator) {
+    mut text.push("x"); // expected-error[E0305]: push may allocate in no-allocation context
+    mut text.reserve(8); // expected-error[E0305]: reserve may allocate in no-allocation context
+    mut text.tryReserve(8); // expected-error[E0305]: reserve may allocate in no-allocation context
+    val owned = String.fromIn("x", mut allocator); // expected-error[E0305]: String.from may allocate in no-allocation context
+    val copied = text.clone(); // expected-error[E0305]: clone may allocate in no-allocation context
+    val copiedIn = text.cloneIn(mut allocator); // expected-error[E0305]: clone may allocate in no-allocation context
+}
+
+@noAlloc
+fn badCollectionApis(mut allocator: GlobalAllocator) {
+    var bytes = Vector<U8>.withCapacity(4); // expected-error[E0305]: collection allocation is not allowed in no-allocation context
+    val page = Array<U8>.filled(4, 0); // expected-error[E0305]: collection allocation is not allowed in no-allocation context
+    var counts = Map<UserId, USize>.emptyIn(mut allocator); // expected-error[E0305]: collection allocation is not allowed in no-allocation context
+    mut counts.insert(UserId { raw: 1 }, 1); // expected-error[E0305]: collection insertion may allocate in no-allocation context
+    val entry = mut counts.entry(UserId { raw: 2 }); // expected-error[E0305]: collection insertion may allocate in no-allocation context
+    val boxed = Box.newIn(Packet { value: 1 }, mut allocator); // expected-error[E0305]: Box/Shared allocation is not allowed in no-allocation context
+    val shared = Shared.newIn(Packet { value: 2 }, mut allocator); // expected-error[E0305]: Box/Shared allocation is not allowed in no-allocation context
+}

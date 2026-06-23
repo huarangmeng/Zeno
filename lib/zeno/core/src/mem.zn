@@ -1,0 +1,14 @@
+module core.mem;
+
+// intrinsic: core.mem.sizeOf
+pub fn sizeOf<T>() -> USize;
+
+// intrinsic: core.mem.alignOf
+pub fn alignOf<T>() -> USize;
+
+// intrinsic: core.mem.offsetOf
+pub fn offsetOf<T>(field: StringSlice) -> USize;
+
+pub struct CachePadded<T> {
+    value: T,
+}

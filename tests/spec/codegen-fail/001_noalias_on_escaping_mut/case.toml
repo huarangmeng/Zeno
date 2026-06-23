@@ -17,5 +17,5 @@ llvmParamAttrs = [
 ]
 
 [expect]
+# expected-error: noalias requires proven unique non-escaping access
 error = "noalias requires proven unique non-escaping access"
-

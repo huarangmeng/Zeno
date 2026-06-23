@@ -1,0 +1,23 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: owning collection clone APIs are available for Copy element, key, and value types
+
+module tests.pass.collectionCloneCopyBounds;
+
+fn cloneArray(items: Array<U8>) -> Array<U8> {
+    return items.clone();
+}
+
+fn cloneVector(items: Vector<U8>) -> Vector<U8> {
+    return items.clone();
+}
+
+fn cloneMap(items: Map<U64, USize>) -> Map<U64, USize> {
+    return items.clone();
+}
+
+fn cloneSet(items: Set<U64>) -> Set<U64> {
+    return items.clone();
+}

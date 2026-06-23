@@ -1,0 +1,7 @@
+module lib;
+
+import std.thread; // expected-error[E0201]: std is available only in hosted profile or an explicit hosted-capable builtin dependency
+
+pub fn useThread() -> I32 {
+    return 0;
+}

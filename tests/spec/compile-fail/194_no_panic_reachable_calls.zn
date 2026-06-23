@@ -1,0 +1,43 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M4
+// profile: hosted
+// oom: panic
+// purpose: @noPanic rejects reachable local panic calls and OOM-as-panic allocation APIs
+
+module tests.fail.noPanicReachableCalls;
+
+struct Packet: Copy {
+    value: U8,
+}
+
+fn leaf() {
+    panic("boom");
+}
+
+fn middle() {
+    leaf();
+}
+
+@noPanic
+fn badDirectCall() {
+    leaf(); // expected-error[E0807]: noPanic function cannot call function that may panic
+}
+
+@noPanic
+fn badTransitiveCall() {
+    middle(); // expected-error[E0807]: noPanic function cannot call function that may panic
+}
+
+@noPanic
+fn badStringGrowth(mut text: String) {
+    mut text.push("x"); // expected-error[E0807]: allocation failure would call panic in this profile
+    mut text.reserve(8); // expected-error[E0807]: allocation failure would call panic in this profile
+    val copied = text.clone(); // expected-error[E0807]: allocation failure would call panic in this profile
+}
+
+@noPanic
+fn badOwnerConstruction() {
+    var bytes = Vector<U8>.withCapacity(4); // expected-error[E0807]: allocation failure would call panic in this profile
+    val boxed = Box.new(Packet { value: 1 }); // expected-error[E0807]: allocation failure would call panic in this profile
+}

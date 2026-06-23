@@ -1,0 +1,33 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: panic and OOM handlers named by manifest must return Never
+
+[package]
+name = "kernelHandlers"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "kernel"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "handler"
+handler = "kernel.panicHandler"
+stack = "addresses"
+
+[oom]
+strategy = "handler"
+handler = "kernel.oomHandler"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = true
+inlineAsm = false
+interrupts = false
+dependencyTrust = false
+requireReport = true

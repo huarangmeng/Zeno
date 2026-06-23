@@ -1,0 +1,12 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:0000000000000000"
+contentHash = "fnv1a64:0000000000000000" # expected-error: lockfile content hash is stale for package app
+trust = []
+dependencies = []

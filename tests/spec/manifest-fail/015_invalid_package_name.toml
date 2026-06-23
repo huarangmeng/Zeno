@@ -1,0 +1,29 @@
+# stage: mvp
+# milestone: M2
+# purpose: package.name must be usable as a stable package/import identifier
+
+[package]
+name = "bad-name" # expected-error[E1003]: package.name must be a legal Zeno identifier
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

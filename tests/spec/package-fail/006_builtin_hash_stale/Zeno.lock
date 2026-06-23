@@ -1,0 +1,32 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:460d5c8f7572c10f"
+contentHash = "fnv1a64:3613c2eef6dbc1e9"
+trust = []
+dependencies = [
+  { key = "std", package = "std" },
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:fa8871e4647caeae"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "std"
+version = "builtin"
+source = "builtin:std"
+compilerPackageHash = "fnv1a64:0000000000000000" # expected-error: builtin package hash is stale for std
+trust = []
+dependencies = [
+]

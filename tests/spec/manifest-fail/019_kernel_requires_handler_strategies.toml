@@ -1,0 +1,21 @@
+# category: manifest-fail
+# stage: mvp
+# milestone: M2
+# purpose: kernel profile must use handler strategies for panic and OOM
+
+[package]
+name = "kernel_bad_strategies"
+version = "0.1.0"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "kernel"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "abort" # expected-error[E1002]: kernel profile requires handler panic strategy
+
+[oom]
+strategy = "trap" # expected-error[E1002]: kernel profile requires handler oom strategy

@@ -1,0 +1,12 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// purpose: top-level bindings cannot create implicit module initialization work
+
+module tests.fail.topLevelValModuleInitializer;
+
+fn readConfig() -> U32 {
+    return 1;
+}
+
+val config = readConfig(); // expected-error[E0004]: top-level executable statements are not allowed; use an explicit function or const/static CTFE initializer

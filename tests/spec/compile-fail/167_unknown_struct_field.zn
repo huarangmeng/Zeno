@@ -1,0 +1,18 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: known struct constructors and field access must name declared fields
+
+module tests.fail.unknownStructField;
+
+struct Packet {
+    value: I32,
+}
+
+fn badConstructor() -> Packet {
+    return Packet { missing: 1 }; // expected-error[E0201]: field missing is not declared in struct Packet
+}
+
+fn badAccess(packet: Packet) -> I32 {
+    return packet.missing; // expected-error[E0201]: field missing is not declared in struct Packet
+}

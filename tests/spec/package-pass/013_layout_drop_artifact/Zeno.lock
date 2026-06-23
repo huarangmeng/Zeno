@@ -1,0 +1,23 @@
+version = 1
+root = "layoutDrop"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "layoutDrop"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:826b3d4296500ca3"
+contentHash = "fnv1a64:a28ed31317fe259d"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

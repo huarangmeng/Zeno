@@ -1,0 +1,24 @@
+# category: module-pass
+# stage: mvp
+# milestone: M2
+# purpose: named imports from path dependencies resolve only exported declarations
+
+[package]
+name = "namedImportApp"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[dependencies]
+platform = { path = "platform" }

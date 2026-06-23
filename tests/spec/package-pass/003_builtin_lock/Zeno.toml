@@ -1,0 +1,32 @@
+# category: package-pass
+# purpose: builtin dependencies are audited through lockfile builtin sources and compiler package hashes
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+std = "builtin"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

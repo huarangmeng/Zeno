@@ -18,4 +18,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: static interface return must lower to its concrete return type
 error = "static interface return must lower to its concrete return type"

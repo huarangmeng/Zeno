@@ -1,0 +1,23 @@
+version = 1
+root = "declarationCollection"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "declarationCollection"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:8e7593192c601d51"
+contentHash = "fnv1a64:0204fa1d648e801d"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

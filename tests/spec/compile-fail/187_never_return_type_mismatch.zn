@@ -1,0 +1,22 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M3
+// purpose: functions declared Never cannot return ordinary values
+
+module tests.fail.neverReturnTypeMismatch;
+
+fn cleanup() -> Unit {
+    return;
+}
+
+fn badInteger() -> Never {
+    return 1; // expected-error[E0302]: Never function cannot return integer expression
+}
+
+fn badBool() -> Never {
+    return false; // expected-error[E0302]: Never function cannot return Bool expression
+}
+
+fn badUnit() -> Never {
+    return cleanup(); // expected-error[E0302]: Never function cannot return Unit expression
+}

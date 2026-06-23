@@ -1,0 +1,15 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: enum-qualified constructors must name declared variants
+
+module tests.fail.unknownEnumVariant;
+
+enum State {
+    Ready,
+    Done,
+}
+
+fn badState() -> State {
+    return State.Missing; // expected-error[E0201]: variant Missing is not declared in enum State
+}

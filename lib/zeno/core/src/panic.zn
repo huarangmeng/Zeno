@@ -1,0 +1,37 @@
+module core.panic;
+
+// intrinsic: core.panic.panic
+// runtime: panic
+pub fn panic(message: StringSlice) -> Never;
+
+// intrinsic: core.panic.oom
+// runtime: oom
+pub fn oom(layout: Layout) -> Never;
+
+pub struct PanicInfo {}
+pub struct SourceLocation {}
+pub struct StackFrame {}
+pub struct StackFrames {}
+
+impl PanicInfo {
+    fn message(self) -> StringSlice;
+    fn location(self) -> SourceLocation;
+    fn stack(self) -> StackFrames;
+}
+
+impl SourceLocation {
+    fn file(self) -> StringSlice;
+    fn function(self) -> StringSlice;
+    fn line(self) -> U32;
+    fn column(self) -> U32;
+}
+
+impl StackFrame {
+    fn instructionPointer(self) -> USize;
+    fn returnAddress(self) -> USize;
+    fn symbol(self) -> Option<StringSlice>;
+}
+
+impl Iterator<StackFrame> for StackFrames {
+    fn next(mut self) -> Option<StackFrame>;
+}

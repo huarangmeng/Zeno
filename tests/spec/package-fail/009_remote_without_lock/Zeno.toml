@@ -1,0 +1,32 @@
+# category: package-fail
+# purpose: stage0 does not resolve or fetch git/registry dependencies without a pre-resolved lockfile
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+hash = { git = "https://example.com/hash.git", rev = "4f9c2a7d8e9f00112233445566778899aabbccdd" } # expected-error[E9002]: git dependency requires a pre-resolved Zeno.lock in stage0
+log = { version = "1.2.3" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

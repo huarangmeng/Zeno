@@ -1,0 +1,23 @@
+version = 1
+root = "artifactLib"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "artifactLib"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:01088d545fb309bc"
+contentHash = "fnv1a64:3fe7daca003c2b68"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

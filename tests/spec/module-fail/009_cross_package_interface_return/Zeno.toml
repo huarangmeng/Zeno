@@ -1,0 +1,31 @@
+# category: module-fail
+# purpose: cross-package pub fn returning an interface requires delayed opaque return metadata
+
+[package]
+name = "app"
+entry = "main.main"
+
+[dependencies]
+writerlib = { path = "writerlib" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

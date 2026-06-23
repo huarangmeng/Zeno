@@ -1,0 +1,33 @@
+version = 1
+root = "hostedThread"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "hostedThread"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:7a9559d0004cfb6e"
+contentHash = "fnv1a64:6a8d2fa1a62039a0"
+trust = []
+dependencies = [
+  { key = "std", package = "std" },
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "std"
+version = "builtin"
+source = "builtin:std"
+compilerPackageHash = "fnv1a64:803180c8ce4dc26c"
+trust = []
+dependencies = [
+]
+

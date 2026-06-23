@@ -1,0 +1,25 @@
+module lib;
+
+pub interface Worker {
+    fn run(self) -> I32;
+}
+
+pub struct Job {
+    pub value: I32,
+}
+
+impl Worker for Job {
+    fn run(self) -> I32 {
+        return self.value;
+    }
+}
+
+impl Job {
+    fn helper(self) -> I32 {
+        return self.value;
+    }
+}
+
+pub fn makeJob() -> Job {
+    return Job { value: 7 };
+}

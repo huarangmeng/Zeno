@@ -1,0 +1,28 @@
+# stage: mvp
+# milestone: M2
+# purpose: oom.strategy accepts only abort, trap, or handler
+
+[package]
+name = "badOomStrategy"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "recover" # expected-error[E1002]: unknown oom strategy
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

@@ -1,0 +1,6 @@
+import platform.os.{Pid, missingPid}; // expected-error[E0201]: imported item missingPid is not declared in module platform.os
+
+pub fn main() -> I32 {
+    val pid: Pid = missingPid();
+    return pid.value;
+}

@@ -1,0 +1,23 @@
+version = 1
+root = "cAbiRuntime"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "cAbiRuntime"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:c28a5cb975be50cb"
+contentHash = "fnv1a64:98eb229758d8d9c4"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

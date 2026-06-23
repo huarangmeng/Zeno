@@ -1,0 +1,20 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M2
+// purpose: local bindings and top-level constants are known in simple identifier expressions
+
+module tests.pass.knownIdentifierFlow;
+
+const DefaultCount: U32 = 7;
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn main(input: U32) -> U32 {
+    val local: U32 = input;
+    val fromConst: U32 = DefaultCount;
+    var total: U32 = local;
+    total = fromConst;
+    return needCount(DefaultCount);
+}

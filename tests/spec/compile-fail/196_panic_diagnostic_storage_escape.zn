@@ -1,0 +1,25 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M4
+// profile: hosted
+// purpose: panic diagnostic access values cannot escape through storage containers
+
+module tests.fail.panicDiagnosticStorageEscape;
+
+import core.alloc.GlobalAllocator;
+import core.panic.{PanicInfo, StackFrames};
+
+struct SavedDiagnostics {
+    infos: Vector<PanicInfo>, // expected-error[E0809]: PanicInfo is a diagnostic access value and cannot be stored
+    frames: Vector<StackFrames>, // expected-error[E0809]: StackFrames is valid only inside the panic handler path
+}
+
+static LastInfo: PanicInfo; // expected-error[E0809]: PanicInfo is a diagnostic access value and cannot be stored
+static LastFrames: StackFrames; // expected-error[E0809]: StackFrames is valid only inside the panic handler path
+
+fn storeLocals(info: PanicInfo, frames: StackFrames, mut allocator: GlobalAllocator) {
+    val infos: Vector<PanicInfo> = Vector<PanicInfo>.withCapacity(1); // expected-error[E0809]: PanicInfo is a diagnostic access value and cannot be stored
+    var frameStack: Vector<StackFrames> = Vector<StackFrames>.withCapacity(1); // expected-error[E0809]: StackFrames is valid only inside the panic handler path
+    val boxed = Box.newIn(info, mut allocator); // expected-error[E0809]: PanicInfo is a diagnostic access value and cannot be stored
+    val shared = Shared.newIn(frames, mut allocator); // expected-error[E0809]: StackFrames is valid only inside the panic handler path
+}

@@ -1,0 +1,11 @@
+# stage: mvp
+# milestone: M2
+# purpose: stage0 accepts only the frozen first target triples
+
+[package]
+name = "badTarget"
+kind = "library"
+
+[target]
+triple = "wasm32-unknown-unknown" # expected-error[E1002]: unsupported target triple
+profile = "freestanding"

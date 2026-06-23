@@ -1,0 +1,6 @@
+import writerlib.api;
+
+pub fn main() -> I32 {
+    val writer = api.openWriter();
+    return 0;
+}

@@ -1,0 +1,26 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: returning a known local value must match the declared function result type
+
+module tests.fail.returnVariableTypeMismatch;
+
+struct Packet {
+    value: U32,
+}
+
+struct Header {
+    value: U32,
+}
+
+fn flagAsCount(flag: Bool) -> U32 {
+    return flag; // expected-error[E0302]: return type U32 does not match Bool expression
+}
+
+fn countAsFlag(count: U32) -> Bool {
+    return count; // expected-error[E0302]: return type Bool does not match U32 expression
+}
+
+fn headerAsPacket(header: Header) -> Packet {
+    return header; // expected-error[E0302]: return type Packet does not match Header expression
+}

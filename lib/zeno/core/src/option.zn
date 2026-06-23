@@ -1,0 +1,18 @@
+module core.option;
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+impl<T> Option<T> {
+    fn isSome(self) -> Bool;
+    fn isNone(self) -> Bool;
+    fn okOr<E>(move self, move error: E) -> Result<T, E>;
+    fn okOrElse<E>(move self, move makeError: OnceFn<E>) -> Result<T, E>;
+    fn unwrapOrElse(move self, move makeFallback: OnceFn<T>) -> T;
+}
+
+impl<T: Copy> Option<T> {
+    fn unwrapOr(self, fallback: T) -> T;
+}

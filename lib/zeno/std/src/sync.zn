@@ -1,0 +1,21 @@
+module std.sync;
+
+// runtime: thread
+pub struct Mutex<T> {}
+pub struct AtomicU32 {}
+pub struct AtomicU64 {}
+
+impl<T> Mutex<T> {
+    fn new(move value: T) -> Mutex<T>;
+    fn withLock<R>(mut self, move body: MutFn<T, R>) -> R;
+}
+
+impl AtomicU32 {
+    fn load(self) -> U32;
+    fn store(mut self, value: U32);
+}
+
+impl AtomicU64 {
+    fn load(self) -> U64;
+    fn store(mut self, value: U64);
+}

@@ -21,4 +21,5 @@ forbid = [
 ]
 
 [expect]
+# expected-error: future drop must clean initialized state
 error = "future drop must clean initialized state"

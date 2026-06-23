@@ -1,0 +1,31 @@
+[package]
+name = "std"
+version = "builtin"
+kind = "library"
+
+[dependencies]
+core = "builtin"
+alloc = "builtin"
+
+[target]
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = true
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+threadSafety = true
+dependencyTrust = false

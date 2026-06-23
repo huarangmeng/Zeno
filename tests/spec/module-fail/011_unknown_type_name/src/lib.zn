@@ -1,0 +1,9 @@
+module lib;
+
+pub struct Holder {
+    pub item: MissingType, // expected-error[E0201]: type MissingType is not declared
+}
+
+pub fn make(value: MissingArg) -> Holder { // expected-error[E0201]: type MissingArg is not declared
+    return Holder { item: value };
+}

@@ -1,0 +1,23 @@
+# category: incremental-pass
+# feature: diagnostic-order
+# purpose: replayable incremental diagnostics keep a stable package/file/offset/code order
+
+[before]
+package = "app"
+file = "src/main.zn"
+item = "main"
+publicFingerprint = "sha256:pub-stable"
+packageFingerprint = "sha256:pkg-stable"
+bodyFingerprint = "sha256:body-before"
+
+[after]
+bodyFingerprint = "sha256:body-after"
+publicFingerprint = "sha256:pub-stable"
+packageFingerprint = "sha256:pkg-stable"
+
+[expect]
+recheck = ["app::main.body"]
+recodegen = ["app::main"]
+invalidateDownstream = []
+keepValid = []
+diagnosticOrderStable = true

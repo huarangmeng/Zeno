@@ -1,0 +1,21 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: calls to uniquely known local functions must match argument count
+
+module tests.fail.functionArgumentArityMismatch;
+
+fn needPair(left: U32, right: U32) -> U32 {
+    return left + right;
+}
+
+fn needNone() -> U32 {
+    return 0;
+}
+
+fn badCalls(count: U32) -> U32 {
+    val a = needPair(count); // expected-error[E0302]: function needPair expects 2 arguments but got 1
+    val b = needPair(count, count, count); // expected-error[E0302]: function needPair expects 2 arguments but got 3
+    val c = needNone(count); // expected-error[E0302]: function needNone expects 0 arguments but got 1
+    return a + b + c;
+}

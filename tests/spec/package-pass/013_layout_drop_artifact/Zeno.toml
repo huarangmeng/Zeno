@@ -1,0 +1,33 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# zmeta-contains: layoutFingerprint = "fnv1a64:
+# zmeta-contains: dropFingerprint = "fnv1a64:
+# zmeta-contains: CPoint:C:fingerprint=
+# zmeta-contains: Packet:Packed:fingerprint=
+# zmeta-contains: Resource:Auto:fingerprint=
+# zmeta-contains: dropGlue = ["Resource:destroy"]
+# zmeta-contains: layouts=fnv1a64:
+# zmeta-contains: drop=fnv1a64:
+# purpose: layout and drop glue metadata contributes stable artifact fingerprints and cache keys
+
+[package]
+name = "layoutDrop"
+version = "0.1.0"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

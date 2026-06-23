@@ -20,4 +20,5 @@ llvm = [
 ]
 
 [expect]
+# expected-error: trust does not imply noalias or provenance facts
 error = "trust does not imply noalias or provenance facts"

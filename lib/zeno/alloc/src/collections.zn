@@ -1,0 +1,123 @@
+module alloc.collections;
+
+// runtime: allocator
+pub struct Array<T> {}
+pub struct Vector<T> {}
+pub struct Map<K, V> {}
+pub struct MapEntry<K, V> {}
+pub struct Set<T> {}
+pub struct String {}
+
+impl<T> Array<T> {
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn asSlice(self) -> ArraySlice<T>;
+    fn replaceAt(mut self, index: USize, move value: T) -> T;
+}
+
+impl<T: Copy> Array<T> {
+    fn get(self, index: USize) -> Option<T>;
+    fn filled(count: USize, value: T) -> Array<T>;
+    fn filledIn<A: Allocator>(count: USize, value: T, mut allocator: A) -> Array<T>;
+    fn clone(self) -> Array<T>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Array<T>;
+}
+
+impl<T> Vector<T> {
+    fn withCapacity(capacity: USize) -> Vector<T>;
+    fn withCapacityIn<A: Allocator>(capacity: USize, mut allocator: A) -> Vector<T>;
+    fn len(self) -> USize;
+    fn capacity(self) -> USize;
+    fn asSlice(self) -> ArraySlice<T>;
+    fn reserve(mut self, additional: USize);
+    fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn push(mut self, move value: T);
+    fn pop(mut self) -> Option<T>;
+    fn replaceAt(mut self, index: USize, move value: T) -> T;
+}
+
+impl<T: Copy> Vector<T> {
+    fn clone(self) -> Vector<T>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Vector<T>;
+}
+
+impl<K: HashKey, V> Map<K, V> {
+    fn empty() -> Map<K, V>;
+    fn emptyIn<A: Allocator>(mut allocator: A) -> Map<K, V>;
+    fn withCapacity(capacity: USize) -> Map<K, V>;
+    fn withCapacityIn<A: Allocator>(capacity: USize, mut allocator: A) -> Map<K, V>;
+    fn len(self) -> USize;
+    fn capacity(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn reserve(mut self, additional: USize);
+    fn reserveExact(mut self, additional: USize);
+    fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn tryReserveExact(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn insert(mut self, key: K, move value: V) -> Option<V>;
+    fn get(self, key: K) -> Option<V>;
+    fn containsKey(self, key: K) -> Bool;
+    fn remove(mut self, key: K) -> Option<V>;
+    fn removeEntry(mut self, key: K) -> Option<(K, V)>;
+    fn entry(mut self, move key: K) -> MapEntry<K, V>;
+    fn clear(mut self);
+    fn shrinkToFit(mut self);
+}
+
+impl<K: HashKey, V: Copy> Map<K, V> {
+    fn get(self, key: K) -> Option<V>;
+}
+
+impl<K: CopyHashKey, V: Copy> Map<K, V> {
+    fn clone(self) -> Map<K, V>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Map<K, V>;
+}
+
+impl<K: HashKey, V> MapEntry<K, V> {
+    fn exists(self) -> Bool;
+    fn insert(mut self, move value: V) -> Option<V>;
+    fn remove(mut self) -> Option<V>;
+    fn removeEntry(mut self) -> Option<(K, V)>;
+}
+
+impl<K: HashKey, V: Copy> MapEntry<K, V> {
+    fn value(self) -> V;
+    fn replace(mut self, value: V);
+}
+
+impl<T: HashKey> Set<T> {
+    fn empty() -> Set<T>;
+    fn emptyIn<A: Allocator>(mut allocator: A) -> Set<T>;
+    fn withCapacity(capacity: USize) -> Set<T>;
+    fn withCapacityIn<A: Allocator>(capacity: USize, mut allocator: A) -> Set<T>;
+    fn len(self) -> USize;
+    fn capacity(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn reserve(mut self, additional: USize);
+    fn reserveExact(mut self, additional: USize);
+    fn tryReserve(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn tryReserveExact(mut self, additional: USize) -> Result<Unit, AllocError>;
+    fn insert(mut self, value: T) -> Bool;
+    fn contains(self, value: T) -> Bool;
+    fn remove(mut self, value: T) -> Bool;
+    fn take(mut self, value: T) -> Option<T>;
+    fn clear(mut self);
+    fn shrinkToFit(mut self);
+}
+
+impl<T: CopyHashKey> Set<T> {
+    fn clone(self) -> Set<T>;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> Set<T>;
+}
+
+impl String {
+    fn from(text: StringSlice) -> String;
+    fn fromIn<A: Allocator>(text: StringSlice, mut allocator: A) -> String;
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn asSlice(self) -> StringSlice;
+    fn asBytes(self) -> ArraySlice<U8>;
+    fn tryReserve(mut self, additionalBytes: USize) -> Result<Unit, AllocError>;
+    fn push(mut self, text: StringSlice);
+    fn clone(self) -> String;
+    fn cloneIn<A: Allocator>(self, mut allocator: A) -> String;
+}

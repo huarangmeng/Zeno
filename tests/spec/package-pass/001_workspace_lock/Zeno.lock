@@ -6,18 +6,29 @@ compiler = "zeno-stage0 0.1.0"
 name = "corelib"
 version = "0.1.0"
 source = "path:core"
-manifestHash = "sha256:core-manifest"
-contentHash = "sha256:core-content"
+manifestHash = "fnv1a64:b75dc8f2cd9972ac"
+contentHash = "fnv1a64:f80f042955379510"
 trust = []
-dependencies = []
+dependencies = [
+]
 
 [[package]]
 name = "app"
 version = "0.1.0"
 source = "path:app"
-manifestHash = "sha256:app-manifest"
-contentHash = "sha256:app-content"
+manifestHash = "fnv1a64:b603bae4666015b7"
+contentHash = "fnv1a64:a481a257ba134dc1"
 trust = []
 dependencies = [
   { key = "corelib", package = "corelib" },
 ]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

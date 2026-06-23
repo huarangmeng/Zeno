@@ -1,0 +1,7 @@
+module lib;
+
+import std.thread;
+
+pub fn threadToken() -> I32 {
+    return 1;
+}

@@ -1,0 +1,23 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: MapEntry is usable as a short-lived local entry view
+
+module tests.pass.mapEntryLocalFlow;
+
+struct UserId: Copy {
+    raw: U64,
+}
+
+impl HashKey for UserId {}
+
+fn upsert() -> USize {
+    var counts = Map<UserId, USize>.empty();
+    var entry = mut counts.entry(UserId { raw: 7 });
+    if entry.exists() {
+        return entry.value();
+    }
+    val old = mut entry.insert(1).unwrapOr(0);
+    return old + counts.len();
+}

@@ -1,0 +1,40 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: hosted
+# build-artifact: application
+# zmeta-contains: runtimeNeeds = ["thread"]
+# zmeta-contains: linkRuntimeNeeds = ["thread"]
+# zmeta-contains: runtime=fnv1a64:
+# purpose: reachable hosted thread APIs are recorded as explicit runtime link needs
+
+[package]
+name = "hostedThread"
+version = "0.1.0"
+kind = "application"
+
+[dependencies]
+std = "builtin"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

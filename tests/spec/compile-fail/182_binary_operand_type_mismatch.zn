@@ -1,0 +1,26 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: arithmetic operators require numeric operands when both operand types are known
+
+module tests.fail.binaryOperandTypeMismatch;
+
+struct Packet {
+    count: U32,
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn badBinaryOperands(flag: Bool, count: U32) -> U32 {
+    val inferred = flag + count; // expected-error[E0302]: operator + requires numeric operands, got Bool and U32
+    val initialized: U32 = flag - count; // expected-error[E0302]: operator - requires numeric operands, got Bool and U32
+    var total: U32 = count;
+    total = count * flag; // expected-error[E0302]: operator * requires numeric operands, got U32 and Bool
+    val fieldInit = Packet { count: flag / count }; // expected-error[E0302]: operator / requires numeric operands, got Bool and U32
+    var packet: Packet = Packet { count: count };
+    packet.count = flag + count; // expected-error[E0302]: operator + requires numeric operands, got Bool and U32
+    needCount(flag - count); // expected-error[E0302]: operator - requires numeric operands, got Bool and U32
+    return flag * count; // expected-error[E0302]: operator * requires numeric operands, got Bool and U32
+}

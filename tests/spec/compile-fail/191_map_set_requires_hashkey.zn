@@ -1,0 +1,29 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: Map keys and Set values must implement HashKey
+
+module tests.fail.mapSetRequiresHashKey;
+
+struct Packet: Copy {
+    id: U64,
+}
+
+fn badMapSignature(map: Map<Packet, USize>) { // expected-error[E0601]: Map key type Packet must implement HashKey
+    val ignored = map;
+}
+
+fn badSetSignature(set: Set<Packet>) { // expected-error[E0601]: Set value type Packet must implement HashKey
+    val ignored = set;
+}
+
+fn badMapConstruction() {
+    var map = Map<Packet, USize>.withCapacity(4); // expected-error[E0601]: Map key type Packet must implement HashKey
+    mut map.insert(Packet { id: 1 }, 1);
+}
+
+fn badSetConstruction() {
+    var set = Set<Packet>.empty(); // expected-error[E0601]: Set value type Packet must implement HashKey
+    mut set.insert(Packet { id: 1 });
+}

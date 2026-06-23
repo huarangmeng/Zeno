@@ -1,0 +1,31 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: trust.allowedPackages restricts which packages may contain trust boundaries
+
+[package]
+name = "driver"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = true
+rawMemory = true
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false
+allowedPackages = ["platform"]

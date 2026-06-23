@@ -1,0 +1,5 @@
+import platform.os;
+
+pub fn platformPid() -> I32 {
+    return os.pid();
+}

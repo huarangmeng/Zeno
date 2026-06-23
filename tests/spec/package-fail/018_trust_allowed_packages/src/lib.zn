@@ -1,0 +1,9 @@
+module lib;
+
+trust extern "C" fn getpid() -> I32; // expected-error[E1006]: package driver is not allowed to contain trust boundaries
+
+pub fn readByte(address: USize) -> U8 {
+    return trust { // expected-error[E1006]: package driver is not allowed to contain trust boundaries
+        RawPointer<U8>.fromAddress(address).read() // expected-error[E1006]: package driver is not allowed to contain trust boundaries
+    };
+}

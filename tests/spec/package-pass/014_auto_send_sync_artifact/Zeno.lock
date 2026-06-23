@@ -1,0 +1,23 @@
+version = 1
+root = "autoSendSync"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "autoSendSync"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:0970fe600ee1358c"
+contentHash = "fnv1a64:8521b9d43315c457"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

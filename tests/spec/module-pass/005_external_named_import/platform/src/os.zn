@@ -1,0 +1,13 @@
+module os;
+
+pub struct Pid {
+    pub value: I32,
+}
+
+pub fn currentPid() -> Pid {
+    return Pid { value: 42 };
+}
+
+fn hiddenPid() -> Pid {
+    return Pid { value: 0 };
+}

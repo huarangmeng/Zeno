@@ -1,0 +1,17 @@
+pub interface Writer {
+    fn write(self, bytes: ArraySlice<U8>) -> Result<USize, WriteError>;
+}
+
+pub struct MemoryWriter {
+    total: USize,
+}
+
+impl Writer for MemoryWriter {
+    fn write(self, bytes: ArraySlice<U8>) -> Result<USize, WriteError> {
+        return Ok(bytes.len());
+    }
+}
+
+pub fn openWriter() -> Writer { // expected-error[E9004]: cross-package pub fn -> Interface opaque return metadata is not implemented in stage0
+    return MemoryWriter { total: 0 };
+}

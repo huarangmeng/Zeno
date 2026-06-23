@@ -1,0 +1,13 @@
+trust extern "C" fn getpid() -> I32;
+
+pub fn currentPid() -> I32 {
+    return trust {
+        getpid()
+    };
+}
+
+pub fn readByte(address: USize) -> U8 {
+    return trust {
+        RawPointer<U8>.fromAddress(address).read()
+    };
+}

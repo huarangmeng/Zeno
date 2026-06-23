@@ -1,0 +1,30 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: explicit local initializer types must match obvious expression types
+
+module tests.fail.initializerTypeMismatch;
+
+struct Packet {
+    value: U32,
+}
+
+struct Header {
+    value: U32,
+}
+
+enum Maybe {
+    None,
+}
+
+enum State {
+    Ready,
+}
+
+fn badInitializers(flag: Bool, count: U32, header: Header) -> U32 {
+    val numeric: U32 = flag; // expected-error[E0302]: initializer type U32 does not match Bool expression
+    var boolean: Bool = count; // expected-error[E0302]: initializer type Bool does not match U32 expression
+    val packet: Packet = header; // expected-error[E0302]: initializer type Packet does not match Header expression
+    val state: State = Maybe.None; // expected-error[E0302]: initializer type State does not match Maybe expression
+    return 0;
+}

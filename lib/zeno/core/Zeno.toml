@@ -1,0 +1,26 @@
+[package]
+name = "core"
+version = "builtin"
+kind = "library"
+
+[target]
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+threadSafety = true
+dependencyTrust = false

@@ -1,0 +1,6 @@
+import platform.os.{Pid, currentPid};
+
+pub fn main() -> I32 {
+    val pid: Pid = currentPid();
+    return pid.value;
+}

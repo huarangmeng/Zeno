@@ -1,0 +1,37 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: owning collection clone APIs require Copy element, key, and value types
+
+module tests.fail.collectionCloneRequiresCopy;
+
+struct Packet {
+    id: U32,
+}
+
+impl Packet {
+    destroy {}
+}
+
+impl HashKey for Packet {}
+
+fn badArray(items: Array<Packet>) -> Array<Packet> {
+    return items.clone(); // expected-error[E0513]: Array.clone requires T: Copy
+}
+
+fn badVector(items: Vector<Packet>) -> Vector<Packet> {
+    return items.clone(); // expected-error[E0513]: Vector.clone requires T: Copy
+}
+
+fn badMapKey(items: Map<Packet, U32>) -> Map<Packet, U32> {
+    return items.clone(); // expected-error[E0513]: Map.clone requires K: Copy and V: Copy
+}
+
+fn badMapValue(items: Map<U32, Packet>) -> Map<U32, Packet> {
+    return items.clone(); // expected-error[E0513]: Map.clone requires K: Copy and V: Copy
+}
+
+fn badSet(items: Set<Packet>) -> Set<Packet> {
+    return items.clone(); // expected-error[E0513]: Set.clone requires T: Copy
+}

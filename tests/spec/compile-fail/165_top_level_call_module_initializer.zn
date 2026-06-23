@@ -1,0 +1,10 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// purpose: top-level calls cannot create implicit module initialization work
+
+module tests.fail.topLevelCallModuleInitializer;
+
+fn initialize() -> Unit {}
+
+initialize(); // expected-error[E0004]: top-level executable statements are not allowed; use an explicit function or const/static CTFE initializer

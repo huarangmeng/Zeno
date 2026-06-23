@@ -1,0 +1,21 @@
+module core.traits;
+
+pub interface Copy {}
+pub interface Send {}
+pub interface Sync {}
+pub interface Eq {
+    fn eq(self, other: Self) -> Bool;
+}
+pub interface Ord {
+    fn cmp(self, other: Self) -> Ordering;
+}
+pub enum Ordering {
+    Less,
+    Equal,
+    Greater,
+}
+pub interface Hash {
+    fn hash(self) -> U64;
+}
+pub interface HashKey {}
+pub interface CopyHashKey: HashKey, Copy {}

@@ -1,0 +1,21 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M2
+// purpose: explicit value-returning functions end in a terminal return/panic shape
+
+module tests.pass.explicitReturnPaths;
+
+import core.panic.panic;
+
+fn withReturn(value: U32) -> U32 {
+    val adjusted = value + 1;
+    return adjusted;
+}
+
+fn withPanic() -> U32 {
+    panic("no value");
+}
+
+fn main() -> U32 {
+    return withReturn(1);
+}

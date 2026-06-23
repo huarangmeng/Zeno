@@ -1,0 +1,18 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: obvious return literals must match the declared function result type
+
+module tests.fail.returnLiteralTypeMismatch;
+
+fn boolAsNumber() -> U32 {
+    return false; // expected-error[E0302]: return type U32 does not match Bool expression
+}
+
+fn numberAsBool() -> Bool {
+    return 1; // expected-error[E0302]: return type Bool does not match integer expression
+}
+
+fn stringSliceAsString() -> String {
+    return "hello"; // expected-error[E0301]: string literal is StringSlice; use String.from("hello") for owned String
+}

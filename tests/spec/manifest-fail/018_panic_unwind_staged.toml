@@ -1,0 +1,27 @@
+# stage: mvp
+# milestone: M2
+# purpose: panic.strategy unwind is parsed but staged out of stage0 MVP
+
+[package]
+name = "panicUnwindStaged"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+
+[panic]
+strategy = "unwind" # expected-error[E9003]: panic unwind is not implemented in stage0
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

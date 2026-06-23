@@ -1,0 +1,33 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: root dependencyTrust=false rejects trust boundaries in path dependency sources
+
+[package]
+name = "app"
+kind = "library"
+
+[dependencies]
+platform = { path = "platform" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

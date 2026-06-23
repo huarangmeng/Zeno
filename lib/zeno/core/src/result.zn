@@ -1,0 +1,12 @@
+module core.result;
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    fn isOk(self) -> Bool;
+    fn isErr(self) -> Bool;
+    fn mapErr<F>(move self, move mapper: OnceFn<E, F>) -> Result<T, F>;
+}

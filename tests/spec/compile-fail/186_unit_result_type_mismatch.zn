@@ -1,0 +1,35 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: Unit-returning calls cannot be used where ordinary values are expected
+
+module tests.fail.unitResultTypeMismatch;
+
+struct Counter {
+    value: U32,
+}
+
+fn cleanup() -> Unit {
+    return;
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn badUnitUses() -> U32 {
+    val count: U32 = cleanup(); // expected-error[E0302]: initializer type U32 does not match Unit expression
+    var flag: Bool = cleanup(); // expected-error[E0302]: initializer type Bool does not match Unit expression
+    var total: U32 = 0;
+    total = cleanup(); // expected-error[E0302]: assignment type U32 does not match Unit expression
+    val badField = Counter { value: cleanup() }; // expected-error[E0302]: field value type U32 does not match Unit expression
+    val badArg = needCount(cleanup()); // expected-error[E0302]: argument 1 of needCount expects U32 but got Unit
+    if cleanup() { // expected-error[E0302]: if condition must be Bool, got Unit
+        return 0;
+    }
+    return cleanup(); // expected-error[E0302]: return type U32 does not match Unit expression
+}
+
+fn badUnitReturn() -> Unit {
+    return 1; // expected-error[E0302]: Unit function cannot return integer expression
+}

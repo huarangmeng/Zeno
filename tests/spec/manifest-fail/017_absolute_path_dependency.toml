@@ -1,0 +1,32 @@
+# stage: mvp
+# milestone: M2
+# purpose: local path dependencies must be relative for reproducible stage0 manifests
+
+[package]
+name = "absolutePathDependency"
+kind = "library"
+
+[dependencies]
+platform = { path = "/opt/zeno/platform" } # expected-error[E1004]: dependency path must be relative, not absolute
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

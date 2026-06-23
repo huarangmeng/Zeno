@@ -1,0 +1,23 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: enum-qualified constructors must match declared payload shape
+
+module tests.fail.enumVariantPayloadShape;
+
+enum Maybe {
+    Some(U32),
+    None,
+}
+
+fn missingPayload() -> Maybe {
+    return Maybe.Some; // expected-error[E0201]: variant Some requires 1 payload value
+}
+
+fn unexpectedPayload() -> Maybe {
+    return Maybe.None(1); // expected-error[E0201]: variant None does not take payload values
+}
+
+fn wrongArity() -> Maybe {
+    return Maybe.Some(1, 2); // expected-error[E0201]: variant Some expects 1 payload value but got 2
+}

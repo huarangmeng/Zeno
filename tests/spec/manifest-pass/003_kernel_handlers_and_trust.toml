@@ -6,7 +6,7 @@ name = "kernel"
 version = "0.1.0"
 
 [target]
-triple = "x86_64-unknown-none"
+triple = "x86_64-unknown-linux-gnu"
 profile = "kernel"
 
 [allocator]

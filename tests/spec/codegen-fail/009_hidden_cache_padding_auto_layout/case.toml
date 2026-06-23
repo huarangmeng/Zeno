@@ -17,5 +17,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: cache-line padding must be requested with CachePadded<T>
 error = "cache-line padding must be requested with CachePadded<T>"
-

@@ -1,5 +1,5 @@
 # category: manifest-fail
-# purpose: hosted packages cannot enable hardware trust capabilities without an explicit low-level profile
+# purpose: hosted packages cannot enable low-level trust capabilities without an explicit low-level profile
 
 [package]
 name = "hostedHardware"
@@ -23,6 +23,6 @@ strategy = "abort"
 ffi = false
 rawMemory = false
 hardware = true # expected-error: hosted profile cannot enable hardware trust capability
-inlineAsm = false
-interrupts = false
+inlineAsm = true # expected-error: hosted profile cannot enable inlineAsm trust capability
+interrupts = true # expected-error: hosted profile cannot enable interrupts trust capability
 dependencyTrust = false

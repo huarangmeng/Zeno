@@ -1,0 +1,18 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M2
+// purpose: explicit Unit-returning calls can flow through Unit contexts
+
+module tests.pass.unitReturnFlow;
+
+fn cleanup() -> Unit {
+    return;
+}
+
+fn forward() -> Unit {
+    val done: Unit = cleanup();
+    if true {
+        return cleanup();
+    }
+    return;
+}

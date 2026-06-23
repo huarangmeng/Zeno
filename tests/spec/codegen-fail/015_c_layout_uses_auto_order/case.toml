@@ -19,4 +19,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: layout(C) must preserve source field order and target C ABI padding
 error = "layout(C) must preserve source field order and target C ABI padding"

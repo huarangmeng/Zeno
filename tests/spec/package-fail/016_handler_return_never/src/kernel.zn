@@ -1,0 +1,9 @@
+module kernel;
+
+pub fn panicHandler() -> Unit { // expected-error[E1002]: panic.handler must return Never
+    return ();
+}
+
+pub fn oomHandler() -> I32 { // expected-error[E1002]: oom.handler must return Never
+    return 0;
+}

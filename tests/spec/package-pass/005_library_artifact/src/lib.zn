@@ -1,0 +1,3 @@
+pub fn answer() -> I32 {
+    return 42;
+}

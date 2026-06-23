@@ -1,0 +1,100 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# artifact-emit: mir
+# zmeta-contains: astFingerprint = "fnv1a64:
+# zmeta-contains: hirFingerprint = "fnv1a64:
+# zmeta-contains: mirFingerprint = "fnv1a64:
+# zmeta-contains: llvmFingerprint = "fnv1a64:
+# zmeta-contains: astNodes = [
+# zmeta-contains: module lib module=lib span=src/lib.zn:1:1
+# zmeta-contains: import core.traits.{Copy, Send} module=lib span=src/lib.zn:3:1
+# zmeta-contains: attribute @layout(C) module=lib span=src/lib.zn:5:1
+# zmeta-contains: decl.struct Packet module=lib span=src/lib.zn:6:1 attrs=@layout(C)
+# zmeta-contains: decl.interface Driver module=lib span=src/lib.zn:10:1
+# zmeta-contains: decl.extern host_read module=lib span=src/lib.zn:14:1 trusted=true abi=C
+# zmeta-contains: expr.trust block module=lib span=src/lib.zn:17:1
+# zmeta-contains: stmt.return readHost module=lib span=src/lib.zn:17:1 expr=trust-block expected=I32
+# zmeta-contains: decl.fn observe module=lib span=src/lib.zn:22:1
+# zmeta-contains: stmt.return observe module=lib span=src/lib.zn:23:1 expr=name:value expected=I32
+# zmeta-contains: decl.fn compute module=lib span=src/lib.zn:26:1
+# zmeta-contains: stmt.val compute.next module=lib span=src/lib.zn:27:1 expr=binary:+ type=I32
+# zmeta-contains: stmt.var compute.total module=lib span=src/lib.zn:28:1 expr=name:next
+# zmeta-contains: stmt.expr compute module=lib span=src/lib.zn:29:1 expr=call:observe
+# zmeta-contains: stmt.return compute module=lib span=src/lib.zn:30:1 expr=name:total expected=I32
+# zmeta-contains: decl.impl Driver for Packet module=lib span=src/lib.zn:33:1
+# zmeta-contains: hirNodes = [
+# zmeta-contains: hir.fn readHost module=lib span=src/lib.zn:16:1
+# zmeta-contains: hir.return readHost expr=trust-block expected=I32 span=src/lib.zn:17:1
+# zmeta-contains: hir.fn compute module=lib span=src/lib.zn:26:1
+# zmeta-contains: hir.local compute.next mode=val expr=binary:+ type=I32 span=src/lib.zn:27:1
+# zmeta-contains: hir.local compute.total mode=var expr=name:next type=inferred span=src/lib.zn:28:1
+# zmeta-contains: hir.expr compute expr=call:observe span=src/lib.zn:29:1
+# zmeta-contains: hir.return compute expr=name:total expected=I32 span=src/lib.zn:30:1
+# zmeta-contains: mirNodes = [
+# zmeta-contains: mir.fn readHost entry=bb0 return=I32
+# zmeta-contains: mir.return readHost value=trust-block type=I32
+# zmeta-contains: mir.fn compute entry=bb0 return=I32
+# zmeta-contains: mir.local compute.next init=binary:+ mutable=false
+# zmeta-contains: mir.local compute.total init=name:next mutable=true
+# zmeta-contains: mir.eval compute expr=call:observe
+# zmeta-contains: mir.return compute value=name:total type=I32
+# zmeta-contains: llvmNodes = [
+# zmeta-contains: llvm.define-preview @readHost return=I32
+# zmeta-contains: llvm.define-preview @compute return=I32
+# zmeta-contains: llvm.call-preview @observe in @compute
+# zmeta-contains: llvm.ret-preview @readHost type=I32 value=trust-block
+# zmeta-contains: llvm.ret-preview @compute type=I32 value=name:total
+# zmeta-contains: "ast=fnv1a64:
+# zmeta-contains: "hir=fnv1a64:
+# zmeta-contains: "mir=fnv1a64:
+# zmeta-contains: "llvm=fnv1a64:
+# emit-contains: astFingerprint fnv1a64:
+# emit-contains: hirFingerprint fnv1a64:
+# emit-contains: mirFingerprint fnv1a64:
+# emit-contains: llvmFingerprint fnv1a64:
+# emit-contains: stage0.pipeline ast->hir->mir->llvm
+# emit-contains: hir.fn readHost module=lib span=src/lib.zn:16:1
+# emit-contains: mir.fn readHost entry=bb0 return=I32
+# emit-contains: hir.return readHost expr=trust-block expected=I32 span=src/lib.zn:17:1
+# emit-contains: mir.return readHost value=trust-block type=I32
+# emit-contains: hir.local compute.next mode=val expr=binary:+ type=I32 span=src/lib.zn:27:1
+# emit-contains: mir.local compute.next init=binary:+ mutable=false
+# emit-contains: hir.expr compute expr=call:observe span=src/lib.zn:29:1
+# emit-contains: llvm.call-preview @observe in @compute
+# emit-contains: mir.return compute value=name:total type=I32
+# purpose: top-level AST node facts enter artifact metadata, emitted MIR preview, and cache keys
+
+[package]
+name = "astArtifact"
+version = "0.1.0"
+kind = "library"
+
+[dependencies]
+core = "builtin"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = true
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

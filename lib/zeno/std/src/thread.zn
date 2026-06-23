@@ -1,0 +1,19 @@
+module std.thread;
+
+// runtime: thread
+pub struct ThreadHandle<T> {}
+
+pub struct Thread {}
+
+impl Thread {
+    fn spawn<T: Send>(move job: OnceFn<T>) -> Result<ThreadHandle<T>, ThreadError>;
+}
+
+impl<T> ThreadHandle<T> {
+    fn join(move self) -> Result<T, ThreadError>;
+}
+
+pub enum ThreadError {
+    SpawnFailed,
+    JoinFailed,
+}

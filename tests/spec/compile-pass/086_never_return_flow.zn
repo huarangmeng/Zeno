@@ -1,0 +1,45 @@
+// category: compile-pass
+// stage: mvp
+// milestone: M3
+// purpose: Never-producing calls can satisfy explicit return and value contexts
+
+module tests.pass.neverReturnFlow;
+
+import core.panic.panic;
+
+struct Counter {
+    value: U32,
+}
+
+fn fail() -> Never {
+    panic("unreachable");
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn countOrFail(flag: Bool) -> U32 {
+    if flag {
+        return 1;
+    }
+    return fail();
+}
+
+fn unitOrFail(flag: Bool) -> Unit {
+    if flag {
+        return;
+    }
+    return fail();
+}
+
+fn valueContexts() -> U32 {
+    val count: U32 = fail();
+    var total: U32 = 0;
+    total = fail();
+    val counter = Counter { value: fail() };
+    if fail() {
+        return needCount(fail());
+    }
+    return count + total + counter.value;
+}

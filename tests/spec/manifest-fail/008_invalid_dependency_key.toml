@@ -8,7 +8,7 @@ name = "app"
 my-lib = { path = "../my-lib" } # expected-error: dependency key must be a legal Zeno identifier
 
 [target]
-triple = "wasm32-unknown-unknown"
+triple = "x86_64-unknown-linux-gnu"
 profile = "freestanding"
 
 [allocator]

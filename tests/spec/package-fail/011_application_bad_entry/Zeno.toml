@@ -1,0 +1,31 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: explicit application entries must resolve to a declared top-level function
+
+[package]
+name = "badEntry"
+kind = "application"
+entry = "main.start" # expected-error[E1003]: application entry function is not declared
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

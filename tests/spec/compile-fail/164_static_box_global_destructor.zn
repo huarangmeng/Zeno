@@ -1,0 +1,13 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: static Box owners cannot require exit-time global destruction
+
+module tests.fail.staticBoxGlobalDestructor;
+
+struct Handle {
+    fd: I32,
+}
+
+static HandleOwner: Box<Handle>; // expected-error[E0801]: static initializer cannot require exit-time global destruction; use explicit runtime-owned state

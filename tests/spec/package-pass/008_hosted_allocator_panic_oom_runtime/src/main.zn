@@ -1,0 +1,27 @@
+module main;
+
+import core.alloc.Layout;
+import core.panic.{panic, oom};
+
+pub fn requirePositive(value: I32) -> I32 {
+    if value > 0 {
+        return value;
+    }
+
+    panic("expected positive value");
+}
+
+pub fn allocateDefault() -> String {
+    return String.from("hello");
+}
+
+pub fn failAllocation() -> Vector<U8> {
+    val layout = Layout { size: 64, align: 8 };
+    oom(layout);
+}
+
+pub fn main() -> I32 {
+    val text = allocateDefault();
+    val ignored = text;
+    return requirePositive(1);
+}

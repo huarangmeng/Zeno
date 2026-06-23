@@ -16,5 +16,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: non-escaping closure cannot introduce hidden allocation
 error = "non-escaping closure cannot introduce hidden allocation"
-

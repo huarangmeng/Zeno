@@ -1,0 +1,30 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: package source trust boundaries require matching manifest trust capabilities
+
+[package]
+name = "trustDenied"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

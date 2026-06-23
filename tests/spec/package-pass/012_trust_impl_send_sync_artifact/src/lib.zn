@@ -1,0 +1,10 @@
+pub struct OsHandle {
+    raw: I32,
+}
+
+impl OsHandle {
+    destroy {}
+}
+
+trust impl Send for OsHandle {}
+trust impl Sync for OsHandle {}

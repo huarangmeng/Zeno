@@ -1,0 +1,31 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: explicit application entry modules must map to an existing source file
+
+[package]
+name = "missingEntryFile"
+kind = "application"
+entry = "cli.main" # expected-error[E1003]: application entry source file does not exist
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

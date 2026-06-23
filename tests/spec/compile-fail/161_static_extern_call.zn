@@ -1,0 +1,12 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// trust.ffi: true
+// purpose: static initialization cannot call extern functions even when FFI is trusted
+
+module tests.fail.staticExternCall;
+
+trust extern "C" fn getpid() -> I32;
+
+static Pid: I32 = getpid(); // expected-error[E0801]: static initializer must be CTFE; extern calls cannot execute at compile time

@@ -1,0 +1,23 @@
+module main;
+
+import core.result.{Result, Ok};
+import std.thread.Thread;
+
+enum Error {
+    Failed,
+}
+
+struct Job {
+    id: U64,
+    priority: U32,
+}
+
+pub fn main() -> Result<Unit, Error> {
+    val job = Job { id: 42, priority: 7 };
+    val handle = try Thread.spawn(move () -> Result<Unit, Error> {
+        val ignored = job.id + job.priority as U64;
+        return Ok(());
+    });
+    try move handle.join();
+    return Ok(());
+}

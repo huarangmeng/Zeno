@@ -21,5 +21,5 @@ llvm = [
 ]
 
 [expect]
+# expected-error: packed field load must use packed alignment or byte sequence
 error = "packed field load must use packed alignment or byte sequence"
-

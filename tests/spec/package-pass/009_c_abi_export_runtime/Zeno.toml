@@ -1,0 +1,38 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: hosted
+# build-artifact: library
+# zmeta-contains: runtimeNeeds = ["c-abi-boundary"]
+# zmeta-contains: linkRuntimeNeeds = ["c-abi-boundary"]
+# zmeta-contains: exports = ["fd_value:abi=C", "point_sum:abi=C", "zeno_add:abi=C"]
+# zmeta-contains: runtime=fnv1a64:
+# purpose: exported C ABI symbols are recorded with explicit runtime/link boundary needs
+
+[package]
+name = "cAbiRuntime"
+version = "0.1.0"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "hosted"
+
+[allocator]
+default = true
+symbol = "std.alloc.system"
+
+[panic]
+strategy = "abort"
+stack = "symbols"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

@@ -1,0 +1,30 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: application packages default to src/main.zn unless package.entry is explicit
+
+[package]
+name = "missingMain"
+kind = "application" # expected-error[E1003]: application default entry requires src/main.zn or explicit package.entry
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

@@ -1,0 +1,46 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: MapEntry is a view-like value and cannot be stored or returned
+
+module tests.fail.mapEntryCannotEscape;
+
+import core.alloc.GlobalAllocator;
+
+struct UserId: Copy {
+    raw: U64,
+}
+
+impl HashKey for UserId {}
+
+struct EntryStore {
+    entry: MapEntry<UserId, USize>, // expected-error[E0503]: MapEntry cannot be stored in structure fields
+}
+
+struct EntryVectorStore {
+    entries: Vector<MapEntry<UserId, USize>>, // expected-error[E0503]: MapEntry cannot be stored inside collection fields
+}
+
+static cachedEntry: MapEntry<UserId, USize>; // expected-error[E0503]: MapEntry cannot be stored in static storage
+
+fn badReturn(mut counts: Map<UserId, USize>) -> MapEntry<UserId, USize> { // expected-error[E0503]: MapEntry cannot be returned from a function
+    return mut counts.entry(UserId { raw: 1 });
+}
+
+fn badCollection() {
+    val entries = Vector<MapEntry<UserId, USize>>.withCapacity(1); // expected-error[E0503]: MapEntry cannot be stored inside collections
+    val ignored = entries;
+}
+
+fn badBox(mut counts: Map<UserId, USize>, mut allocator: GlobalAllocator) {
+    val entry = mut counts.entry(UserId { raw: 2 });
+    val boxed = Box.newIn(move entry, mut allocator); // expected-error[E0503]: MapEntry cannot be stored in Box
+    val ignored = boxed;
+}
+
+fn badShared(mut counts: Map<UserId, USize>, mut allocator: GlobalAllocator) {
+    val entry = mut counts.entry(UserId { raw: 3 });
+    val shared = Shared.newIn(entry, mut allocator); // expected-error[E0503]: MapEntry cannot be stored in Shared
+    val ignored = shared;
+}

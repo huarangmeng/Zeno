@@ -1,0 +1,26 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: if and while conditions must be Bool when the expression type is known
+
+module tests.fail.conditionTypeMismatch;
+
+fn makeCount() -> U32 {
+    return 1;
+}
+
+fn badConditions(count: U32) -> U32 {
+    if count { // expected-error[E0302]: if condition must be Bool, got U32
+        return 1;
+    }
+
+    if 1 { // expected-error[E0302]: if condition must be Bool, got integer expression
+        return 2;
+    }
+
+    while makeCount() { // expected-error[E0302]: while condition must be Bool, got U32
+        return 3;
+    }
+
+    return 0;
+}

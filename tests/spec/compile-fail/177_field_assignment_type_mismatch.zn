@@ -1,0 +1,39 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: assignments to known struct fields must match declared field types
+
+module tests.fail.fieldAssignmentTypeMismatch;
+
+struct Header {
+    value: U32,
+}
+
+struct Packet {
+    count: U32,
+    enabled: Bool,
+    header: Header,
+    state: State,
+}
+
+enum Maybe {
+    None,
+}
+
+enum State {
+    Ready,
+}
+
+impl Packet {
+    fn reset(mut self, flag: Bool) {
+        self.count = flag; // expected-error[E0302]: field assignment count type U32 does not match Bool expression
+    }
+}
+
+fn badFieldAssignments(mut packet: Packet, flag: Bool, count: U32, header: Header) -> U32 {
+    packet.count = flag; // expected-error[E0302]: field assignment count type U32 does not match Bool expression
+    packet.enabled = count; // expected-error[E0302]: field assignment enabled type Bool does not match U32 expression
+    packet.header = packet; // expected-error[E0302]: field assignment header type Header does not match Packet expression
+    packet.state = Maybe.None; // expected-error[E0302]: field assignment state type State does not match Maybe expression
+    return header.value;
+}

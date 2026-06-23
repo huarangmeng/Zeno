@@ -1,0 +1,24 @@
+version = 1
+root = "astArtifact"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "astArtifact"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:da9276a5458242a9"
+contentHash = "fnv1a64:4c70a7d0bf5841e0"
+trust = []
+dependencies = [
+  { key = "core", package = "core" },
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

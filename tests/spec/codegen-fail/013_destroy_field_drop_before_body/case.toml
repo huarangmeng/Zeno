@@ -39,4 +39,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: destroy body must run before field drops
 error = "destroy body must run before field drops"

@@ -21,5 +21,6 @@ llvm = [
 ]
 
 [expect]
+# expected-error[E0902]: try must lower to branch and cleanup, not exception machinery
 code = "E0902"
 error = "try must lower to branch and cleanup, not exception machinery"

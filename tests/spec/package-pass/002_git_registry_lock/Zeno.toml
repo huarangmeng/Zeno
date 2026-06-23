@@ -10,7 +10,7 @@ hash = { git = "https://example.com/hash.git", rev = "4f9c2a7d8e9f00112233445566
 log = { version = "1.2.3" }
 
 [target]
-triple = "wasm32-unknown-unknown"
+triple = "x86_64-unknown-linux-gnu"
 profile = "freestanding"
 
 [allocator]

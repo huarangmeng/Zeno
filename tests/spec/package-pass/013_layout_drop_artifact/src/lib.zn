@@ -1,0 +1,19 @@
+@layout(C)
+pub struct CPoint {
+    pub x: I32,
+    pub y: I32,
+}
+
+@layout(Packed(1))
+pub struct Packet {
+    tag: I32,
+    value: I32,
+}
+
+pub struct Resource {
+    fd: I32,
+}
+
+impl Resource {
+    destroy {}
+}

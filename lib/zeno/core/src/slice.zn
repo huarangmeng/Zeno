@@ -1,0 +1,23 @@
+module core.slice;
+
+pub struct ArraySlice<T> {}
+pub struct StringSlice {}
+
+impl<T> ArraySlice<T> {
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn dropPrefix(self, count: USize) -> ArraySlice<T>;
+}
+
+impl StringSlice {
+    fn len(self) -> USize;
+    fn isEmpty(self) -> Bool;
+    fn asBytes(self) -> ArraySlice<U8>;
+    fn dropPrefix(self, byteCount: USize) -> StringSlice;
+    fn chars(self) -> Utf8Chars;
+}
+
+pub struct Utf8Chars {}
+impl Iterator<Char> for Utf8Chars {
+    fn next(mut self) -> Option<Char>;
+}

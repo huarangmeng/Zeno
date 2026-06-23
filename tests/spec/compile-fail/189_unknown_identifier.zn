@@ -1,0 +1,28 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: unknown bare identifiers are rejected in simple value positions
+
+module tests.fail.unknownIdentifier;
+
+struct Counter {
+    value: U32,
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn badUnknownIdentifiers() -> U32 {
+    val explicitInit: U32 = missingInit; // expected-error[E0201]: value missingInit is not declared
+    val inferred = missingInferred; // expected-error[E0201]: value missingInferred is not declared
+    var total: U32 = 0;
+    total = missingAssign; // expected-error[E0201]: value missingAssign is not declared
+    missingTarget = 1; // expected-error[E0201]: value missingTarget is not declared
+    val badField = Counter { value: missingField }; // expected-error[E0201]: value missingField is not declared
+    needCount(missingArg); // expected-error[E0201]: value missingArg is not declared
+    if missingCondition { // expected-error[E0201]: value missingCondition is not declared
+        return 0;
+    }
+    return missingReturn; // expected-error[E0201]: value missingReturn is not declared
+}

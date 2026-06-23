@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "app"
 version = "0.1.0"
 source = "path:."
-manifestHash = "sha256:app-manifest"
-contentHash = "sha256:app-content"
+manifestHash = "fnv1a64:c0ecf8668fdd8dba"
+contentHash = "fnv1a64:d5b9525d3f98efcb"
 trust = []
 dependencies = [
   { key = "hash", package = "hash" },

@@ -1,0 +1,38 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# zmeta-contains: sendSync = ["OsHandle:Send:trusted", "OsHandle:Sync:trusted"]
+# zmeta-contains: trustCapabilities = ["manifest:dependencyTrust=false", "manifest:ffi=false", "manifest:hardware=false", "manifest:inlineAsm=false", "manifest:interrupts=false", "manifest:rawMemory=false", "manifest:threadSafety=true", "threadSafety"]
+# zmeta-contains: trust.threadSafety=true
+# zmeta-contains: linkRuntimeNeeds = []
+# purpose: trust impl Send/Sync records threadSafety facts without implying runtime linkage
+
+[package]
+name = "trustedSendSync"
+version = "0.1.0"
+kind = "library"
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+threadSafety = true
+dependencyTrust = false

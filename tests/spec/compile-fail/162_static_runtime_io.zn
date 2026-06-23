@@ -1,0 +1,9 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: static initialization cannot perform runtime I/O
+
+module tests.fail.staticRuntimeIo;
+
+static Config: File = File.open("zeno.toml"); // expected-error[E0801]: static initializer cannot perform runtime I/O; I/O must be explicit runtime code

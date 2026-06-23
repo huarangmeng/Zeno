@@ -23,5 +23,6 @@ lowering = [
 ]
 
 [expect]
+# expected-error[E0902]: const owned value requires explicit runtime materialization
 code = "E0902"
 error = "const owned value requires explicit runtime materialization"

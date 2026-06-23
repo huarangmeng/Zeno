@@ -1,0 +1,9 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M5
+// profile: hosted
+// purpose: static initialization cannot create task runtime work
+
+module tests.fail.staticTaskRuntimeWork;
+
+static Job: I32 = runtime.spawn(fetchPage()); // expected-error[E0801]: static initializer cannot create task runtime work; task creation must be explicit runtime code

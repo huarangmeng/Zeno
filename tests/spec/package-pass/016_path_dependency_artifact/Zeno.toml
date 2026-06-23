@@ -1,0 +1,40 @@
+# category: package-pass
+# feature: build-artifact
+# target: x86_64-unknown-linux-gnu
+# profile: freestanding
+# build-artifact: library
+# zmeta-contains: dependencyPackageFingerprint = "fnv1a64:
+# zmeta-contains: dependencyPackages=fnv1a64:
+# zmeta-contains: platform/driver:package=driver:path=platform/driver:manifest=fnv1a64:
+# zmeta-contains: platform:package=platform:path=platform:manifest=fnv1a64:
+# zmeta-contains: :content=fnv1a64:
+# zmeta-contains: dependencyRuntimeNeeds = ["platform/driver:thread", "platform:allocator", "platform:oom", "platform:panic"]
+# zmeta-contains: runtimeNeeds = []
+# zmeta-contains: linkRuntimeNeeds = ["allocator", "oom", "panic", "thread"]
+# zmeta-contains: linkRuntime=fnv1a64:
+# zmeta-contains: linkRuntimeFingerprint = "fnv1a64:
+# zmeta-contains: manifestDependencies = ["platform:path=platform"]
+# zmeta-contains: dependencies = ["builtin:core", "manifest:platform:path=platform", "platform"]
+# purpose: path dependency package identity, fingerprints, and transitive runtime needs contribute artifact cache metadata
+
+[package]
+name = "pathDepArtifact"
+version = "0.1.0"
+kind = "library"
+
+[dependencies]
+platform = { path = "platform" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"

@@ -1,0 +1,46 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M2
+// purpose: calls to uniquely known local functions must match argument types
+
+module tests.fail.functionArgumentTypeMismatch;
+
+struct Packet {
+    value: U32,
+}
+
+struct Header {
+    value: U32,
+}
+
+enum Maybe {
+    None,
+}
+
+enum State {
+    Ready,
+}
+
+fn needCount(value: U32) -> U32 {
+    return value;
+}
+
+fn needFlag(value: Bool) -> U32 {
+    return 0;
+}
+
+fn needPacket(packet: Packet) -> U32 {
+    return packet.value;
+}
+
+fn needState(state: State) -> U32 {
+    return 0;
+}
+
+fn badCalls(flag: Bool, count: U32, header: Header) -> U32 {
+    val a = needCount(flag); // expected-error[E0302]: argument 1 of needCount expects U32 but got Bool
+    val b = needFlag(count); // expected-error[E0302]: argument 1 of needFlag expects Bool but got U32
+    val c = needPacket(header); // expected-error[E0302]: argument 1 of needPacket expects Packet but got Header
+    val d = needState(Maybe.None); // expected-error[E0302]: argument 1 of needState expects State but got Maybe
+    return a + b + c + d;
+}

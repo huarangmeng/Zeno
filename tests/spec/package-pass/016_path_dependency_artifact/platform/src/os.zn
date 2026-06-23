@@ -1,0 +1,15 @@
+pub fn pid() -> I32 {
+    return 42;
+}
+
+pub fn allocateName() -> String {
+    return String.from("platform");
+}
+
+pub fn failFast() -> Never {
+    panic("platform failure");
+}
+
+pub fn allocationFailed() -> Never {
+    oom(Layout { size: 1, align: 1 });
+}

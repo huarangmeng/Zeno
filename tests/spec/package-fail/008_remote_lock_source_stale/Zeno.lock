@@ -1,0 +1,34 @@
+version = 1
+root = "app"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:0000000000000000"
+contentHash = "fnv1a64:0000000000000000"
+trust = []
+dependencies = [
+  { key = "hash", package = "hash" },
+  { key = "log", package = "log" },
+]
+
+[[package]]
+name = "hash"
+version = "0.3.0"
+source = "git:https://example.com/hash.git#0000000000000000000000000000000000000000" # expected-error: lockfile is missing git source for dependency hash
+manifestHash = "sha256:hash-manifest"
+contentHash = "sha256:hash-content"
+trust = []
+dependencies = []
+
+[[package]]
+name = "log"
+version = "1.2.3"
+source = "registry:log@9.9.9"
+registry = "https://packages.zeno.dev"
+manifestHash = "sha256:log-manifest"
+contentHash = "sha256:log-content"
+trust = []
+dependencies = []

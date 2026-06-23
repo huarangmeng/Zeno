@@ -1,0 +1,10 @@
+# category: package-fail
+# purpose: pinned git and exact registry dependencies must match lockfile sources
+
+[package]
+name = "app"
+version = "0.1.0"
+
+[dependencies]
+hash = { git = "https://example.com/hash.git", rev = "4f9c2a7d8e9f00112233445566778899aabbccdd" }
+log = { version = "1.2.3" }

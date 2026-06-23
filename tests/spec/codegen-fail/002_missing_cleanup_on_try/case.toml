@@ -22,4 +22,5 @@ forbid = [
 ]
 
 [expect]
+# expected-error: try early return edge must enter cleanup chain
 error = "try early return edge must enter cleanup chain"

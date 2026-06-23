@@ -17,4 +17,5 @@ contains = [
 ]
 
 [expect]
+# expected-error: interface parameter must lower to static dispatch
 error = "interface parameter must lower to static dispatch"

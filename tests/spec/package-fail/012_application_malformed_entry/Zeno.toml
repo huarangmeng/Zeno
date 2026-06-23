@@ -1,0 +1,31 @@
+# category: package-fail
+# stage: mvp
+# milestone: M2
+# purpose: application entry names must include both module and function
+
+[package]
+name = "malformedEntry"
+kind = "application"
+entry = "main" # expected-error[E1003]: application entry must be module.function
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

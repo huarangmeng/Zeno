@@ -1,0 +1,26 @@
+module lib;
+
+struct UartRegs {
+    status: U32,
+}
+
+pub struct Mmio<T> {
+    raw: USize,
+}
+
+pub fn mapUart(base: USize) -> Mmio<UartRegs> {
+    return trust {
+        Mmio.mapRaw<UartRegs>(base, 4096) // expected-error[E0712]: manifest does not allow hardware trust capability
+    };
+}
+
+pub fn pauseCpu() {
+    trust {
+        InlineAsm.emit("nop") // expected-error[E0713]: manifest does not allow inlineAsm trust capability
+    };
+}
+
+@interrupt // expected-error[E0715]: manifest does not allow interrupts trust capability
+pub fn timerInterrupt() -> Never {
+    panic("interrupt")
+}

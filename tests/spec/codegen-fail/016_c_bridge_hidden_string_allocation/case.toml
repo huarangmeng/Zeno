@@ -31,4 +31,5 @@ lowering = [
 ]
 
 [expect]
+# expected-error: bridge C cannot lower Result<String, Error> without hidden ownership cost
 error = "bridge C cannot lower Result<String, Error> without hidden ownership cost"

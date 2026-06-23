@@ -1,0 +1,4 @@
+pub struct Job {
+    pub id: U64,
+    pub priority: U32,
+}

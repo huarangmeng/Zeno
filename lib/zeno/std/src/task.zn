@@ -1,0 +1,41 @@
+module std.task;
+
+// runtime: task-runtime
+pub struct Runtime {}
+pub struct Task<T> {}
+pub struct TaskGroup<T> {}
+pub struct TaskContext {}
+
+impl Runtime {
+    fn withWorkerCount(count: USize) -> Result<Runtime, TaskError>;
+    fn spawn<T>(mut self, move job: OnceFn<T>) -> Result<Task<T>, TaskError>;
+    fn spawnBlocking<T>(mut self, move job: OnceFn<T>) -> Result<Task<T>, TaskError>;
+    fn blockOn<T>(mut self, move task: Task<T>) -> T;
+}
+
+impl<T> Task<T> {
+    fn cancel(move self) -> TaskCancelStatus;
+    fn detach(move self);
+}
+
+impl TaskContext {
+    fn isCancellationRequested(self) -> Bool;
+}
+
+impl<T> TaskGroup<T> {
+    fn withCapacity(capacity: USize, mut runtime: Runtime) -> TaskGroup<T>;
+    fn spawn(mut self, move job: OnceFn<T>) -> Result<Unit, TaskError>;
+    fn tryJoinAll(mut self) -> Result<Vector<T>, TaskError>;
+    fn tryNext(mut self) -> Result<Option<T>, TaskError>;
+    fn cancelRemaining(mut self);
+}
+
+pub enum TaskCancelStatus {
+    Requested,
+    AlreadyCompleted,
+}
+
+pub enum TaskError {
+    SpawnFailed,
+    Cancelled,
+}

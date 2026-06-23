@@ -1,0 +1,21 @@
+[package]
+name = "platform"
+version = "0.1.0"
+kind = "library"
+
+[dependencies]
+driver = { path = "driver" }
+
+[target]
+triple = "x86_64-unknown-linux-gnu"
+profile = "freestanding"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
