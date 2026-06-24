@@ -10,7 +10,7 @@ fn missingReturn() -> U32 {
 } // expected-error[E0302]: function missingReturn must return U32 on all paths
 
 fn conditionalOnly(flag: Bool) -> U32 {
-    if flag {
+    if (flag) {
         return 1;
     }
 } // expected-error[E0302]: function conditionalOnly must return U32 on all paths

@@ -33,7 +33,7 @@ impl Ord for Key {
 impl SortKey for Key {}
 
 fn min<T: SortKey>(a: T, b: T) -> T {
-    if a.lessThan(b) {
+    if (a.lessThan(b)) {
         return a;
     }
     return b;

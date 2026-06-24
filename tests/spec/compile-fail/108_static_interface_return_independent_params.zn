@@ -9,7 +9,7 @@ interface Writer {
 }
 
 fn choose(flag: Bool, left: Writer, right: Writer) -> Writer {
-    if flag {
+    if (flag) {
         return left;
     }
 

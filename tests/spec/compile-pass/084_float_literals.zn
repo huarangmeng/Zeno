@@ -18,7 +18,7 @@ fn main() -> F64 {
     val x: F32 = 1.0;
     var point: Point = Point { x: x, y: 2.5 };
     point.y = accept(3.25);
-    if point.y > 1.0 {
+    if (point.y > 1.0) {
         return point.y;
     }
     return 0.5;

@@ -29,7 +29,7 @@ impl Writer for Counter {
 
 fn writeAll<W: Writer>(mut writer: W, bytes: ArraySlice<U8>) -> Result<Unit, WriteError> {
     val n = try mut writer.write(bytes);
-    if n == bytes.len {
+    if (n == bytes.len) {
         return Ok(());
     }
     return Err(WriteError.Failed);

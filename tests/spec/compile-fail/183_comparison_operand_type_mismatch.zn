@@ -22,7 +22,7 @@ fn badComparisonOperands(flag: Bool, count: U32) -> Bool {
     val packet = Packet { enabled: count > flag }; // expected-error[E0302]: operator > requires numeric operands, got U32 and Bool
     var other: Packet = Packet { enabled: true };
     other.enabled = flag >= count; // expected-error[E0302]: operator >= requires numeric operands, got Bool and U32
-    if count == flag { // expected-error[E0302]: operator == requires operands of the same comparable type, got U32 and Bool
+    if (count == flag) { // expected-error[E0302]: operator == requires operands of the same comparable type, got U32 and Bool
         return false;
     }
     needFlag(count < flag); // expected-error[E0302]: operator < requires numeric operands, got U32 and Bool

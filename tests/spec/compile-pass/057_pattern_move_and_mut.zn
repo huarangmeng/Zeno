@@ -27,14 +27,14 @@ fn consume(move job: Job) -> U32 {
 }
 
 fn takeOptional(maybe: Maybe<Job>) -> U32 {
-    if move Maybe.Some(job) = maybe {
+    if (maybe is move Maybe.Some(job)) {
         return consume(move job);
     }
     return 0;
 }
 
 fn bump(mut state: State) -> U32 {
-    if mut State.Ready(job) = state {
+    if (state is mut State.Ready(job)) {
         job.priority = job.priority + 1;
         return job.priority;
     }

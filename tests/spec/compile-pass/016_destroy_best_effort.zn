@@ -21,7 +21,7 @@ struct File {
 
 impl File {
     fn close(move self) -> Result<Unit, IoError> {
-        if closeChecked(self.handle) {
+        if (closeChecked(self.handle)) {
             self.closed = true;
             return Ok(());
         }
@@ -29,7 +29,7 @@ impl File {
     }
 
     destroy {
-        if !self.closed {
+        if (!self.closed) {
             closeBestEffort(self.handle);
         }
     }

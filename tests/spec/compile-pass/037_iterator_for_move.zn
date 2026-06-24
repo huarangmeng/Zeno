@@ -17,7 +17,7 @@ impl Counter {
 
 impl Iterator<U32> for Counter {
     fn next(mut self) -> Option<U32> {
-        if self.current >= self.end {
+        if (self.current >= self.end) {
             return None;
         }
         val value = self.current;

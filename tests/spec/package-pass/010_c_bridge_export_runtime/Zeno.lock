@@ -7,7 +7,7 @@ name = "cBridgeRuntime"
 version = "0.1.0"
 source = "path:."
 manifestHash = "fnv1a64:2841dbff425a0462"
-contentHash = "fnv1a64:5079f282f2b82d19"
+contentHash = "fnv1a64:1a29d43a8c02589f"
 trust = []
 dependencies = [
 ]

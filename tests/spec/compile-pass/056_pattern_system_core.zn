@@ -30,7 +30,7 @@ struct Counter {
 
 impl Counter {
     fn next(mut self) -> Maybe<U32> {
-        if self.nextValue == 0 {
+        if (self.nextValue == 0) {
             return Maybe.None;
         }
 
@@ -58,7 +58,7 @@ fn destructure(point: Point, pair: (U32, U32)) -> U32 {
 }
 
 fn optional(maybe: Maybe<U32>) -> U32 {
-    if Maybe.Some(value) = maybe {
+    if (maybe is Maybe.Some(value)) {
         return value;
     } else {
         return 0;
@@ -67,7 +67,7 @@ fn optional(maybe: Maybe<U32>) -> U32 {
 
 fn sumCounter(mut counter: Counter) -> U32 {
     var sum: U32 = 0;
-    while Maybe.Some(value) = counter.next() {
+    while (counter.next() is Maybe.Some(value)) {
         sum = sum + value;
     }
     return sum;

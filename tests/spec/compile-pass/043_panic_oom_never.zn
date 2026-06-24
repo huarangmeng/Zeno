@@ -10,7 +10,7 @@ import core.alloc.Layout;
 import core.panic.{panic, oom};
 
 fn requirePositive(value: I32) -> I32 {
-    if value > 0 {
+    if (value > 0) {
         return value;
     }
 

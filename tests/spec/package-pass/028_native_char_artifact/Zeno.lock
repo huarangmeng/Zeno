@@ -1,13 +1,13 @@
 version = 1
-root = "nativeBoolApp"
+root = "nativeCharApp"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "nativeBoolApp"
-version = "0.1.0"
+name = "nativeCharApp"
+version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:893b46d16a1a01b1"
-contentHash = "fnv1a64:bda3b3b9f78b7d30"
+manifestHash = "fnv1a64:d12e630af57646ef"
+contentHash = "fnv1a64:efa511a51ac6dfa8"
 trust = []
 dependencies = [
 ]

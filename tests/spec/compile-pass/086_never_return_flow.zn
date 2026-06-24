@@ -20,14 +20,14 @@ fn needCount(value: U32) -> U32 {
 }
 
 fn countOrFail(flag: Bool) -> U32 {
-    if flag {
+    if (flag) {
         return 1;
     }
     return fail();
 }
 
 fn unitOrFail(flag: Bool) -> Unit {
-    if flag {
+    if (flag) {
         return;
     }
     return fail();
@@ -38,7 +38,7 @@ fn valueContexts() -> U32 {
     var total: U32 = 0;
     total = fail();
     val counter = Counter { value: fail() };
-    if fail() {
+    if (fail()) {
         return needCount(fail());
     }
     return count + total + counter.value;

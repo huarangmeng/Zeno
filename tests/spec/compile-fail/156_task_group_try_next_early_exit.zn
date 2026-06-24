@@ -13,8 +13,8 @@ async fn bad(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Unit, Fetc
         });
     }
 
-    while Some(page) = try await mut group.tryNext() {
-        if shouldStop(page) {
+    while (try await mut group.tryNext() is Some(page)) {
+        if (shouldStop(page)) {
             return Ok(()); // expected-error: task group may still contain unfinished tasks; call move group.cancelRemaining() before leaving
         }
 

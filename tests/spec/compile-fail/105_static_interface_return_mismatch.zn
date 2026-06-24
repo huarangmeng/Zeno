@@ -29,7 +29,7 @@ impl Writer for MemoryWriter {
 }
 
 fn makeWriter(flag: Bool) -> Writer {
-    if flag {
+    if (flag) {
         return FileWriter { total: 1 };
     }
 

@@ -1,0 +1,22 @@
+module main;
+
+fn isAsciiA(ch: Char) -> Bool {
+    return ch == 'A';
+}
+
+fn score(ch: Char) -> I32 {
+    val newline: Char = '\n';
+    if (isAsciiA(ch)) {
+        return 40;
+    }
+    if (ch != newline) {
+        return 1;
+    }
+    return 2;
+}
+
+fn main() -> I32 {
+    val a: Char = 'A';
+    val nl: Char = '\n';
+    return score(a) + score(nl) + score('z');
+}

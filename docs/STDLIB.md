@@ -426,7 +426,7 @@ impl<T: CopyHashKey> Set<T> {
 | `Task.cancel` | `move self` | 无 | 消费任务句柄，请求协作式取消，丢弃输出 | `val status = move task.cancel()` |
 | `Task.detach` | `move self` | 无 | 消费任务句柄，让任务后台继续运行并丢弃输出 | `move task.detach()` |
 | `TaskContext.isCancellationRequested` | `self` | 无 | 显式检查当前任务是否收到取消请求 | `ctx.isCancellationRequested()` |
-| `Iterator.next` | `mut self` | 无 | 推进迭代器，可能返回一个 owner | `while Some(x) = mut iter.next()` |
+| `Iterator.next` | `mut self` | 无 | 推进迭代器，可能返回一个 owner | `while (mut iter.next() is Some(x))` |
 | `File.read` / `write` | `mut self` | buffer | 推进文件状态或写入 OS 缓冲，不移动文件 | `try mut file.read(mut out)` |
 | async `File.readU32` | `mut self` | 无 | 立即 await 时可暂停并恢复文件拥有者 | `val x = try await mut file.readU32()` |
 | `File.close` | `move self` | 无 | 显式结束资源生命周期，失败时仍触发兜底销毁 | `try move file.close()` |
@@ -946,7 +946,7 @@ struct File {
 impl File {
     fn close(move self) -> Result<Unit, IoError> {
         val rc = trust { close(self.handle.rawFd) };
-        if rc < 0 {
+        if (rc < 0) {
             return Err(IoError.LastOsError);
         }
         self.closed = true;
@@ -954,7 +954,7 @@ impl File {
     }
 
     destroy {
-        if !self.closed {
+        if (!self.closed) {
             closeBestEffort(self.handle.rawFd);
         }
     }

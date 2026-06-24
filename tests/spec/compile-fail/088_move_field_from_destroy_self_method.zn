@@ -11,13 +11,13 @@ struct Packet {
 
 impl Packet {
     destroy {
-        if self.cleanupNeeded {
+        if (self.cleanupNeeded) {
             cleanupPacket(self);
         }
     }
 
     fn intoBytes(move self) -> Array<U8> {
-        if self.cleanupNeeded {
+        if (self.cleanupNeeded) {
             cleanupPacket(self);
             self.cleanupNeeded = false;
         }

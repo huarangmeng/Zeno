@@ -61,7 +61,7 @@ fn main() -> I32 {
     val specific = identity(small);
     val generic = identity(true);
 
-    if generic {
+    if (generic) {
         return exact + arity + read + written + owned + specific;
     }
 

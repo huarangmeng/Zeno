@@ -6,7 +6,7 @@ module tests.fail.taskContextThreadEscape;
 
 async fn runBad(move work: Work, ctx: TaskContext) -> Result<Unit, Error> {
     val handle = try Thread.spawn(move () -> Unit {
-        if ctx.isCancellationRequested() { // expected-error: TaskContext cannot be captured by Thread.spawn
+        if (ctx.isCancellationRequested()) { // expected-error: TaskContext cannot be captured by Thread.spawn
             return;
         }
         return;

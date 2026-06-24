@@ -44,7 +44,7 @@ fn parseDigit(value: U32) -> Result<U32, ParseError> {
 }
 
 fn nextMaybe(value: U32) -> Option<U32> {
-    if value == 0 {
+    if (value == 0) {
         return None;
     }
     return Some(value - 1);
@@ -60,7 +60,7 @@ fn sumValues(values: ArraySlice<U32>) -> Result<U32, ParseError> {
     val point = Point { x: 1, y: 2 };
     val Point { x, y } = point;
     for value in values {
-        if value == 0 {
+        if (value == 0) {
             continue;
         }
         total = total + value;
@@ -79,7 +79,7 @@ fn classify(maybe: Option<U32>) -> U32 {
 }
 
 fn optional(maybe: Option<U32>) -> U32 {
-    if Some(value) = maybe {
+    if (maybe is Some(value)) {
         return value;
     } else {
         return maybe.unwrapOr(0);
@@ -88,8 +88,8 @@ fn optional(maybe: Option<U32>) -> U32 {
 
 fn drain(start: U32) -> U32 {
     var total: U32 = start;
-    while Some(value) = nextMaybe(total) {
-        if value == 0 {
+    while (nextMaybe(total) is Some(value)) {
+        if (value == 0) {
             break total;
         }
         total = value;
@@ -108,7 +108,7 @@ fn expressions(buffer: USize, values: ArraySlice<U32>) -> U32 {
 }
 
 fn patternModes(maybe: Option<U32>) -> U32 {
-    if move Some(value) = maybe {
+    if (maybe is move Some(value)) {
         return value;
     }
     return match move maybe {

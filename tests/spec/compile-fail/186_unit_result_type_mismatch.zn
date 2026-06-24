@@ -24,7 +24,7 @@ fn badUnitUses() -> U32 {
     total = cleanup(); // expected-error[E0302]: assignment type U32 does not match Unit expression
     val badField = Counter { value: cleanup() }; // expected-error[E0302]: field value type U32 does not match Unit expression
     val badArg = needCount(cleanup()); // expected-error[E0302]: argument 1 of needCount expects U32 but got Unit
-    if cleanup() { // expected-error[E0302]: if condition must be Bool, got Unit
+    if (cleanup()) { // expected-error[E0302]: if condition must be Bool, got Unit
         return 0;
     }
     return cleanup(); // expected-error[E0302]: return type U32 does not match Unit expression

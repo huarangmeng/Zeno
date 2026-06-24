@@ -7,7 +7,7 @@ name = "nativeApp"
 version = "0.1.0"
 source = "path:."
 manifestHash = "fnv1a64:54b1996a526c9b12"
-contentHash = "fnv1a64:5ea16943146ac5cd"
+contentHash = "fnv1a64:73def4d37ac627e9"
 trust = []
 dependencies = [
 ]

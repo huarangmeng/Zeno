@@ -20,7 +20,7 @@ fn badCharLiterals(flag: Bool, count: U32, ch: Char) -> Char {
     token.kind = count; // expected-error[E0302]: field assignment kind type Char does not match U32 expression
     val badField = Token { kind: flag }; // expected-error[E0302]: field kind type Char does not match Bool expression
     val badArg = needChar(count); // expected-error[E0302]: argument 1 of needChar expects Char but got U32
-    if ch { // expected-error[E0302]: if condition must be Bool, got Char
+    if (ch) { // expected-error[E0302]: if condition must be Bool, got Char
         return 'q';
     }
     return flag; // expected-error[E0302]: return type Char does not match Bool expression

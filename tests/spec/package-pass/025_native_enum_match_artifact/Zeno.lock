@@ -7,7 +7,7 @@ name = "nativeEnumMatchApp"
 version = "0.1.0"
 source = "path:."
 manifestHash = "fnv1a64:447af6ecd195907f"
-contentHash = "fnv1a64:e8108ee190d88714"
+contentHash = "fnv1a64:356a3a9dc6330716"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

@@ -16,7 +16,7 @@ fn currentPid() -> Result<I32, IoError> {
         getpid()
     };
 
-    if pid < 0 {
+    if (pid < 0) {
         return Err(IoError.Failed);
     }
     return Ok(pid);

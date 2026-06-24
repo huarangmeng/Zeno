@@ -5,7 +5,7 @@ pub fn isPositive(value: I32) -> Bool {
 }
 
 pub fn pick(value: I32) -> I32 {
-    if isPositive(value) {
+    if (isPositive(value)) {
         return 7;
     }
     return 1;

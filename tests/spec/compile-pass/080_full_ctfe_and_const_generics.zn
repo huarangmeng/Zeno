@@ -10,7 +10,7 @@ fn pow2(n: USize) -> USize {
     var value: USize = 1;
     var i: USize = 0;
 
-    while i < n {
+    while (i < n) {
         value = value * 2;
         i = i + 1;
     }
@@ -22,7 +22,7 @@ fn sumFirst(n: USize) -> USize {
     var values = Vector<USize>.withCapacity(n);
     var i: USize = 0;
 
-    while i < n {
+    while (i < n) {
         mut values.push(i);
         i = i + 1;
     }

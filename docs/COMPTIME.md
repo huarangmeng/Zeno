@@ -67,7 +67,7 @@ Zeno 的 CTFE 是完整的普通语言解释执行，而不是只支持少量字
 
 ```zn
 fn fib(n: U32) -> U32 {
-    if n < 2 {
+    if (n < 2) {
         return n;
     }
     return fib(n - 1) + fib(n - 2);
@@ -102,7 +102,7 @@ fn sumFirst(n: USize) -> USize {
     var values = Vector<USize>.withCapacity(n);
     var i: USize = 0;
 
-    while i < n {
+    while (i < n) {
         mut values.push(i);
         i = i + 1;
     }

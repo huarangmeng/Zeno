@@ -15,7 +15,7 @@ fn processAll(mut shards: Vector<U8>, workerCount: USize) {
 }
 
 fn processShard(mut shard: ArraySlice<U8>) {
-    if shard.len > 0 {
+    if (shard.len > 0) {
         shard[0] = shard[0] + 1;
     }
 }

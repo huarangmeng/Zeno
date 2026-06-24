@@ -7,7 +7,7 @@ name = "hostedRuntime"
 version = "0.1.0"
 source = "path:."
 manifestHash = "fnv1a64:44b5821ab656df11"
-contentHash = "fnv1a64:8261bc28ab55da32"
+contentHash = "fnv1a64:67ed749e0573b4b7"
 trust = []
 dependencies = [
   { key = "alloc", package = "alloc" },

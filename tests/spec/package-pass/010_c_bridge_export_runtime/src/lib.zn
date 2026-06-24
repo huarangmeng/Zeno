@@ -23,7 +23,7 @@ pub struct FileDescriptor {
 
 impl FileDescriptor {
     fn read(self, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
-        if out.len() == 0 {
+        if (out.len() == 0) {
             return Ok(0);
         }
 
@@ -44,7 +44,7 @@ pub fn nameLen(name: StringSlice) -> Result<USize, IoError> {
 
 @export("zeno_first_byte", bridge: C)
 pub fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
-    if bytes.len() == 0 {
+    if (bytes.len() == 0) {
         return None;
     }
     return Some(bytes[0]);

@@ -20,7 +20,7 @@ fn badFloatLiterals() -> Bool {
     point.x = true; // expected-error[E0302]: field assignment x type F32 does not match Bool expression
     val badField = Point { x: false }; // expected-error[E0302]: field x type F32 does not match Bool expression
     val badArg = needCount(3.5); // expected-error[E0302]: argument 1 of needCount expects U32 but got float expression
-    if 4.5 { // expected-error[E0302]: if condition must be Bool, got float expression
+    if (4.5) { // expected-error[E0302]: if condition must be Bool, got float expression
         return false;
     }
     return 5.5; // expected-error[E0302]: return type Bool does not match float expression

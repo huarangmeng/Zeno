@@ -12,7 +12,7 @@ struct Guard {
 
 impl Guard {
     destroy {
-        if self.armed {
+        if (self.armed) {
             panic("cleanup failed"); // expected-error: destroy cannot call panic
         }
     }

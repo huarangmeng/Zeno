@@ -90,7 +90,7 @@ header.version = 1;
 - 对已初始化位置赋值会先求右侧，再销毁旧值，再写入新值；右侧失败时旧值保持不变。
 - 赋值不能覆盖当前存在活动访问的位置；需要取回旧值时使用 `replaceAt` 或类型提供的显式替换 API。
 - 只读 `match` 不移动 enum payload；`match move` 消耗整个 enum 并允许移动出被选中 payload；`match mut` 只给 payload 唯一可写访问，不给所有权。
-- `if pattern` 和 `while pattern` 遵守同样的只读 / `move` / `mut` pattern 规则。
+- `if (expr is pattern)` 和 `while (expr is pattern)` 遵守同样的只读 / `move` / `mut` pattern 规则。
 - `val` 解构只允许不可失败 pattern，避免在初始化语义中引入隐式失败路径。
 - or pattern 两侧必须绑定相同名字、类型和访问模式，防止某条分支中绑定不存在或所有权不同。
 - 带 guard 的 pattern 不参与穷尽证明，guard 中不能移动出只读绑定。
@@ -176,7 +176,7 @@ fn badReturn(packet: Packet) -> Packet {
 
 ```zn
 fn firstByte(data: ArraySlice<U8>) -> Option<U8> {
-    if data.len == 0 { return None; }
+    if (data.len == 0) { return None; }
     return Some(data[0]);
 }
 ```
@@ -429,7 +429,7 @@ fn readFileRaw(fd: I32, mut out: ArraySlice<U8>) -> Result<USize, IoError> {
         read(fd, out.rawAddress(), out.len)
     };
 
-    if n < 0 {
+    if (n < 0) {
         return Err(IoError.LastOsError);
     }
     return Ok(n as USize);

@@ -12,7 +12,7 @@ enum ParseError {
 
 @export("parse_i32", bridge: C)
 pub fn parse(value: I32) -> Result<I32, ParseError> { // expected-error: ParseError must implement CErrorCode for bridge C Result lowering
-    if value < 0 {
+    if (value < 0) {
         return Err(ParseError.BadInput);
     }
     return Ok(value);

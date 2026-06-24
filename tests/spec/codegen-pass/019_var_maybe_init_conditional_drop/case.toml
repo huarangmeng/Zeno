@@ -17,7 +17,7 @@ impl File {
 fn replaceMaybe(flag: Bool, pathA: StringSlice, pathB: StringSlice) -> Result<File, IoError> {
     var file: File;
 
-    if flag {
+    if (flag) {
         file = try File.open(pathA);
     }
 

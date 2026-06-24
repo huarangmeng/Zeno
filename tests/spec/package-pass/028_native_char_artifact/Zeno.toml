@@ -1,0 +1,45 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 43
+# zmeta-contains: decl.fn isAsciiA module=main span=src/main.zn:3:1 params=(ch: Char) return=Bool
+# zmeta-contains: decl.fn score module=main span=src/main.zn:7:1 params=(ch: Char) return=I32
+# zmeta-contains: stmt.val score.newline module=main span=src/main.zn:8:1 expr=char-literal type=Char
+# zmeta-contains: stmt.if score module=main span=src/main.zn:9:1 condition=call:isAsciiA
+# zmeta-contains: stmt.if score module=main span=src/main.zn:12:1 condition=compare:!=
+# zmeta-contains: stmt.val main.a module=main span=src/main.zn:19:1 expr=char-literal type=Char
+# zmeta-contains: stmt.val main.nl module=main span=src/main.zn:20:1 expr=char-literal type=Char
+# mir-contains: hir.fn-signature isAsciiA params=(ch: Char) return=Bool
+# mir-contains: hir.fn-signature score params=(ch: Char) return=I32
+# mir-contains: hir.val score.newline expr=char-literal type=Char
+# mir-contains: hir.if score condition=call:isAsciiA
+# mir-contains: hir.if score condition=compare:!=
+# mir-contains: mir.operand score expr=char-literal kind=const
+# mir-contains: mir.branch score kind=if condition=call:isAsciiA
+# mir-contains: mir.branch score kind=if condition=compare:!=
+# emit-contains: define i1 @isAsciiA(i32 %ch)
+# emit-contains: %t0 = icmp eq i32 %ch, 65
+# emit-contains: define i32 @score(i32 %ch)
+# emit-contains: %newline = add i32 0, 10
+# emit-contains: %t0 = call i1 @isAsciiA(i32 %ch)
+# emit-contains: %t2 = icmp ne i32 %ch, %newline
+# emit-contains: define i32 @main()
+# emit-contains: %a = add i32 0, 65
+# emit-contains: %nl = add i32 0, 10
+# emit-contains: %t0 = call i32 @score(i32 %a)
+# emit-contains: %t1 = call i32 @score(i32 %nl)
+# object-contains: _isAsciiA
+# object-contains: _score
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: Char primitive native lowering is concentrated here: Char parameters, Char locals, escaped Char literals, Char equality/inequality conditions, Bool-returning Char comparison, real LLVM i32 scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeCharApp"
+kind = "application"
+entry = "main.main"

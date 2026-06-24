@@ -11,7 +11,7 @@ enum Error {
 
 @export("parse_i32", abi: C)
 pub fn parse(value: I32) -> Result<I32, Error> { // expected-error: Result is not C-compatible in an exported C ABI signature
-    if value < 0 {
+    if (value < 0) {
         return Err(Error.Bad);
     }
     return Ok(value);

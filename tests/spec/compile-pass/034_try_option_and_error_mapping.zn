@@ -18,7 +18,7 @@ enum ParseError {
 }
 
 fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
-    if bytes.len == 0 {
+    if (bytes.len == 0) {
         return None;
     }
     return Some(bytes[0]);
@@ -26,7 +26,7 @@ fn firstByte(bytes: ArraySlice<U8>) -> Option<U8> {
 
 fn secondByte(bytes: ArraySlice<U8>) -> Option<U8> {
     val first = try firstByte(bytes);
-    if bytes.len < 2 {
+    if (bytes.len < 2) {
         return None;
     }
     return Some(first + bytes[1]);

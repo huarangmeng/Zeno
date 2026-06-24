@@ -15,7 +15,7 @@ fn makeHandle(id: U32) -> Handle {
 fn bad(flag: Bool) -> Handle {
     val handle: Handle;
 
-    if flag {
+    if (flag) {
         handle = makeHandle(1);
     }
 

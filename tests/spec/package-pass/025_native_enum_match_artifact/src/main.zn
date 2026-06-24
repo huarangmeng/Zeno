@@ -74,14 +74,14 @@ fn finish(move state: WorkState) -> I32 {
 }
 
 fn bump(mut state: WorkState) -> I32 {
-    if mut WorkState.Ready(job) = state {
+    if (state is mut WorkState.Ready(job)) {
         return job.priority + 1;
     }
     return 0;
 }
 
 fn unwrapMaybe(maybe: Maybe<I32>) -> I32 {
-    if Maybe.Some(value) = maybe {
+    if (maybe is Maybe.Some(value)) {
         return value;
     } else {
         return 0;
@@ -105,7 +105,7 @@ fn makeNoJob() -> Maybe<Job> {
 }
 
 fn unwrapJob(maybe: Maybe<Job>) -> I32 {
-    if Maybe.Some(job) = maybe {
+    if (maybe is Maybe.Some(job)) {
         return job.priority;
     } else {
         return 0;
@@ -148,14 +148,14 @@ fn eventCode(event: Event) -> I32 {
 }
 
 fn firstKey(code: I32) -> I32 {
-    while Event.Key(value) = makeKey(code) {
+    while (makeKey(code) is Event.Key(value)) {
         return value + 1;
     }
     return 0;
 }
 
 fn keyUntil(limit: I32, current: I32) -> Event {
-    if current < limit {
+    if (current < limit) {
         return Event.Key(current);
     }
     return Event.Finished;
@@ -164,7 +164,7 @@ fn keyUntil(limit: I32, current: I32) -> Event {
 fn sumKeys(limit: I32) -> I32 {
     var i = 0;
     var acc = 0;
-    while Event.Key(value) = keyUntil(limit, i) {
+    while (keyUntil(limit, i) is Event.Key(value)) {
         acc = acc + value;
         i = i + 1;
     }
@@ -206,7 +206,7 @@ fn matchTask(maybe: Maybe<Task>) -> I32 {
 }
 
 fn maybeUntil(limit: I32, current: I32) -> Maybe<I32> {
-    if current < limit {
+    if (current < limit) {
         return Maybe.Some(current);
     }
     return Maybe.None;
@@ -215,7 +215,7 @@ fn maybeUntil(limit: I32, current: I32) -> Maybe<I32> {
 fn sumMaybe(limit: I32) -> I32 {
     var i = 0;
     var acc = 0;
-    while Maybe.Some(value) = maybeUntil(limit, i) {
+    while (maybeUntil(limit, i) is Maybe.Some(value)) {
         acc = acc + value;
         i = i + 1;
     }

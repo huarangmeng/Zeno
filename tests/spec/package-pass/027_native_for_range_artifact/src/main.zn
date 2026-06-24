@@ -35,10 +35,10 @@ fn singleClosed(value: I32) -> I32 {
 fn sumForSkipBreak(limit: I32) -> I32 {
     var acc: I32 = 0;
     for i in 0..limit {
-        if i == 2 {
+        if (i == 2) {
             continue;
         }
-        if i == 5 {
+        if (i == 5) {
             break;
         }
         acc = acc + i;
@@ -49,12 +49,12 @@ fn sumForSkipBreak(limit: I32) -> I32 {
 fn sumWhileSkipBreak(limit: I32) -> I32 {
     var i: I32 = 0;
     var acc: I32 = 0;
-    while i < limit {
+    while (i < limit) {
         i = i + 1;
-        if i == 2 {
+        if (i == 2) {
             continue;
         }
-        if i == 5 {
+        if (i == 5) {
             break;
         }
         acc = acc + i;

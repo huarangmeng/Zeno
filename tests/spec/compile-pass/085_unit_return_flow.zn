@@ -11,7 +11,7 @@ fn cleanup() -> Unit {
 
 fn forward() -> Unit {
     val done: Unit = cleanup();
-    if true {
+    if (true) {
         return cleanup();
     }
     return;

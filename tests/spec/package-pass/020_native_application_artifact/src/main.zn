@@ -1,7 +1,7 @@
 module main;
 
 pub fn addIfPositive(value: I32, delta: I32) -> I32 {
-    if value > 0 {
+    if (value > 0) {
         return value + delta;
     }
     return delta;
@@ -10,7 +10,7 @@ pub fn addIfPositive(value: I32, delta: I32) -> I32 {
 pub fn sumTo(limit: I32) -> I32 {
     var i: I32 = 0;
     var acc: I32 = 0;
-    while i < limit {
+    while (i < limit) {
         acc = acc + i;
         i = i + 1;
     }

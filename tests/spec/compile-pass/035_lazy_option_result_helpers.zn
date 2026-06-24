@@ -20,7 +20,7 @@ struct User: Copy {
 }
 
 fn findUser(id: U64) -> Option<User> {
-    if id == 0 {
+    if (id == 0) {
         return None;
     }
     return Some(User { id: id });

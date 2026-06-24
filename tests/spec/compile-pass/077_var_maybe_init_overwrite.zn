@@ -19,7 +19,7 @@ fn makeHandle(id: U32) -> Handle {
 fn overwrite(flag: Bool) -> Handle {
     var slot: Handle;
 
-    if flag {
+    if (flag) {
         slot = makeHandle(1);
     }
 

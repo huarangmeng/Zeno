@@ -7,7 +7,7 @@ name = "astSyntaxSurface"
 version = "0.1.0"
 source = "path:."
 manifestHash = "fnv1a64:c4e2d02a5fcebe8f"
-contentHash = "fnv1a64:d9038e35279f10c2"
+contentHash = "fnv1a64:5798c28bfde2602b"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

@@ -13,7 +13,7 @@ enum ParseError {
 }
 
 fn parseDigit(text: StringSlice) -> Result<U8, ParseError> {
-    if text.len == 0 {
+    if (text.len == 0) {
         return Err(ParseError.Empty);
     }
     return Ok(1);

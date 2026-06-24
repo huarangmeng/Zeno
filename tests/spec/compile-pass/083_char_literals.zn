@@ -18,7 +18,7 @@ fn main() -> Char {
     val explicit: Char = inferred;
     var token: Token = Token { kind: explicit };
     token.kind = accept('a');
-    if token.kind == 'a' {
+    if (token.kind == 'a') {
         return token.kind;
     }
     return '\n';
