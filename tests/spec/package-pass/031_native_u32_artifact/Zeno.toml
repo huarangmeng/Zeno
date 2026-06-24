@@ -1,0 +1,53 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 34
+# zmeta-contains: decl.fn isLarge module=main span=src/main.zn:3:1 params=(value: U32) return=Bool
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: U32) return=I32
+# zmeta-contains: stmt.val classify.doubled module=main span=src/main.zn:8:1 expr=binary:* type=U32
+# zmeta-contains: stmt.val classify.half module=main span=src/main.zn:9:1 expr=binary:/ type=U32
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isLarge
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:<
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=int-literal:6 type=U32
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=int-literal:11 type=U32
+# mir-contains: hir.fn-signature isLarge params=(value: U32) return=Bool
+# mir-contains: hir.fn-signature classify params=(value: U32) return=I32
+# mir-contains: hir.local classify.doubled mode=val expr=binary:* type=U32
+# mir-contains: hir.local classify.half mode=val expr=binary:/ type=U32
+# mir-contains: hir.if classify condition=call:isLarge
+# mir-contains: hir.if classify condition=compare:<
+# mir-contains: mir.local-slot classify %doubled mutable=false type=U32
+# mir-contains: mir.local-slot classify %half mutable=false type=U32
+# mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
+# mir-contains: mir.rvalue classify expr=binary:/ kind=binary op=/
+# mir-contains: mir.branch classify kind=if condition=call:isLarge
+# mir-contains: mir.branch classify kind=if condition=compare:<
+# emit-contains: define i1 @isLarge(i32 %value)
+# emit-contains: %t0 = icmp uge i32 %value, 10
+# emit-contains: define i32 @classify(i32 %value)
+# emit-contains: %t0 = mul i32 %value, 2
+# emit-contains: %doubled = add i32 0, %t0
+# emit-contains: %t1 = udiv i32 %doubled, 2
+# emit-contains: %half = add i32 0, %t1
+# emit-contains: %t2 = call i1 @isLarge(i32 %half)
+# emit-contains: %t4 = icmp ult i32 %half, 7
+# emit-contains: define i32 @main()
+# emit-contains: %low = add i32 0, 6
+# emit-contains: %high = add i32 0, 11
+# emit-contains: %t0 = call i32 @classify(i32 %low)
+# emit-contains: %t1 = call i32 @classify(i32 %high)
+# object-contains: _isLarge
+# object-contains: _classify
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: U32 primitive native lowering is concentrated here: U32 parameters, annotated U32 locals, integer literals typed by context, unsigned multiply/divide, unsigned comparisons, Bool-returning U32 comparison calls, real LLVM i32 unsigned scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeU32App"
+kind = "application"
+entry = "main.main"

@@ -1,0 +1,54 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 36
+# zmeta-contains: decl.fn isHuge module=main span=src/main.zn:3:1 params=(value: I64) return=Bool
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: I64) return=I32
+# zmeta-contains: stmt.val classify.doubled module=main span=src/main.zn:8:1 expr=binary:* type=I64
+# zmeta-contains: stmt.val classify.half module=main span=src/main.zn:9:1 expr=binary:/ type=I64
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isHuge
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:<
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=int-literal:8 type=I64
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=int-literal:4294967296 type=I64
+# mir-contains: hir.fn-signature isHuge params=(value: I64) return=Bool
+# mir-contains: hir.fn-signature classify params=(value: I64) return=I32
+# mir-contains: hir.local classify.doubled mode=val expr=binary:* type=I64
+# mir-contains: hir.local classify.half mode=val expr=binary:/ type=I64
+# mir-contains: hir.if classify condition=call:isHuge
+# mir-contains: hir.if classify condition=compare:<
+# mir-contains: mir.local-slot classify %doubled mutable=false type=I64
+# mir-contains: mir.local-slot classify %half mutable=false type=I64
+# mir-contains: mir.local main.high init=int-literal:4294967296 mutable=false
+# mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
+# mir-contains: mir.rvalue classify expr=binary:/ kind=binary op=/
+# mir-contains: mir.branch classify kind=if condition=call:isHuge
+# mir-contains: mir.branch classify kind=if condition=compare:<
+# emit-contains: define i1 @isHuge(i64 %value)
+# emit-contains: %t0 = icmp sge i64 %value, 4294967296
+# emit-contains: define i32 @classify(i64 %value)
+# emit-contains: %t0 = mul i64 %value, 2
+# emit-contains: %doubled = add i64 0, %t0
+# emit-contains: %t1 = sdiv i64 %doubled, 2
+# emit-contains: %half = add i64 0, %t1
+# emit-contains: %t2 = call i1 @isHuge(i64 %half)
+# emit-contains: %t4 = icmp slt i64 %half, 9
+# emit-contains: define i32 @main()
+# emit-contains: %low = add i64 0, 8
+# emit-contains: %high = add i64 0, 4294967296
+# emit-contains: %t0 = call i32 @classify(i64 %low)
+# emit-contains: %t1 = call i32 @classify(i64 %high)
+# object-contains: _isHuge
+# object-contains: _classify
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: I64 primitive native lowering is concentrated here: I64 parameters, annotated I64 locals, integer literals typed by context including values wider than I32, signed multiply/divide, signed comparisons, Bool-returning I64 comparison calls, real LLVM i64 signed scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeI64App"
+kind = "application"
+entry = "main.main"

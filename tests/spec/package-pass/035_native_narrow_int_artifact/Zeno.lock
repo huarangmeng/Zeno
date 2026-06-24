@@ -1,0 +1,23 @@
+version = 1
+root = "nativeNarrowIntApp"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "nativeNarrowIntApp"
+version = "0.0.0"
+source = "path:."
+manifestHash = "fnv1a64:0d55dd4a80c4c4b9"
+contentHash = "fnv1a64:14d06e894257d400"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

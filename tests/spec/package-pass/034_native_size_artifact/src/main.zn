@@ -1,0 +1,41 @@
+module main;
+
+fn isWideSize(value: USize) -> Bool {
+    return value >= 4294967296;
+}
+
+fn classifySize(value: USize) -> I32 {
+    val doubled: USize = value * 2;
+    val half: USize = doubled / 2;
+    if (isWideSize(half)) {
+        return 30;
+    }
+    if (half < 9) {
+        return 7;
+    }
+    return 0;
+}
+
+fn isWideOffset(value: ISize) -> Bool {
+    return value >= 4294967296;
+}
+
+fn classifyOffset(value: ISize) -> I32 {
+    val doubled: ISize = value * 2;
+    val half: ISize = doubled / 2;
+    if (isWideOffset(half)) {
+        return 40;
+    }
+    if (half < 9) {
+        return 8;
+    }
+    return 0;
+}
+
+fn main() -> I32 {
+    val sizeLow: USize = 8;
+    val sizeHigh: USize = 4294967296;
+    val offsetLow: ISize = 8;
+    val offsetHigh: ISize = 4294967296;
+    return classifySize(sizeLow) + classifySize(sizeHigh) + classifyOffset(offsetLow) + classifyOffset(offsetHigh);
+}

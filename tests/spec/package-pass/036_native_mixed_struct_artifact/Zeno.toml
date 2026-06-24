@@ -1,0 +1,83 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 49
+# zmeta-contains: decl.struct Header module=main span=src/main.zn:3:1
+# zmeta-contains: decl.field Header.tag module=main span=src/main.zn:4:1 type=U8
+# zmeta-contains: decl.field Header.length module=main span=src/main.zn:5:1 type=U16
+# zmeta-contains: decl.field Header.weight module=main span=src/main.zn:6:1 type=I64
+# zmeta-contains: decl.field Header.ratio module=main span=src/main.zn:7:1 type=F32
+# zmeta-contains: decl.field Header.exact module=main span=src/main.zn:8:1 type=F64
+# zmeta-contains: decl.fn makeHeader module=main span=src/main.zn:46:1 params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Header
+# zmeta-contains: decl.fn identity module=main span=src/main.zn:50:1 params=(header: Header) return=Header
+# zmeta-contains: decl.fn consume module=main span=src/main.zn:54:1 params=(header: Header) return=I32
+# zmeta-contains: hir.field Header.tag type=U8
+# zmeta-contains: hir.field Header.length type=U16
+# zmeta-contains: hir.field Header.weight type=I64
+# zmeta-contains: hir.field Header.ratio type=F32
+# zmeta-contains: hir.field Header.exact type=F64
+# zmeta-contains: hir.fn-signature makeHeader params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Header
+# zmeta-contains: hir.fn-signature identity params=(header: Header) return=Header
+# zmeta-contains: hir.fn-signature consume params=(header: Header) return=I32
+# zmeta-contains: mir.type Header layout=Auto
+# zmeta-contains: mir.field Header.tag type=U8
+# zmeta-contains: mir.field Header.length type=U16
+# zmeta-contains: mir.field Header.weight type=I64
+# zmeta-contains: mir.field Header.ratio type=F32
+# zmeta-contains: mir.field Header.exact type=F64
+# zmeta-contains: mir.rvalue makeHeader expr=struct-literal:Header kind=struct-literal type=Header
+# zmeta-contains: mir.return identity value=name:header type=Header
+# zmeta-contains: llvm.type %Header layout=Auto
+# zmeta-contains: llvm.field-preview Header.tag type=U8
+# zmeta-contains: llvm.field-preview Header.length type=U16
+# zmeta-contains: llvm.field-preview Header.weight type=I64
+# zmeta-contains: llvm.field-preview Header.ratio type=F32
+# zmeta-contains: llvm.field-preview Header.exact type=F64
+# zmeta-contains: llvm.aggregate-preview @makeHeader type=Header
+# emit-contains: %Header = type { i8, i16, i64, float, double }
+# emit-contains: define %Header @makeHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)
+# emit-contains: %t0 = insertvalue %Header undef, i8 %tag, 0
+# emit-contains: %t1 = insertvalue %Header %t0, i16 %length, 1
+# emit-contains: %t2 = insertvalue %Header %t1, i64 %weight, 2
+# emit-contains: %t3 = insertvalue %Header %t2, float %ratio, 3
+# emit-contains: %t4 = insertvalue %Header %t3, double %exact, 4
+# emit-contains: define %Header @identity(%Header %header)
+# emit-contains: ret %Header %header
+# emit-contains: define i32 @consume(%Header %header)
+# emit-contains: %t0 = extractvalue %Header %header, 0
+# emit-contains: %t1 = call i32 @scoreTag(i8 %t0)
+# emit-contains: %t2 = extractvalue %Header %header, 1
+# emit-contains: %t3 = call i32 @scoreLength(i16 %t2)
+# emit-contains: %t5 = extractvalue %Header %header, 2
+# emit-contains: %t6 = call i32 @scoreWeight(i64 %t5)
+# emit-contains: %t8 = extractvalue %Header %header, 3
+# emit-contains: %t9 = call i32 @scoreRatio(float %t8)
+# emit-contains: %t11 = extractvalue %Header %header, 4
+# emit-contains: %t12 = call i32 @scoreExact(double %t11)
+# emit-contains: %t0 = call %Header @makeHeader(i8 7, i16 300, i64 4294967296, float 2.5, double 2.75)
+# emit-contains: %t0 = fcmp olt double %value, 3.0
+# emit-contains: %t0 = icmp uge i16 %value, 300
+# emit-contains: %t0 = fcmp ogt float %value, 1.5
+# emit-contains: %t0 = icmp eq i8 %value, 7
+# emit-contains: %t0 = icmp sge i64 %value, 4294967296
+# object-contains: _makeHeader
+# object-contains: _identity
+# object-contains: _consume
+# object-contains: _scoreTag
+# object-contains: _scoreLength
+# object-contains: _scoreWeight
+# object-contains: _scoreRatio
+# object-contains: _scoreExact
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: mixed primitive scalar struct lowering is concentrated here: U8, U16, I64, F32, and F64 fields are constructed in one aggregate, returned, passed through an identity function, extracted with their LLVM scalar types, passed to typed helper calls, compiled to object code, linked to a host executable, and direct run-exit-code validated
+
+[package]
+name = "nativeMixedStructApp"
+kind = "application"
+entry = "main.main"

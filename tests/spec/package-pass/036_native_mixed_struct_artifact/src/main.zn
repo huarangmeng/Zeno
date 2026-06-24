@@ -1,0 +1,62 @@
+module main;
+
+struct Header {
+    tag: U8,
+    length: U16,
+    weight: I64,
+    ratio: F32,
+    exact: F64,
+}
+
+fn scoreTag(value: U8) -> I32 {
+    if (value == 7) {
+        return 3;
+    }
+    return 0;
+}
+
+fn scoreLength(value: U16) -> I32 {
+    if (value >= 300) {
+        return 5;
+    }
+    return 0;
+}
+
+fn scoreWeight(value: I64) -> I32 {
+    if (value >= 4294967296) {
+        return 11;
+    }
+    return 0;
+}
+
+fn scoreRatio(value: F32) -> I32 {
+    if (value > 1.5) {
+        return 13;
+    }
+    return 0;
+}
+
+fn scoreExact(value: F64) -> I32 {
+    if (value < 3.0) {
+        return 17;
+    }
+    return 0;
+}
+
+fn makeHeader(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Header {
+    return Header { tag: tag, length: length, weight: weight, ratio: ratio, exact: exact };
+}
+
+fn identity(header: Header) -> Header {
+    return header;
+}
+
+fn consume(header: Header) -> I32 {
+    return scoreTag(header.tag) + scoreLength(header.length) + scoreWeight(header.weight) + scoreRatio(header.ratio) + scoreExact(header.exact);
+}
+
+fn main() -> I32 {
+    val header = makeHeader(7, 300, 4294967296, 2.5, 2.75);
+    val normalized = identity(header);
+    return consume(normalized);
+}

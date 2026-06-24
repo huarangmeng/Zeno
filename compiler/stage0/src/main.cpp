@@ -6673,6 +6673,7 @@ struct NativeI32Local {
 
 struct NativeI32StructType {
   std::vector<std::string> fields;
+  std::vector<std::string> fieldTypes;
 };
 
 struct NativeI32EnumType {
@@ -6732,21 +6733,52 @@ bool isNativeI32ScalarType(const std::string &typeName) {
   return normalized == "I32" || normalized == "Char";
 }
 
+bool isNativeIntegerScalarType(const std::string &typeName) {
+  const std::string normalized = normalizeSignatureType(typeName);
+  return normalized == "I8" || normalized == "I16" || normalized == "I32" ||
+         normalized == "I64" || normalized == "ISize" ||
+         normalized == "U8" || normalized == "U16" || normalized == "U32" ||
+         normalized == "U64" || normalized == "USize" ||
+         normalized == "Char";
+}
+
 bool isNativeScalarType(const std::string &typeName) {
   const std::string normalized = normalizeSignatureType(typeName);
-  return isNativeI32ScalarType(normalized) || normalized == "F64";
+  return isNativeIntegerScalarType(normalized) || normalized == "F32" || normalized == "F64";
+}
+
+bool isNativeFloatingScalarType(const std::string &typeName) {
+  const std::string normalized = normalizeSignatureType(typeName);
+  return normalized == "F32" || normalized == "F64";
+}
+
+bool isNativeUnsignedIntegerScalarType(const std::string &typeName) {
+  const std::string normalized = normalizeSignatureType(typeName);
+  return normalized == "U8" || normalized == "U16" || normalized == "U32" ||
+         normalized == "U64" || normalized == "USize" || normalized == "Char";
 }
 
 std::string nativeScalarLlvmType(const std::string &typeName) {
-  return normalizeSignatureType(typeName) == "F64" ? "double" : "i32";
+  const std::string normalized = normalizeSignatureType(typeName);
+  if (normalized == "I8" || normalized == "U8") return "i8";
+  if (normalized == "I16" || normalized == "U16") return "i16";
+  if (normalized == "I64") return "i64";
+  if (normalized == "ISize") return "i64";
+  if (normalized == "U64") return "i64";
+  if (normalized == "USize") return "i64";
+  if (normalized == "F32") return "float";
+  if (normalized == "F64") return "double";
+  return "i32";
 }
 
 std::string nativeScalarZero(const std::string &typeName) {
-  return normalizeSignatureType(typeName) == "F64" ? "0.000000e+00" : "0";
+  const std::string normalized = normalizeSignatureType(typeName);
+  return (normalized == "F32" || normalized == "F64") ? "0.000000e+00" : "0";
 }
 
 std::string nativeScalarCopyOp(const std::string &typeName) {
-  return normalizeSignatureType(typeName) == "F64" ? "fadd" : "add";
+  const std::string normalized = normalizeSignatureType(typeName);
+  return (normalized == "F32" || normalized == "F64") ? "fadd" : "add";
 }
 
 std::optional<int> nativeCharLiteralValue(const std::string &rawExpr) {
@@ -6770,7 +6802,7 @@ std::optional<int> nativeCharLiteralValue(const std::string &rawExpr) {
   return std::nullopt;
 }
 
-bool isNativeF64Literal(const std::string &rawExpr) {
+bool isNativeFloatLiteral(const std::string &rawExpr) {
   const std::string expr = trim(rawExpr);
   return std::regex_match(expr, std::regex(R"([0-9]+\.[0-9]+(?:[eE][+-]?[0-9]+)?)"));
 }
@@ -6841,6 +6873,18 @@ int nativeStructFieldIndex(const NativeI32StructType &type, const std::string &f
     if (type.fields[i] == fieldName) return static_cast<int>(i);
   }
   return -1;
+}
+
+std::string nativeStructFieldTypeAt(const NativeI32StructType &type, std::size_t index) {
+  if (index >= type.fieldTypes.size()) return "I32";
+  return type.fieldTypes[index];
+}
+
+bool nativeStructUsesOnlyI32PayloadSlots(const NativeI32StructType &type) {
+  if (type.fieldTypes.size() != type.fields.size()) return false;
+  return std::all_of(type.fieldTypes.begin(), type.fieldTypes.end(), [](const std::string &fieldType) {
+    return isNativeI32ScalarType(fieldType);
+  });
 }
 
 std::string nativeAccessName(std::string name) {
@@ -7026,7 +7070,7 @@ bool nativeParameterList(std::string params,
     if (!std::regex_match(name, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) return false;
     const std::string type = normalizeSignatureType(trimmedParam.substr(colon + 1));
     std::string llvmType;
-    if (isNativeI32ScalarType(type)) llvmType = "i32";
+    if (isNativeScalarType(type)) llvmType = nativeScalarLlvmType(type);
     else if (enumTypes.count(type)) llvmType = "i32";
     else if (structTypes.count(type)) llvmType = nativeLlvmTypeRef(type);
     else return false;
@@ -7046,15 +7090,25 @@ NativeI32Expr lowerNativeI32Expr(const std::string &rawExpr,
                                  const std::map<std::string, NativeI32EnumType> &enumTypes,
                                  const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
                                  const std::set<std::string> &candidateCallees,
-                                 int &tempId) {
+                                 int &tempId,
+                                 const std::string &expectedType = "") {
   std::string expr = trim(rawExpr);
   if (!expr.empty() && expr.back() == ';') expr.pop_back();
   expr = trim(expr);
   if (std::regex_match(expr, std::regex(R"([0-9]+)"))) {
-    return NativeI32Expr{true, "", expr};
+    const std::string expected = normalizeSignatureType(expectedType);
+    const std::string literalType = expected == "I8" || expected == "I16" ||
+                                    expected == "I64" || expected == "ISize" ||
+                                    expected == "U8" || expected == "U16" ||
+                                    expected == "U32" || expected == "U64" ||
+                                    expected == "USize"
+                                      ? expected
+                                      : "I32";
+    return NativeI32Expr{true, "", expr, literalType};
   }
-  if (isNativeF64Literal(expr)) {
-    return NativeI32Expr{true, "", expr, "F64"};
+  if (isNativeFloatLiteral(expr)) {
+    const std::string literalType = normalizeSignatureType(expectedType) == "F32" ? "F32" : "F64";
+    return NativeI32Expr{true, "", expr, literalType};
   }
   if (auto charValue = nativeCharLiteralValue(expr)) {
     return NativeI32Expr{true, "", std::to_string(*charValue), "Char"};
@@ -7069,33 +7123,38 @@ NativeI32Expr lowerNativeI32Expr(const std::string &rawExpr,
     if (type == structTypes.end()) return {};
     const int index = nativeStructFieldIndex(type->second, (*field)[2]);
     if (index < 0) return {};
+    const std::string fieldType = nativeStructFieldTypeAt(type->second, static_cast<std::size_t>(index));
     const std::string temp = "%t" + std::to_string(tempId++);
     return NativeI32Expr{true,
                          "  " + temp + " = extractvalue " + nativeLlvmTypeRef(aggregate->second.typeName) + " " + aggregate->second.value + ", " + std::to_string(index) + "\n",
-                         temp};
+                         temp,
+                         fieldType};
   }
   std::optional<std::size_t> binaryIndex = findTopLevelNativeBinaryOperator(expr, "+-");
   if (!binaryIndex) binaryIndex = findTopLevelNativeBinaryOperator(expr, "*/");
   if (binaryIndex) {
     const std::string op(1, expr[*binaryIndex]);
-    auto left = lowerNativeI32Expr(expr.substr(0, *binaryIndex), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
-    auto right = lowerNativeI32Expr(expr.substr(*binaryIndex + 1), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    auto left = lowerNativeI32Expr(expr.substr(0, *binaryIndex), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, expectedType);
+    const std::string rightExpected = isNativeFloatingScalarType(left.typeName) ? left.typeName : expectedType;
+    auto right = lowerNativeI32Expr(expr.substr(*binaryIndex + 1), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, rightExpected);
     if (!left.ok || !right.ok) return {};
     std::string llvmOp;
     std::string resultType = "I32";
-    if (left.typeName == "F64" || right.typeName == "F64") {
-      if (left.typeName != "F64" || right.typeName != "F64") return {};
-      resultType = "F64";
+    if (isNativeFloatingScalarType(left.typeName) || isNativeFloatingScalarType(right.typeName)) {
+      if (!isNativeFloatingScalarType(left.typeName) || left.typeName != right.typeName) return {};
+      resultType = left.typeName;
       if (op == "+") llvmOp = "fadd";
       else if (op == "-") llvmOp = "fsub";
       else if (op == "*") llvmOp = "fmul";
       else if (op == "/") llvmOp = "fdiv";
       else return {};
     } else {
+      if (left.typeName != right.typeName) return {};
+      resultType = left.typeName;
       if (op == "+") llvmOp = "add";
       else if (op == "-") llvmOp = "sub";
       else if (op == "*") llvmOp = "mul";
-      else if (op == "/") llvmOp = "sdiv";
+      else if (op == "/") llvmOp = isNativeUnsignedIntegerScalarType(resultType) ? "udiv" : "sdiv";
       else return {};
     }
     const std::string temp = "%t" + std::to_string(tempId++);
@@ -7131,8 +7190,9 @@ NativeI32Expr lowerNativeI32Expr(const std::string &rawExpr,
       const std::string arg = trim(rawArgs[i]);
       const std::string paramType = paramTypes[i];
       if (isNativeScalarType(paramType)) {
-        auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+        auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, paramType);
         if (!lowered.ok) return {};
+        if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(paramType)) return {};
         code += lowered.code;
         arguments.push_back(nativeScalarLlvmType(paramType) + " " + lowered.value);
       } else if (enumTypes.count(paramType)) {
@@ -7173,20 +7233,38 @@ NativeI32Condition lowerNativeI32Condition(const std::string &rawCondition,
   const std::regex comparisonPattern(R"(^(.+)\s*(>=|<=|==|!=|>|<)\s*(.+)$)");
   if (auto comparison = matchRegex(condition, comparisonPattern)) {
     auto left = lowerNativeI32Expr((*comparison)[1], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
-    auto right = lowerNativeI32Expr((*comparison)[3], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    auto right = lowerNativeI32Expr((*comparison)[3], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, left.typeName);
     if (!left.ok || !right.ok) return {};
     const std::string op = (*comparison)[2];
     std::string predicate;
-    if (op == ">") predicate = "sgt";
-    else if (op == ">=") predicate = "sge";
-    else if (op == "<") predicate = "slt";
-    else if (op == "<=") predicate = "sle";
-    else if (op == "==") predicate = "eq";
-    else if (op == "!=") predicate = "ne";
-    else return {};
+    std::string compareOpcode = "icmp";
+    std::string compareType = "i32";
+    if (isNativeFloatingScalarType(left.typeName) || isNativeFloatingScalarType(right.typeName)) {
+      if (!isNativeFloatingScalarType(left.typeName) || left.typeName != right.typeName) return {};
+      compareOpcode = "fcmp";
+      compareType = nativeScalarLlvmType(left.typeName);
+      if (op == ">") predicate = "ogt";
+      else if (op == ">=") predicate = "oge";
+      else if (op == "<") predicate = "olt";
+      else if (op == "<=") predicate = "ole";
+      else if (op == "==") predicate = "oeq";
+      else if (op == "!=") predicate = "one";
+      else return {};
+    } else {
+      if (left.typeName != right.typeName) return {};
+      const bool unsignedCompare = isNativeUnsignedIntegerScalarType(left.typeName);
+      compareType = nativeScalarLlvmType(left.typeName);
+      if (op == ">") predicate = unsignedCompare ? "ugt" : "sgt";
+      else if (op == ">=") predicate = unsignedCompare ? "uge" : "sge";
+      else if (op == "<") predicate = unsignedCompare ? "ult" : "slt";
+      else if (op == "<=") predicate = unsignedCompare ? "ule" : "sle";
+      else if (op == "==") predicate = "eq";
+      else if (op == "!=") predicate = "ne";
+      else return {};
+    }
     const std::string temp = "%t" + std::to_string(tempId++);
     return NativeI32Condition{true,
-                              left.code + right.code + "  " + temp + " = icmp " + predicate + " i32 " + left.value + ", " + right.value + "\n",
+                              left.code + right.code + "  " + temp + " = " + compareOpcode + " " + predicate + " " + compareType + " " + left.value + ", " + right.value + "\n",
                               temp};
   }
   if (condition == "true") return NativeI32Condition{true, "", "true"};
@@ -7196,17 +7274,37 @@ NativeI32Condition lowerNativeI32Condition(const std::string &rawCondition,
     if (!candidateBoolCallees.count(callee)) return {};
     std::string code;
     std::vector<std::string> arguments;
-    for (const auto &arg : splitArguments((*call)[2])) {
-      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
-      if (!lowered.ok) return {};
-      code += lowered.code;
-      arguments.push_back(lowered.value);
+    std::vector<std::string> paramTypes;
+    auto signature = candidateFunctionParamTypes.find(callee);
+    const auto rawArgs = splitArguments((*call)[2]);
+    if (signature != candidateFunctionParamTypes.end()) {
+      paramTypes = signature->second;
+      if (paramTypes.size() != rawArgs.size()) return {};
+    } else {
+      paramTypes.assign(rawArgs.size(), "I32");
+    }
+    for (std::size_t i = 0; i < rawArgs.size(); ++i) {
+      const std::string paramType = paramTypes[i];
+      if (isNativeScalarType(paramType)) {
+        auto lowered = lowerNativeI32Expr(rawArgs[i], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, paramType);
+        if (!lowered.ok) return {};
+        if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(paramType)) return {};
+        code += lowered.code;
+        arguments.push_back(nativeScalarLlvmType(paramType) + " " + lowered.value);
+      } else if (enumTypes.count(paramType)) {
+        auto lowered = lowerNativeI32Expr(rawArgs[i], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+        if (!lowered.ok) return {};
+        code += lowered.code;
+        arguments.push_back("i32 " + lowered.value);
+      } else {
+        return {};
+      }
     }
     const std::string temp = "%t" + std::to_string(tempId++);
     code += "  " + temp + " = call i1 @" + callee + "(";
     for (std::size_t i = 0; i < arguments.size(); ++i) {
       if (i != 0) code += ", ";
-      code += "i32 " + arguments[i];
+      code += arguments[i];
     }
     code += ")\n";
     return NativeI32Condition{true, code, temp};
@@ -7244,13 +7342,15 @@ NativeI32StructExpr lowerNativeI32StructLiteral(const std::string &rawExpr,
   std::string aggregateValue = "undef";
   for (std::size_t i = 0; i < structType->second.fields.size(); ++i) {
     const std::string &fieldName = structType->second.fields[i];
+    const std::string fieldType = nativeStructFieldTypeAt(structType->second, i);
     auto fieldExpr = fieldExprs.find(fieldName);
     if (fieldExpr == fieldExprs.end()) return {};
-    auto lowered = lowerNativeI32Expr(fieldExpr->second, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    auto lowered = lowerNativeI32Expr(fieldExpr->second, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, fieldType);
     if (!lowered.ok) return {};
+    if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(fieldType)) return {};
     const std::string temp = "%t" + std::to_string(tempId++);
     code += lowered.code;
-    code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(structName) + " " + aggregateValue + ", i32 " + lowered.value + ", " + std::to_string(i) + "\n";
+    code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(structName) + " " + aggregateValue + ", " + nativeScalarLlvmType(fieldType) + " " + lowered.value + ", " + std::to_string(i) + "\n";
     aggregateValue = temp;
   }
   return NativeI32StructExpr{true, code, structName, aggregateValue};
@@ -7326,7 +7426,7 @@ NativeI32StructExpr lowerNativePayloadEnumConstructor(const std::string &rawExpr
     const std::string payloadType = payloadTypes[i];
     const std::string arg = trim(args[i]);
     if (isNativeI32ScalarType(payloadType)) {
-      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, payloadType);
       if (!lowered.ok) return {};
       temp = "%t" + std::to_string(tempId++);
       code += lowered.code;
@@ -7340,17 +7440,18 @@ NativeI32StructExpr lowerNativePayloadEnumConstructor(const std::string &rawExpr
       } else {
         loweredStruct = lowerNativeI32StructLiteral(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
       }
-      auto structType = structTypes.find(payloadType);
-      if (!loweredStruct.ok || loweredStruct.typeName != payloadType || structType == structTypes.end()) return {};
-      code += loweredStruct.code;
-      for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
-        const std::string fieldTemp = "%t" + std::to_string(tempId++);
-        temp = "%t" + std::to_string(tempId++);
-        code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(payloadType) + " " + loweredStruct.value + ", " + std::to_string(field) + "\n";
-        code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", i32 " + fieldTemp + ", " + std::to_string(slot++) + "\n";
-        aggregateValue = temp;
-      }
-    }
+	      auto structType = structTypes.find(payloadType);
+	      if (!loweredStruct.ok || loweredStruct.typeName != payloadType ||
+	          structType == structTypes.end() || !nativeStructUsesOnlyI32PayloadSlots(structType->second)) return {};
+	      code += loweredStruct.code;
+	      for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+	        const std::string fieldTemp = "%t" + std::to_string(tempId++);
+	        temp = "%t" + std::to_string(tempId++);
+	        code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(payloadType) + " " + loweredStruct.value + ", " + std::to_string(field) + "\n";
+	        code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(slot++) + "\n";
+	        aggregateValue = temp;
+	      }
+	    }
   }
   return NativeI32StructExpr{true, code, enumName, aggregateValue};
 }
@@ -7414,7 +7515,13 @@ NativeI32StructExpr lowerNativeAggregateExpr(const std::string &rawExpr,
   for (std::size_t i = 0; i < rawArgs.size(); ++i) {
     const std::string arg = trim(rawArgs[i]);
     const std::string paramType = paramTypes[i];
-    if (isNativeI32ScalarType(paramType) || enumTypes.count(paramType)) {
+    if (isNativeScalarType(paramType)) {
+      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, paramType);
+      if (!lowered.ok) return {};
+      if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(paramType)) return {};
+      code += lowered.code;
+      arguments.push_back(nativeScalarLlvmType(paramType) + " " + lowered.value);
+    } else if (enumTypes.count(paramType)) {
       auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
       if (!lowered.ok) return {};
       code += lowered.code;
@@ -7481,16 +7588,16 @@ bool bindNativePayloadEnumArm(const NativePayloadEnumType &enumType,
     armLocals[bindingName] = NativeI32Local{false, temp};
     return true;
   }
-  auto structType = structTypes.find(payloadType);
-  if (structType == structTypes.end()) return false;
-  std::string structValue = "undef";
-  for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
-    const std::string fieldTemp = "%t" + std::to_string(tempId++);
-    const std::string aggregateTemp = "%t" + std::to_string(tempId++);
-    code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(field + 1) + "\n";
-    code += "  " + aggregateTemp + " = insertvalue " + nativeLlvmTypeRef(payloadType) + " " + structValue + ", i32 " + fieldTemp + ", " + std::to_string(field) + "\n";
-    structValue = aggregateTemp;
-  }
+	  auto structType = structTypes.find(payloadType);
+	  if (structType == structTypes.end() || !nativeStructUsesOnlyI32PayloadSlots(structType->second)) return false;
+	  std::string structValue = "undef";
+	  for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+	    const std::string fieldTemp = "%t" + std::to_string(tempId++);
+	    const std::string aggregateTemp = "%t" + std::to_string(tempId++);
+	    code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(field + 1) + "\n";
+	    code += "  " + aggregateTemp + " = insertvalue " + nativeLlvmTypeRef(payloadType) + " " + structValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(field) + "\n";
+	    structValue = aggregateTemp;
+	  }
   armStructLocals[bindingName] = NativeI32StructLocal{payloadType, structValue};
   return true;
 }
@@ -7730,8 +7837,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
   const std::regex fnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*I32\s*\{?)");
   const std::regex boolFnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*Bool\s*\{?)");
   const std::regex structFnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]+>)?)\s*\{?)");
-  const std::regex localConstPattern(R"(^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(?:I32|Char))?\s*=\s*(.+?)\s*;?\s*$)");
-  const std::regex bindingPattern(R"(^\s*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(?:I32|Char))?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex localConstPattern(R"(^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(I8|I16|I32|I64|ISize|U8|U16|U32|U64|USize|Char|F32|F64))?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex bindingPattern(R"(^\s*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*(I8|I16|I32|I64|ISize|U8|U16|U32|U64|USize|Char|F32|F64))?\s*=\s*(.+?)\s*;?\s*$)");
   const std::regex assignmentPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*$)");
   const std::regex returnPattern(R"(^\s*return\s+(.+?)\s*;?\s*$)");
   const std::regex ifPattern(R"(^\s*if\s*\((.+)\)\s*\{\s*$)");
@@ -7804,13 +7911,13 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
     if (node.kind == "decl.field") {
       const std::size_t dot = node.name.find('.');
       if (dot == std::string::npos) continue;
-      const std::string structName = node.name.substr(0, dot);
-      const std::string fieldName = node.name.substr(dot + 1);
-      if (!isSimpleLlvmGlobalName(structName) || !isSimpleLlvmGlobalName(fieldName) ||
-          !isNativeI32ScalarType(node.returnType)) {
-        nonNativeStructs.insert(structName);
-      } else {
-        nativeStructFields[structName].push_back({fieldName, normalizeSignatureType(node.returnType)});
+	      const std::string structName = node.name.substr(0, dot);
+	      const std::string fieldName = node.name.substr(dot + 1);
+	      if (!isSimpleLlvmGlobalName(structName) || !isSimpleLlvmGlobalName(fieldName) ||
+	          !isNativeScalarType(node.returnType)) {
+	        nonNativeStructs.insert(structName);
+	      } else {
+	        nativeStructFields[structName].push_back({fieldName, normalizeSignatureType(node.returnType)});
       }
       continue;
     }
@@ -7845,11 +7952,12 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
     if (nonNativeStructs.count(structName) || fields.empty()) continue;
     NativeI32StructType type;
     std::string llvmType = "\n" + nativeLlvmTypeRef(structName) + " = type { ";
-    for (std::size_t i = 0; i < fields.size(); ++i) {
-      if (i != 0) llvmType += ", ";
-      llvmType += "i32";
-      type.fields.push_back(fields[i].first);
-    }
+	    for (std::size_t i = 0; i < fields.size(); ++i) {
+	      if (i != 0) llvmType += ", ";
+	      llvmType += nativeScalarLlvmType(fields[i].second);
+	      type.fields.push_back(fields[i].first);
+	      type.fieldTypes.push_back(fields[i].second);
+	    }
     llvmType += " }\n";
     nativeStructs[structName] = type;
     out[nativeLlvmTypeRef(structName)] = llvmType;
@@ -7915,7 +8023,9 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
                 for (const auto &rawType : splitArguments((*variant)[3])) {
                   const std::string payloadType = normalizeSignatureType(rawType);
                   const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
-                  if (!isNativeI32ScalarType(payloadType) && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
+	                  if (!isNativeI32ScalarType(payloadType) &&
+	                      !(nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) &&
+	                      !genericPayload) enumValid = false;
                   payload.payloadTypes.push_back(payloadType);
                 }
               } else if ((*variant)[4].matched) {
@@ -7928,7 +8038,9 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
                   }
                   const std::string payloadType = normalizeSignatureType((*parsedField)[2]);
                   const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
-                  if (!isNativeI32ScalarType(payloadType) && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
+	                  if (!isNativeI32ScalarType(payloadType) &&
+	                      !(nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) &&
+	                      !genericPayload) enumValid = false;
                   payload.payloadNames.push_back((*parsedField)[1]);
                   payload.payloadTypes.push_back(payloadType);
                 }
@@ -7937,8 +8049,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
               for (const auto &payloadType : payload.payloadTypes) {
                 const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
                 if (isNativeI32ScalarType(payloadType) || genericPayload) slots += 1;
-                else if (nativeStructs.count(payloadType)) slots += nativeStructs[payloadType].fields.size();
-                else enumValid = false;
+	                else if (nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) slots += nativeStructs[payloadType].fields.size();
+	                else enumValid = false;
               }
               enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
               enumType.variantPayloads[variantName] = payload;
@@ -7953,14 +8065,16 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             if (enumGeneric) {
               genericPayloadEnums[enumName] = NativeGenericPayloadEnumTemplate{enumGenericParams, enumType};
             } else {
-              nativePayloadEnums[enumName] = enumType;
-              NativeI32StructType aggregateType;
-              aggregateType.fields.push_back("tag");
-              std::string llvmType = "\n" + nativeLlvmTypeRef(enumName) + " = type { i32";
-              for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
-                llvmType += ", i32";
-                aggregateType.fields.push_back("payload" + std::to_string(slot));
-              }
+	              nativePayloadEnums[enumName] = enumType;
+	              NativeI32StructType aggregateType;
+	              aggregateType.fields.push_back("tag");
+	              aggregateType.fieldTypes.push_back("I32");
+	              std::string llvmType = "\n" + nativeLlvmTypeRef(enumName) + " = type { i32";
+	              for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+	                llvmType += ", i32";
+	                aggregateType.fields.push_back("payload" + std::to_string(slot));
+	                aggregateType.fieldTypes.push_back("I32");
+	              }
               llvmType += " }\n";
               nativeStructs[enumName] = aggregateType;
               out[nativeLlvmTypeRef(enumName)] = llvmType;
@@ -7988,7 +8102,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
     if (genericTemplate == genericPayloadEnums.end()) return;
     if (genericTemplate->second.typeParams.size() != instance->second.size()) return;
     for (const auto &arg : instance->second) {
-      if (!isNativeI32ScalarType(arg) && !nativeStructs.count(arg)) return;
+	      if (!isNativeI32ScalarType(arg) &&
+	          !(nativeStructs.count(arg) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[arg]))) return;
     }
     genericPayloadInstances.insert(normalized);
   };
@@ -8028,21 +8143,23 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
       std::size_t slots = 0;
       for (const auto &payloadType : payload.payloadTypes) {
         if (isNativeI32ScalarType(payloadType)) slots += 1;
-        else if (nativeStructs.count(payloadType)) slots += nativeStructs[payloadType].fields.size();
+	        else if (nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) slots += nativeStructs[payloadType].fields.size();
         else validInstance = false;
       }
       enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
       enumType.variantPayloads[variantName] = payload;
     }
     if (!validInstance || enumType.variants.empty()) continue;
-    nativePayloadEnums[instanceTypeName] = enumType;
-    NativeI32StructType aggregateType;
-    aggregateType.fields.push_back("tag");
-    std::string llvmType = "\n" + nativeLlvmTypeRef(instanceTypeName) + " = type { i32";
-    for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
-      llvmType += ", i32";
-      aggregateType.fields.push_back("payload" + std::to_string(slot));
-    }
+	    nativePayloadEnums[instanceTypeName] = enumType;
+	    NativeI32StructType aggregateType;
+	    aggregateType.fields.push_back("tag");
+	    aggregateType.fieldTypes.push_back("I32");
+	    std::string llvmType = "\n" + nativeLlvmTypeRef(instanceTypeName) + " = type { i32";
+	    for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+	      llvmType += ", i32";
+	      aggregateType.fields.push_back("payload" + std::to_string(slot));
+	      aggregateType.fieldTypes.push_back("I32");
+	    }
     llvmType += " }\n";
     nativeStructs[instanceTypeName] = aggregateType;
     out[nativeLlvmTypeRef(instanceTypeName)] = llvmType;
@@ -8156,8 +8273,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             std::vector<std::pair<std::string, std::string>> parsedParams;
             if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
               for (const auto &[paramName, paramType] : parsedParams) {
-                if (isNativeI32ScalarType(paramType)) {
-                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                if (isNativeScalarType(paramType)) {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName, paramType};
                 } else if (nativeEnums.count(paramType)) {
                   locals[paramName] = NativeI32Local{false, "%" + paramName};
                 } else {
@@ -8186,8 +8303,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             std::vector<std::pair<std::string, std::string>> parsedParams;
             if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
               for (const auto &[paramName, paramType] : parsedParams) {
-                if (isNativeI32ScalarType(paramType)) {
-                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                if (isNativeScalarType(paramType)) {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName, paramType};
                 } else if (nativeEnums.count(paramType)) {
                   locals[paramName] = NativeI32Local{false, "%" + paramName};
                 } else {
@@ -8218,8 +8335,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
               std::vector<std::pair<std::string, std::string>> parsedParams;
               if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
                 for (const auto &[paramName, paramType] : parsedParams) {
-                  if (isNativeI32ScalarType(paramType)) {
-                    locals[paramName] = NativeI32Local{false, "%" + paramName};
+                  if (isNativeScalarType(paramType)) {
+                    locals[paramName] = NativeI32Local{false, "%" + paramName, paramType};
                   } else if (nativeEnums.count(paramType)) {
                     locals[paramName] = NativeI32Local{false, "%" + paramName};
                   } else {
@@ -8421,12 +8538,15 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             valid = false;
           } else {
             const std::string localName = (*localConst)[1];
-            auto lowered = lowerNativeI32Expr((*localConst)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            const std::string annotatedType = (*localConst)[2].matched ? trim(std::string((*localConst)[2])) : "";
+            auto lowered = lowerNativeI32Expr((*localConst)[3], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId, annotatedType);
             if (!lowered.ok) {
+              valid = false;
+            } else if (!annotatedType.empty() && normalizeSignatureType(lowered.typeName) != normalizeSignatureType(annotatedType)) {
               valid = false;
             } else {
               body += lowered.code;
-              locals[localName] = NativeI32Local{false, lowered.value};
+              locals[localName] = NativeI32Local{false, lowered.value, lowered.typeName};
             }
           }
         } else
@@ -8436,7 +8556,8 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
           } else {
           const std::string mode = (*binding)[1];
           const std::string localName = (*binding)[2];
-          std::string rawBindingExpr = trim(std::string((*binding)[3]));
+          const std::string annotatedType = (*binding)[3].matched ? trim(std::string((*binding)[3])) : "";
+          std::string rawBindingExpr = trim(std::string((*binding)[4]));
           if (!rawBindingExpr.empty() && rawBindingExpr.back() == ';') rawBindingExpr.pop_back();
           rawBindingExpr = trim(rawBindingExpr);
           bool handledStructBinding = false;
@@ -8520,14 +8641,18 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
                 for (std::size_t i = 0; valid && i < rawArgs.size(); ++i) {
                   const std::string arg = trim(rawArgs[i]);
                   const std::string paramType = paramTypes[i];
-                  if (isNativeI32ScalarType(paramType)) {
-                    auto lowered = lowerNativeI32Expr(arg, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+                  if (isNativeScalarType(paramType)) {
+                    auto lowered = lowerNativeI32Expr(arg, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId, paramType);
                     if (!lowered.ok) {
                       valid = false;
                       break;
                     }
+                    if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(paramType)) {
+                      valid = false;
+                      break;
+                    }
                     code += lowered.code;
-                    arguments.push_back("i32 " + lowered.value);
+                    arguments.push_back(nativeScalarLlvmType(paramType) + " " + lowered.value);
                   } else if (nativeEnums.count(paramType)) {
                     auto lowered = lowerNativeI32Expr(arg, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
                     if (!lowered.ok) {
@@ -8573,20 +8698,22 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             }
           }
           if (!handledTryBinding && !handledStructBinding) {
-            auto lowered = lowerNativeI32Expr(rawBindingExpr, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            auto lowered = lowerNativeI32Expr(rawBindingExpr, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId, annotatedType);
             if (!lowered.ok) {
+              valid = false;
+            } else if (!annotatedType.empty() && normalizeSignatureType(lowered.typeName) != normalizeSignatureType(annotatedType)) {
               valid = false;
             } else {
               body += lowered.code;
               if (mode == "var") {
                 const std::string localPtr = "%" + localName + ".addr";
-                body += "  " + localPtr + " = alloca i32\n";
-                body += "  store i32 " + lowered.value + ", ptr " + localPtr + "\n";
-                locals[localName] = NativeI32Local{true, localPtr};
+                body += "  " + localPtr + " = alloca " + nativeScalarLlvmType(lowered.typeName) + "\n";
+                body += "  store " + nativeScalarLlvmType(lowered.typeName) + " " + lowered.value + ", ptr " + localPtr + "\n";
+                locals[localName] = NativeI32Local{true, localPtr, lowered.typeName};
               } else {
                 const std::string localValue = "%" + localName;
-                body += "  " + localValue + " = add i32 0, " + lowered.value + "\n";
-                locals[localName] = NativeI32Local{false, localValue};
+                body += "  " + localValue + " = " + nativeScalarCopyOp(lowered.typeName) + " " + nativeScalarLlvmType(lowered.typeName) + " " + nativeScalarZero(lowered.typeName) + ", " + lowered.value + "\n";
+                locals[localName] = NativeI32Local{false, localValue, lowered.typeName};
               }
             }
           }
@@ -8901,12 +9028,16 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             if (local == locals.end() || !local->second.mutableLocal) {
               valid = false;
             } else {
-              auto lowered = lowerNativeI32Expr((*assignment)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+              auto lowered = lowerNativeI32Expr((*assignment)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId, local->second.typeName);
               if (!lowered.ok) {
                 valid = false;
               } else {
-                body += lowered.code;
-                body += "  store i32 " + lowered.value + ", ptr " + local->second.value + "\n";
+                if (lowered.typeName != local->second.typeName) {
+                  valid = false;
+                } else {
+                  body += lowered.code;
+                  body += "  store " + nativeScalarLlvmType(local->second.typeName) + " " + lowered.value + ", ptr " + local->second.value + "\n";
+                }
               }
             }
           }

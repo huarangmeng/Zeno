@@ -1,0 +1,52 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 35
+# zmeta-contains: decl.fn isWide module=main span=src/main.zn:3:1 params=(value: F32) return=Bool
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: F32) return=I32
+# zmeta-contains: stmt.val classify.squared module=main span=src/main.zn:8:1 expr=binary:* type=F32
+# zmeta-contains: stmt.val classify.pivot module=main span=src/main.zn:9:1 expr=float-literal:1.250000 type=F32
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isWide
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:>
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=float-literal:1.500000 type=F32
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=float-literal:2.000000 type=F32
+# mir-contains: hir.fn-signature isWide params=(value: F32) return=Bool
+# mir-contains: hir.fn-signature classify params=(value: F32) return=I32
+# mir-contains: hir.local classify.squared mode=val expr=binary:* type=F32
+# mir-contains: hir.local classify.pivot mode=val expr=float-literal:1.250000 type=F32
+# mir-contains: hir.if classify condition=call:isWide
+# mir-contains: hir.if classify condition=compare:>
+# mir-contains: mir.local-slot classify %squared mutable=false type=F32
+# mir-contains: mir.local-slot classify %pivot mutable=false type=F32
+# mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
+# mir-contains: mir.operand classify expr=float-literal:1.250000 kind=const
+# mir-contains: mir.branch classify kind=if condition=call:isWide
+# mir-contains: mir.branch classify kind=if condition=compare:>
+# emit-contains: define i1 @isWide(float %value)
+# emit-contains: %t0 = fcmp ogt float %value, 3.500000
+# emit-contains: define i32 @classify(float %value)
+# emit-contains: %t0 = fmul float %value, %value
+# emit-contains: %squared = fadd float 0.000000e+00, %t0
+# emit-contains: %pivot = fadd float 0.000000e+00, 1.250000
+# emit-contains: %t1 = call i1 @isWide(float %squared)
+# emit-contains: %t3 = fcmp ogt float %squared, %pivot
+# emit-contains: define i32 @main()
+# emit-contains: %low = fadd float 0.000000e+00, 1.500000
+# emit-contains: %high = fadd float 0.000000e+00, 2.000000
+# emit-contains: %t0 = call i32 @classify(float %low)
+# emit-contains: %t1 = call i32 @classify(float %high)
+# object-contains: _isWide
+# object-contains: _classify
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: F32 primitive native lowering is concentrated here: F32 parameters, annotated F32 locals, float literals, floating multiply, floating comparisons, Bool-returning F32 comparison calls, real LLVM float scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeF32App"
+kind = "application"
+entry = "main.main"

@@ -1,0 +1,23 @@
+version = 1
+root = "nativeI64App"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "nativeI64App"
+version = "0.0.0"
+source = "path:."
+manifestHash = "fnv1a64:9a7cb75ce8ff3f0c"
+contentHash = "fnv1a64:c1caa7c194d15901"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

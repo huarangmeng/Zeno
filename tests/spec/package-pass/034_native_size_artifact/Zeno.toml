@@ -1,0 +1,60 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 85
+# zmeta-contains: decl.fn isWideSize module=main span=src/main.zn:3:1 params=(value: USize) return=Bool
+# zmeta-contains: decl.fn classifySize module=main span=src/main.zn:7:1 params=(value: USize) return=I32
+# zmeta-contains: decl.fn isWideOffset module=main span=src/main.zn:19:1 params=(value: ISize) return=Bool
+# zmeta-contains: decl.fn classifyOffset module=main span=src/main.zn:23:1 params=(value: ISize) return=I32
+# zmeta-contains: stmt.val classifySize.doubled module=main span=src/main.zn:8:1 expr=binary:* type=USize
+# zmeta-contains: stmt.val classifySize.half module=main span=src/main.zn:9:1 expr=binary:/ type=USize
+# zmeta-contains: stmt.val classifyOffset.doubled module=main span=src/main.zn:24:1 expr=binary:* type=ISize
+# zmeta-contains: stmt.val classifyOffset.half module=main span=src/main.zn:25:1 expr=binary:/ type=ISize
+# zmeta-contains: stmt.val main.sizeHigh module=main span=src/main.zn:37:1 expr=int-literal:4294967296 type=USize
+# zmeta-contains: stmt.val main.offsetHigh module=main span=src/main.zn:39:1 expr=int-literal:4294967296 type=ISize
+# mir-contains: hir.fn-signature isWideSize params=(value: USize) return=Bool
+# mir-contains: hir.fn-signature classifySize params=(value: USize) return=I32
+# mir-contains: hir.fn-signature isWideOffset params=(value: ISize) return=Bool
+# mir-contains: hir.fn-signature classifyOffset params=(value: ISize) return=I32
+# mir-contains: hir.local classifySize.doubled mode=val expr=binary:* type=USize
+# mir-contains: hir.local classifySize.half mode=val expr=binary:/ type=USize
+# mir-contains: hir.local classifyOffset.doubled mode=val expr=binary:* type=ISize
+# mir-contains: hir.local classifyOffset.half mode=val expr=binary:/ type=ISize
+# mir-contains: mir.local-slot classifySize %doubled mutable=false type=USize
+# mir-contains: mir.local-slot classifySize %half mutable=false type=USize
+# mir-contains: mir.local-slot classifyOffset %doubled mutable=false type=ISize
+# mir-contains: mir.local-slot classifyOffset %half mutable=false type=ISize
+# mir-contains: mir.local main.sizeHigh init=int-literal:4294967296 mutable=false
+# mir-contains: mir.local main.offsetHigh init=int-literal:4294967296 mutable=false
+# emit-contains: define i1 @isWideSize(i64 %value)
+# emit-contains: %t0 = icmp uge i64 %value, 4294967296
+# emit-contains: define i32 @classifySize(i64 %value)
+# emit-contains: %t1 = udiv i64 %doubled, 2
+# emit-contains: %t4 = icmp ult i64 %half, 9
+# emit-contains: define i1 @isWideOffset(i64 %value)
+# emit-contains: %t0 = icmp sge i64 %value, 4294967296
+# emit-contains: define i32 @classifyOffset(i64 %value)
+# emit-contains: %t1 = sdiv i64 %doubled, 2
+# emit-contains: %t4 = icmp slt i64 %half, 9
+# emit-contains: define i32 @main()
+# emit-contains: %sizeHigh = add i64 0, 4294967296
+# emit-contains: %offsetHigh = add i64 0, 4294967296
+# emit-contains: %t0 = call i32 @classifySize(i64 %sizeLow)
+# emit-contains: %t5 = call i32 @classifyOffset(i64 %offsetHigh)
+# object-contains: _isWideSize
+# object-contains: _classifySize
+# object-contains: _isWideOffset
+# object-contains: _classifyOffset
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: USize and ISize primitive native lowering is concentrated here: pointer-sized integer parameters, annotated locals, integer literals typed by context including values wider than 32 bits, unsigned and signed divide/comparison semantics, Bool-returning comparison calls, real LLVM i64 scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeSizeApp"
+kind = "application"
+entry = "main.main"

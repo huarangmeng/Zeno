@@ -1,0 +1,50 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 42
+# zmeta-contains: decl.fn isLarge module=main span=src/main.zn:3:1 params=(value: F64) return=Bool
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: F64) return=I32
+# zmeta-contains: stmt.val classify.scaled module=main span=src/main.zn:8:1 expr=binary:* type=F64
+# zmeta-contains: stmt.val classify.pivot module=main span=src/main.zn:9:1 expr=float-literal:2.5 type=F64
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isLarge
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:>
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=float-literal:1.5 type=F64
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=float-literal:4.0 type=F64
+# mir-contains: hir.fn-signature isLarge params=(value: F64) return=Bool
+# mir-contains: hir.fn-signature classify params=(value: F64) return=I32
+# mir-contains: hir.local classify.scaled mode=val expr=binary:* type=F64
+# mir-contains: hir.local classify.pivot mode=val expr=float-literal:2.5 type=F64
+# mir-contains: hir.if classify condition=call:isLarge
+# mir-contains: hir.if classify condition=compare:>
+# mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
+# mir-contains: mir.operand classify expr=float-literal:2.5 kind=const
+# mir-contains: mir.branch classify kind=if condition=call:isLarge
+# mir-contains: mir.branch classify kind=if condition=compare:>
+# emit-contains: define i1 @isLarge(double %value)
+# emit-contains: %t0 = fcmp ogt double %value, 3.500000
+# emit-contains: define i32 @classify(double %value)
+# emit-contains: %t0 = fmul double %value, 2.000000
+# emit-contains: %scaled = fadd double 0.000000e+00, %t0
+# emit-contains: %pivot = fadd double 0.000000e+00, 2.5
+# emit-contains: %t1 = call i1 @isLarge(double %scaled)
+# emit-contains: %t3 = fcmp ogt double %scaled, %pivot
+# emit-contains: define i32 @main()
+# emit-contains: %low = fadd double 0.000000e+00, 1.5
+# emit-contains: %high = fadd double 0.000000e+00, 4.0
+# emit-contains: %t0 = call i32 @classify(double %low)
+# emit-contains: %t1 = call i32 @classify(double %high)
+# object-contains: _isLarge
+# object-contains: _classify
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: F64 primitive native lowering is concentrated here: F64 parameters, F64 locals, float literals, floating multiply, floating comparisons, Bool-returning F64 comparison calls, real LLVM double scalar codegen, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeF64App"
+kind = "application"
+entry = "main.main"

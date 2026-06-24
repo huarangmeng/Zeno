@@ -349,13 +349,16 @@ semantic phases.
     top-level simple `I32 static` globals loaded through LLVM `load`, local
     `val` / `var` bindings, local-name returns, direct calls to successfully
     lowered `I32` functions, simple `+`, `-`, `*`, and `/`
-    integer expressions, simple all-`I32` struct literals lowered through
-    LLVM named aggregate types plus `insertvalue`, and all-`I32` struct field
-    reads lowered through `extractvalue`; simple all-`I32` struct-returning
-    functions can now return LLVM aggregates and callers can bind `call
-    %Struct` results, pass `%Struct` arguments to covered callees, and extract
-    fields from struct parameters; covered struct parameters can also be
-    returned again as LLVM aggregates, a minimal
+    integer expressions, simple struct literals lowered through LLVM named
+    aggregate types plus `insertvalue`, and struct field reads lowered through
+    `extractvalue`; simple struct-returning functions can now return LLVM
+    aggregates and callers can bind `call %Struct` results, pass `%Struct`
+    arguments to covered callees, and extract fields from struct parameters.
+    The original all-`I32` path still covers the first C ABI aggregate thunk,
+    while the native Auto-layout struct path now also supports mixed primitive
+    scalar fields such as LLVM `{ i8, i16, i64, float, double }`, with field
+    extraction preserving `U8`, `U16`, `I64`, `F32`, and `F64` call signatures;
+    covered struct parameters can also be returned again as LLVM aggregates, a minimal
     `if (<i32 comparison>) { return ... }` plus fallthrough-return control-flow
     shape, simple `if (<i32 comparison>) { return ... } else { return ... }`
     double-return control flow, plus simple
@@ -388,9 +391,9 @@ semantic phases.
     `I32`. Guarded arms, closed `I32` payload range arms, or-pattern arms over
     same-layout payload variants, and unit variants inside payload enums now
     lower through the same native ordered branch path. Covered payload enum
-    `if Pattern = expr` branches now lower to native tag tests and payload
+    `if (expr is Pattern)` branches now lower to native tag tests and payload
     binding too, including the `if (state is mut WorkState.Ready(job))` fixture.
-    Covered payload enum `while Pattern = expr` loops also lower to native loop
+    Covered payload enum `while (expr is Pattern)` loops also lower to native loop
     headers, aggregate-returning scrutinee calls, tag tests, payload binding,
     body blocks, exit blocks, and loop back-edges over mutable locals, including
     `while (keyUntil(limit, i) is Event.Key(value))` with `acc` / `i` stores.
@@ -493,6 +496,17 @@ semantic phases.
     so the debug artifact visibly carries the end-to-end chain;
     the build-artifact verifier now exercises requested emit
     files for the base application and library artifact fixtures.
+  - primitive `I8`, `I16`, `I64`, `ISize`, `U8`, `U16`, `U32`, `U64`,
+    `USize`, `F32`, and `F64` now participate in the covered native scalar
+    path: annotated integer locals and integer literals typed by context lower
+    as LLVM `i8`, `i16`, `i32`, or `i64`, signed integer scalars use `sdiv`
+    and `icmp s*`, unsigned integer scalars use `udiv` and `icmp u*`, while
+    annotated float locals and float literal arguments are lowered as LLVM
+    `float` / `double` with `fadd` / `fsub` / `fmul` / `fdiv` and ordered
+    `fcmp`; `Bool` condition calls preserve the scalar type in their LLVM call
+    signatures. The concentrated `I8`, `I16`, `I64`, `ISize`, `U8`, `U16`,
+    `U32`, `U64`, `USize`, `F32`, and `F64` fixtures produce real IR, native
+    object files, host executables, and runner/direct-checked exit codes.
 
 ## Preview-Backed Gaps
 
@@ -533,7 +547,9 @@ The following V01 areas are still preview-backed or placeholder-backed today:
   var/while-loop, simple `Bool`/`i1` condition-call path, all-`I32` struct
   aggregate path, no-payload enum switch path, first all-`I32` tuple/record
   payload enum aggregate path, and covered `Result<I32, I32>` try-binding
-  branch/early-return path. The
+  branch/early-return path, plus the covered `Char`, `I8`, `I16`, `I64`,
+  `ISize`, `U8`, `U16`, `U32`, `U64`, `USize`, `F32`, and `F64` native scalar
+  paths. The
   next implementation direction is to make the V01 syntax surface complete in
   AST artifacts first, then derive HIR/MIR/LLVM facts from those nodes instead
   of adding more source-text-only scans.
@@ -552,10 +568,9 @@ The following V01 areas are still preview-backed or placeholder-backed today:
   analysis, including exact ABI/layout/drop fingerprints and core library
   declaration package facts beyond the current declaration-package hash and
   source-summary facts.
-- Real MIR, MIR verifier, monomorphization, LLVM lowering, object emission,
-  real object-backed archive generation, linker integration, runtime shim
-  linking, and performance gates beyond the first `case.toml` preview fact
-  checks and stage0 preview artifact layout.
+- Real MIR, MIR verifier, monomorphization, full LLVM lowering, full linker
+  integration, runtime shim linking, and performance gates beyond the covered
+  native build-artifact paths and first `case.toml` preview fact checks.
 - Real incremental cache keys, stable node ids, parallel scheduling, persistent
   cache reuse, and replayable diagnostics beyond the preview invalidation-plan
   verifier and stage0 build-policy fingerprint.
@@ -763,15 +778,15 @@ build/stage0/zeno check tests/spec/compile-fail/195_effect_guards_reject_reachab
 build/stage0/zeno check tests/spec/compile-fail/196_panic_diagnostic_storage_escape.zn --diagnostic-format json
   -> error[E0809]: PanicInfo is a diagnostic access value and cannot be stored; error[E0809]: StackFrames is valid only inside the panic handler path
 build/stage0/zeno test
-  -> zeno test: 136 passed, 0 failed (stage mvp)
+  -> zeno test: 144 passed, 0 failed (stage mvp)
 build/stage0/zeno test --feature diagnostic-order
   -> zeno test: 1 passed, 0 failed
 build/stage0/zeno test --feature build-artifact
-  -> zeno test: 24 passed, 0 failed; artifact fixtures assert top-level AST node facts, covered function-body return/local-binding/pattern-binding/call-statement/assignment/if/else/if-pattern/while/while-pattern/for/match/match-arm/try/local-const/break/continue AST and HIR/MIR/LLVM-preview facts, top-level const/static/type-alias/field/enum-variant/interface/impl/destroy AST and declaration facts, struct-literal/method-call/closure/try/match/tuple/unit/char/cast/index/type-static-call expression facts, simple binary/comparison-expression facts including top-level binary calls, ast/hir/mir/llvm cache inputs, brace-aware top-level declaration collection, declaration stableNodeId/module/visibility/span facts, declaration/runtime/layout/drop/SendSync/interface/ABI/trust/dependency/dependency-package/cost/linked-runtime fingerprints, cacheKeyInputs, emitted MIR/LLVM preview facts, real LLVM IR for the minimal I32 parameter/local/binary-expression/direct-call/if-return/if-else-return/while-loop native path plus simple Bool/i1 functions and Bool-call branch conditions, Char parameter/local/literal/comparison lowering as internal i32 scalars, simple all-I32 struct aggregate `insertvalue` / `extractvalue` lowering, no-payload and all-I32 payload enum discriminants lowered through ordered LLVM branch chains including guarded, range, or-pattern, unit payload-enum arms, generic `Maybe<I32>` / `Maybe<Job>` / `Maybe<Task>` aggregate constructors, generic payload match expressions, `Maybe<I32>` while-pattern loops, `Result<I32, I32>` try-binding plus standalone-try early-return branches, and I32 range `for` loops with real loop headers/steps/backedges, C ABI export thunks carrying all-I32 `@layout(C)` struct parameters as LLVM aggregates, real native object files, host-native executable output plus runner-checked `run-exit-code`, hosted profile with empty linkRuntimeNeeds, reachable Thread.spawn with linkRuntimeNeeds = ["thread"], reachable allocation/panic/OOM with linkRuntimeNeeds = ["allocator", "oom", "panic"], C ABI exports with linkRuntimeNeeds = ["c-abi-boundary"], C bridge exports recorded as bridge=C, trust report capability metadata, trusted and automatic Send/Sync metadata, interface/impl/static-return metadata, transitive path dependency package fingerprints plus dependency runtime propagation, and layout/drop glue cache metadata
+  -> zeno test: 32 passed, 0 failed; artifact fixtures assert top-level AST node facts, covered function-body return/local-binding/pattern-binding/call-statement/assignment/if/else/if-pattern/while/while-pattern/for/match/match-arm/try/local-const/break/continue AST and HIR/MIR/LLVM-preview facts, top-level const/static/type-alias/field/enum-variant/interface/impl/destroy AST and declaration facts, struct-literal/method-call/closure/try/match/tuple/unit/char/cast/index/type-static-call expression facts, simple binary/comparison-expression facts including top-level binary calls, ast/hir/mir/llvm cache inputs, brace-aware top-level declaration collection, declaration stableNodeId/module/visibility/span facts, declaration/runtime/layout/drop/SendSync/interface/ABI/trust/dependency/dependency-package/cost/linked-runtime fingerprints, cacheKeyInputs, emitted MIR/LLVM preview facts, real LLVM IR for the minimal I32 parameter/local/binary-expression/direct-call/if-return/if-else-return/while-loop native path plus simple Bool/i1 functions and Bool-call branch conditions, Char parameter/local/literal/comparison lowering as internal i32 scalars, I8/I16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with signed divide and signed comparisons, U8/U16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with unsigned divide and unsigned comparisons, I64/ISize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with signed divide and signed comparisons, U32 parameter/local/literal/arithmetic/comparison lowering as internal i32 scalars with unsigned divide and unsigned comparisons, U64/USize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with unsigned divide and unsigned comparisons, F32 parameter/local/literal/arithmetic/comparison lowering as internal float scalars, F64 parameter/local/literal/arithmetic/comparison lowering as internal double scalars, simple all-I32 struct aggregate `insertvalue` / `extractvalue` lowering plus mixed primitive scalar struct aggregate lowering as LLVM `{ i8, i16, i64, float, double }`, no-payload and all-I32 payload enum discriminants lowered through ordered LLVM branch chains including guarded, range, or-pattern, unit payload-enum arms, generic `Maybe<I32>` / `Maybe<Job>` / `Maybe<Task>` aggregate constructors, generic payload match expressions, `Maybe<I32>` while-pattern loops, `Result<I32, I32>` try-binding plus standalone-try early-return branches, and I32 range `for` loops with real loop headers/steps/backedges, C ABI export thunks carrying all-I32 `@layout(C)` struct parameters as LLVM aggregates, real native object files, host-native executable output plus runner-checked `run-exit-code`, hosted profile with empty linkRuntimeNeeds, reachable Thread.spawn with linkRuntimeNeeds = ["thread"], reachable allocation/panic/OOM with linkRuntimeNeeds = ["allocator", "oom", "panic"], C ABI exports with linkRuntimeNeeds = ["c-abi-boundary"], C bridge exports recorded as bridge=C, trust report capability metadata, trusted and automatic Send/Sync metadata, interface/impl/static-return metadata, transitive path dependency package fingerprints plus dependency runtime propagation, and layout/drop glue cache metadata
 build/stage0/zeno test --stage mvp --feature build-artifact
-  -> zeno test: 11 passed, 0 failed (stage mvp)
+  -> zeno test: 19 passed, 0 failed (stage mvp)
 build/stage0/zeno test --stage full-spec --feature build-artifact
-  -> zeno test: 24 passed, 0 failed
+  -> zeno test: 32 passed, 0 failed
 build/stage0/zeno test --feature nope
   -> zeno test: 0 passed, 0 failed (no tests selected)
 build/stage0/zeno build tests/spec/package-pass/004_application_artifact --emit mir
@@ -822,8 +837,24 @@ build/stage0/zeno build tests/spec/package-pass/027_native_for_range_artifact --
   -> target/aarch64-apple-darwin/hosted/ir/nativeForRangeApp.ll contains real LLVM lowering for I32 range `for` loops: `define i32 @sumHalfOpen(i32 %limit)` lowers `for i in 0..limit` to `%i.range.0.addr = alloca i32`, `store i32 0`, `for.cond.0:`, `load`, `icmp slt`, `br i1` to `for.body.0` / `for.exit.0`, body accumulator `store`, `for.step.0:`, increment, and a back-edge to `for.cond.0`; `define i32 @sumClosed(i32 %start, i32 %end)` lowers `for i in start..=end` with `icmp sle`; `define i32 @emptyHalfOpen(i32 %limit)` verifies an empty half-open range path, `define i32 @singleClosed(i32 %value)` verifies a one-element closed range path, and `define i32 @sumForSkipBreak(i32 %limit)` / `define i32 @sumWhileSkipBreak(i32 %limit)` lower terminal `if` branches inside loops plus `continue` and `break` to real step/condition/exit branches; target/.../obj/nativeForRangeApp.o contains `_sumHalfOpen` / `_sumClosed` / `_emptyHalfOpen` / `_singleClosed` / `_sumForSkipBreak` / `_sumWhileSkipBreak` / `_main`, target/.../bin/nativeForRangeApp is a host executable, and the build-artifact runner executes it and verifies `run-exit-code: 38`
 build/stage0/zeno build tests/spec/package-pass/028_native_char_artifact --emit llvm-ir
   -> target/aarch64-apple-darwin/hosted/ir/nativeCharApp.ll contains real LLVM lowering for `Char` as an internal i32 scalar: `define i1 @isAsciiA(i32 %ch)` compares `%ch` with literal codepoint `65`, `define i32 @score(i32 %ch)` materializes escaped newline as `10`, calls the Bool function, branches on Char equality/inequality, and `define i32 @main()` calls `@score` with local Char values and literal `'z'`; target/.../obj/nativeCharApp.o contains `_isAsciiA` / `_score` / `_main`, target/.../bin/nativeCharApp is a host executable, and direct execution verifies `run-exit-code: 43`
+build/stage0/zeno build tests/spec/package-pass/029_native_f64_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeF64App.ll contains real LLVM lowering for `F64` as an internal double scalar: `define i1 @isLarge(double %value)` compares with `fcmp ogt`, `define i32 @classify(double %value)` materializes F64 locals with `fadd`, multiplies with `fmul`, calls the Bool function, and branches on a second floating comparison, while `define i32 @main()` calls `@classify` with local F64 values; target/.../obj/nativeF64App.o contains `_classify` / `_isLarge` / `_main`, target/.../bin/nativeF64App is a host executable, and direct execution verifies `run-exit-code: 42`
+build/stage0/zeno build tests/spec/package-pass/030_native_f32_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeF32App.ll contains real LLVM lowering for `F32` as an internal float scalar: `define i1 @isWide(float %value)` compares with `fcmp ogt`, `define i32 @classify(float %value)` materializes annotated F32 locals with `fadd`, multiplies with `fmul`, calls the Bool function, and branches on a second floating comparison, while `define i32 @main()` calls `@classify` with local F32 values; target/.../obj/nativeF32App.o contains `_classify` / `_isWide` / `_main`, target/.../bin/nativeF32App is a host executable, and direct execution verifies `run-exit-code: 35`
+build/stage0/zeno build tests/spec/package-pass/031_native_u32_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeU32App.ll contains real LLVM lowering for `U32` as an internal i32 scalar with unsigned semantics: `define i1 @isLarge(i32 %value)` compares with `icmp uge`, `define i32 @classify(i32 %value)` materializes annotated U32 locals with `add i32 0`, multiplies with `mul`, divides with `udiv`, calls the Bool function, and branches on `icmp ult`, while `define i32 @main()` calls `@classify` with local U32 values; target/.../obj/nativeU32App.o contains `_classify` / `_isLarge` / `_main`, target/.../bin/nativeU32App is a host executable, and direct execution verifies `run-exit-code: 34`
+build/stage0/zeno build tests/spec/package-pass/032_native_u64_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeU64App.ll contains real LLVM lowering for `U64` as an internal i64 scalar with unsigned semantics and a value wider than U32: `define i1 @isHuge(i64 %value)` compares with `icmp uge i64 %value, 4294967296`, `define i32 @classify(i64 %value)` materializes annotated U64 locals with `add i64 0`, multiplies with `mul`, divides with `udiv`, calls the Bool function, and branches on `icmp ult`, while `define i32 @main()` calls `@classify` with local U64 values; target/.../obj/nativeU64App.o contains `_classify` / `_isHuge` / `_main`, target/.../bin/nativeU64App is a host executable, and direct execution verifies `run-exit-code: 35`
+build/stage0/zeno build tests/spec/package-pass/033_native_i64_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeI64App.ll contains real LLVM lowering for `I64` as an internal i64 scalar with signed semantics and a value wider than I32: `define i1 @isHuge(i64 %value)` compares with `icmp sge i64 %value, 4294967296`, `define i32 @classify(i64 %value)` materializes annotated I64 locals with `add i64 0`, multiplies with `mul`, divides with `sdiv`, calls the Bool function, and branches on `icmp slt`, while `define i32 @main()` calls `@classify` with local I64 values; target/.../obj/nativeI64App.o contains `_classify` / `_isHuge` / `_main`, target/.../bin/nativeI64App is a host executable, and direct execution verifies `run-exit-code: 36`
+build/stage0/zeno build tests/spec/package-pass/034_native_size_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeSizeApp.ll contains real LLVM lowering for pointer-sized integer scalars as i64 on the first 64-bit targets: `USize` functions use `udiv i64` and `icmp uge` / `icmp ult`, while `ISize` functions use `sdiv i64` and `icmp sge` / `icmp slt`; the fixture includes `4294967296` typed as both `USize` and `ISize`, target/.../obj/nativeSizeApp.o contains `_classifySize` / `_isWideSize` / `_classifyOffset` / `_isWideOffset` / `_main`, target/.../bin/nativeSizeApp is a host executable, and direct execution verifies `run-exit-code: 85`
+build/stage0/zeno build tests/spec/package-pass/035_native_narrow_int_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeNarrowIntApp.ll contains real LLVM lowering for narrow integer scalars: `I8`/`U8` use LLVM `i8`, `I16`/`U16` use LLVM `i16`, signed functions use `sdiv` and `icmp slt` / `icmp sge`, unsigned functions use `udiv` and `icmp ult` / `icmp uge`, and typed literals materialize as `add i8 0, 8` or `add i16 0, 300`; target/.../obj/nativeNarrowIntApp.o contains `_classifySigned8` / `_classifyUnsigned8` / `_classifySigned16` / `_classifyUnsigned16` / `_isSmallSigned8` / `_isSmallUnsigned8` / `_isLargeSigned16` / `_isLargeUnsigned16` / `_main`, target/.../bin/nativeNarrowIntApp is a host executable, and direct execution verifies `run-exit-code: 79`
+build/stage0/zeno build tests/spec/package-pass/036_native_mixed_struct_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeMixedStructApp.ll contains real LLVM aggregate lowering for mixed primitive scalar fields: `%Header = type { i8, i16, i64, float, double }`, `define %Header @makeHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)` inserts each field with its scalar type, `define i32 @consume(%Header %header)` extracts each field and calls typed helpers as `i8`, `i16`, `i64`, `float`, and `double`, target/.../obj/nativeMixedStructApp.o contains `_makeHeader` / `_identity` / `_consume` / `_scoreTag` / `_scoreLength` / `_scoreWeight` / `_scoreRatio` / `_scoreExact` / `_main`, target/.../bin/nativeMixedStructApp is a host executable, and direct execution verifies `run-exit-code: 49`
 build/stage0/zeno test --stage mvp --milestone M2
-  -> zeno test: 70 passed, 0 failed (stage mvp, M2)
+  -> zeno test: 78 passed, 0 failed (stage mvp, M2)
 build/stage0/zeno test --stage mvp --milestone M3
   -> zeno test: 10 passed, 0 failed (stage mvp, M3)
 build/stage0/zeno test --stage mvp --milestone M5
@@ -835,13 +866,13 @@ build/stage0/zeno test --workspace /private/tmp/zeno-metadata-check
 build/stage0/zeno test --workspace /private/tmp/zeno-target-metadata
   -> invalid test target metadata ... wasm32-unknown-unknown
 build/stage0/zeno test --stage full-spec
-  -> zeno test: 418 passed, 0 failed
+  -> zeno test: 426 passed, 0 failed
 build/stage0/zeno test --stage full-spec --target x86_64-unknown-linux-gnu
   -> zeno test: 410 passed, 0 failed
 build/stage0/zeno test --stage full-spec --target aarch64-apple-darwin
-  -> zeno test: 399 passed, 0 failed
-zeno test: 136 passed, 0 failed (stage mvp)
-zeno test: 418 passed, 0 failed
+  -> zeno test: 407 passed, 0 failed
+zeno test: 144 passed, 0 failed (stage mvp)
+zeno test: 426 passed, 0 failed
 ```
 
 At this point, every `tests/spec/compile-fail/*.zn` file is rejected by ordinary

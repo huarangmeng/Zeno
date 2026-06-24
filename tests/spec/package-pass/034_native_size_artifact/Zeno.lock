@@ -1,0 +1,23 @@
+version = 1
+root = "nativeSizeApp"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "nativeSizeApp"
+version = "0.0.0"
+source = "path:."
+manifestHash = "fnv1a64:d80b32fb2f4d43a8"
+contentHash = "fnv1a64:41acc6be0b82a5f1"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

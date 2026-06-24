@@ -1,0 +1,61 @@
+module main;
+
+fn isSmallSigned8(value: I8) -> Bool {
+    return value < 9;
+}
+
+fn classifySigned8(value: I8) -> I32 {
+    val doubled: I8 = value * 2;
+    val half: I8 = doubled / 2;
+    if (isSmallSigned8(half)) {
+        return 4;
+    }
+    return 0;
+}
+
+fn isSmallUnsigned8(value: U8) -> Bool {
+    return value < 9;
+}
+
+fn classifyUnsigned8(value: U8) -> I32 {
+    val doubled: U8 = value * 2;
+    val half: U8 = doubled / 2;
+    if (isSmallUnsigned8(half)) {
+        return 5;
+    }
+    return 0;
+}
+
+fn isLargeSigned16(value: I16) -> Bool {
+    return value >= 300;
+}
+
+fn classifySigned16(value: I16) -> I32 {
+    val doubled: I16 = value * 2;
+    val half: I16 = doubled / 2;
+    if (isLargeSigned16(half)) {
+        return 30;
+    }
+    return 0;
+}
+
+fn isLargeUnsigned16(value: U16) -> Bool {
+    return value >= 300;
+}
+
+fn classifyUnsigned16(value: U16) -> I32 {
+    val doubled: U16 = value * 2;
+    val half: U16 = doubled / 2;
+    if (isLargeUnsigned16(half)) {
+        return 40;
+    }
+    return 0;
+}
+
+fn main() -> I32 {
+    val i8Value: I8 = 8;
+    val u8Value: U8 = 8;
+    val i16Value: I16 = 300;
+    val u16Value: U16 = 300;
+    return classifySigned8(i8Value) + classifyUnsigned8(u8Value) + classifySigned16(i16Value) + classifyUnsigned16(u16Value);
+}
