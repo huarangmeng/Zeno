@@ -240,7 +240,7 @@ enum / match lowering：
 - `match value` 对 scrutinee 建立只读访问，根据 tag 分支。payload pattern binding 是 payload place 的只读 projection。
 - `match mut value` 对 scrutinee 建立唯一可写访问，根据 tag 分支。payload binding 是 payload place 的 mutable projection，但不是 owning move。
 - `match move value` 先消耗 scrutinee place，根据 tag 分支。被选中 payload binding 是 owning place；未选中 variants 不存在可销毁 payload。
-- `if val` 降低为 refutable pattern test 加 then / else 分支；`while val` 降低为循环头 pattern test 加 body / exit 分支。
+- `if pattern = expr` 降低为 refutable pattern test 加 then / else 分支；`while pattern = expr` 降低为循环头 pattern test 加 body / exit 分支。
 - `val pattern = expr` 只接受 irrefutable pattern；HIR 阶段应拒绝 refutable pattern。
 - struct pattern 降低为字段 projection；tuple pattern 降低为 index projection；嵌套 pattern 递归生成 projection。
 - literal pattern 降低为整数、bool、char 或 unit variant 比较。

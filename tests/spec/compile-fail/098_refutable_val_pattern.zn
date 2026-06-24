@@ -10,6 +10,6 @@ enum Maybe<T> {
 }
 
 fn bad(maybe: Maybe<U32>) -> U32 {
-    val Maybe.Some(value) = maybe; // expected-error: refutable pattern is not allowed in val; use match or if val
+    val Maybe.Some(value) = maybe; // expected-error: refutable pattern is not allowed in val; use match or if Pattern = value
     return value;
 }

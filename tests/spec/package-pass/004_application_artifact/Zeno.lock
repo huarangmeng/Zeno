@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "artifactApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:360c6f400175ca89"
-contentHash = "fnv1a64:1f94aaf5dd275a2a"
+manifestHash = "fnv1a64:cdb420b7e5a99caa"
+contentHash = "fnv1a64:73ae464d4468072d"
 trust = []
 dependencies = [
 ]

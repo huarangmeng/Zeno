@@ -8,7 +8,9 @@
 # zmeta-contains: runtimeFingerprint = "fnv1a64:
 # zmeta-contains: declarations=fnv1a64:
 # zmeta-contains: runtime=fnv1a64:
-# zmeta-contains: archiveFormat = "ar-stage0-preview-object"
+# zmeta-contains: archiveFormat = "ar-native-object"
+# zmeta-contains: objectFormat = "native-object"
+# zmeta-contains: finalArtifact = "lib/libartifactLib.a"
 # zmeta-contains: fn answer stableNodeId=fnv1a64:
 # zmeta-contains: module=root visibility=pub span=src/lib.zn:1:1
 # emit-contains: ; module = 'artifactLib'

@@ -13,7 +13,7 @@ async fn loadStreaming(move runtime: Runtime, move jobs: Vector<Job>) -> Result<
         });
     }
 
-    while val Some(page) = try await mut group.tryNext() {
+    while Some(page) = try await mut group.tryNext() {
         consume(move page);
     }
 

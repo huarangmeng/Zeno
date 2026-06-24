@@ -194,7 +194,7 @@ async fn loadStreaming(move runtime: Runtime, move jobs: Vector<Job>) -> Result<
         });
     }
 
-    while val Some(page) = try await mut group.tryNext() {
+    while Some(page) = try await mut group.tryNext() {
         consume(move page);
     }
 
@@ -229,7 +229,7 @@ impl<T: Send, E: Send> TaskGroup<Result<T, E>> {
 - `joinAll` / `tryJoinAll` 消费 group，等待所有任务，并按完成顺序返回结果；这是最低额外协调成本的默认行为。
 - 需要保持 spawn 顺序时使用 `joinAllOrdered` / `tryJoinAllOrdered`。有序收集可能需要额外索引和结果槽位，成本由方法名表达。
 - `next` / `tryNext` 每次返回一个完成结果，顺序是完成顺序。循环提前退出时，调用方必须用 `move group.cancelRemaining()` 或其他消费 API 显式收尾。
-- `next` / `tryNext` 返回 `None` 后，group 进入 drained 状态，离开作用域不再需要额外收尾。编译器必须认识 `while val Some(x) = await mut group.next()` 和 `while val Some(x) = try await mut group.tryNext()` 这类 drain 循环。
+- `next` / `tryNext` 返回 `None` 后，group 进入 drained 状态，离开作用域不再需要额外收尾。编译器必须认识 `while Some(x) = await mut group.next()` 和 `while Some(x) = try await mut group.tryNext()` 这类 drain 循环。
 - `tryNext` / `tryJoinAll` 遇到第一个 `Err` 时，会请求取消剩余任务并把 group 标记为 settled。等待或丢弃结果的策略由 runtime profile 定义，但不能让未收尾任务逃出 group。
 - 对 `try await mut group.tryNext()`，`try` 的提前返回路径被视为已经收尾，因为 `tryNext` 的 `Err` 路径已经 settled group。
 - `cancelRemaining(move self)` 消费 group，请求取消仍未完成的任务并丢弃后续输出；它不隐藏阻塞等待。

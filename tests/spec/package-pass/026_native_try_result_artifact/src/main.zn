@@ -1,0 +1,51 @@
+module main;
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+fn okValue(value: I32) -> Result<I32, I32> {
+    return Result.Ok(value);
+}
+
+fn errValue(code: I32) -> Result<I32, I32> {
+    return Result.Err(code);
+}
+
+fn step(value: I32) -> Result<I32, I32> {
+    val first = try okValue(value);
+    val second = try okValue(first + 1);
+    return Result.Ok(second + 1);
+}
+
+fn fail(value: I32) -> Result<I32, I32> {
+    val first = try okValue(value);
+    val second = try errValue(first + 7);
+    return Result.Ok(second + 1);
+}
+
+fn checkOk(value: I32) -> Result<I32, I32> {
+    try okValue(value);
+    return Result.Ok(value + 2);
+}
+
+fn checkErr(value: I32) -> Result<I32, I32> {
+    try errValue(value + 9);
+    return Result.Ok(0);
+}
+
+fn unwrapOrCode(result: Result<I32, I32>) -> I32 {
+    return match result {
+        Result.Ok(value) => value,
+        Result.Err(code) => code,
+    };
+}
+
+fn main() -> I32 {
+    val good = step(3);
+    val bad = fail(5);
+    val checked = checkOk(4);
+    val checkedErr = checkErr(2);
+    return unwrapOrCode(good) + unwrapOrCode(bad) + unwrapOrCode(checked) + unwrapOrCode(checkedErr);
+}

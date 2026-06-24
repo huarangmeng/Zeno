@@ -13,7 +13,7 @@ async fn bad(move runtime: Runtime, move jobs: Vector<Job>) -> Result<Unit, Fetc
         });
     }
 
-    while val Some(page) = try await mut group.tryNext() {
+    while Some(page) = try await mut group.tryNext() {
         if shouldStop(page) {
             return Ok(()); // expected-error: task group may still contain unfinished tasks; call move group.cancelRemaining() before leaving
         }

@@ -1,0 +1,119 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 7
+# zmeta-contains: decl.struct Pair module=main span=src/main.zn:3:1
+# zmeta-contains: decl.field Pair.left module=main span=src/main.zn:4:1 type=I32
+# zmeta-contains: decl.field Pair.right module=main span=src/main.zn:5:1 type=I32
+# zmeta-contains: attribute @layout(C) module=main span=src/main.zn:30:1
+# zmeta-contains: decl.struct ExportPair module=main span=src/main.zn:31:1 attrs=@layout(C)
+# zmeta-contains: decl.field ExportPair.left module=main span=src/main.zn:32:1 type=I32
+# zmeta-contains: decl.field ExportPair.right module=main span=src/main.zn:33:1 type=I32
+# zmeta-contains: decl.fn sumPair module=main span=src/main.zn:8:1 params=(a: I32, b: I32) return=I32
+# zmeta-contains: decl.fn consumePair module=main span=src/main.zn:14:1 params=(pair: Pair) return=I32
+# zmeta-contains: decl.fn identityPair module=main span=src/main.zn:18:1 params=(pair: Pair) return=Pair
+# zmeta-contains: decl.fn makePair module=main span=src/main.zn:22:1 params=(a: I32, b: I32) return=Pair
+# zmeta-contains: decl.fn exportedConsumePair module=main span=src/main.zn:37:1 attrs=@export("zeno_consume_pair", abi: C) params=(pair: ExportPair) return=I32
+# zmeta-contains: exports = ["zeno_consume_pair:abi=C"]
+# zmeta-contains: stmt.val sumPair.pair module=main span=src/main.zn:9:1 expr=call:makePair
+# zmeta-contains: stmt.val sumPair.normalized module=main span=src/main.zn:10:1 expr=call:identityPair
+# zmeta-contains: stmt.return sumPair module=main span=src/main.zn:11:1 expr=call:consumePair expected=I32
+# zmeta-contains: stmt.return consumePair module=main span=src/main.zn:15:1 expr=binary:+ expected=I32
+# zmeta-contains: stmt.return identityPair module=main span=src/main.zn:19:1 expr=name:pair expected=Pair
+# zmeta-contains: stmt.return makePair module=main span=src/main.zn:23:1 expr=struct-literal:Pair expected=Pair
+# zmeta-contains: stmt.return exportedConsumePair module=main span=src/main.zn:38:1 expr=binary:+ expected=I32
+# zmeta-contains: hir.field Pair.left type=I32 span=src/main.zn:4:1
+# zmeta-contains: hir.field Pair.right type=I32 span=src/main.zn:5:1
+# zmeta-contains: hir.field ExportPair.left type=I32 span=src/main.zn:32:1
+# zmeta-contains: hir.field ExportPair.right type=I32 span=src/main.zn:33:1
+# zmeta-contains: hir.layout-input ExportPair layout=C
+# zmeta-contains: hir.fn-signature consumePair params=(pair: Pair) return=I32 span=src/main.zn:14:1
+# zmeta-contains: hir.fn-signature identityPair params=(pair: Pair) return=Pair span=src/main.zn:18:1
+# zmeta-contains: hir.fn-signature makePair params=(a: I32, b: I32) return=Pair span=src/main.zn:22:1
+# zmeta-contains: hir.fn-signature exportedConsumePair params=(pair: ExportPair) return=I32 span=src/main.zn:37:1
+# zmeta-contains: hir.local sumPair.pair mode=val expr=call:makePair type=inferred span=src/main.zn:9:1
+# zmeta-contains: hir.local sumPair.normalized mode=val expr=call:identityPair type=inferred span=src/main.zn:10:1
+# zmeta-contains: hir.return sumPair expr=call:consumePair expected=I32 span=src/main.zn:11:1
+# zmeta-contains: hir.return consumePair expr=binary:+ expected=I32 span=src/main.zn:15:1
+# zmeta-contains: hir.return identityPair expr=name:pair expected=Pair span=src/main.zn:19:1
+# zmeta-contains: hir.return makePair expr=struct-literal:Pair expected=Pair span=src/main.zn:23:1
+# zmeta-contains: hir.return exportedConsumePair expr=binary:+ expected=I32 span=src/main.zn:38:1
+# zmeta-contains: mir.type Pair layout=Auto
+# zmeta-contains: mir.field Pair.left type=I32
+# zmeta-contains: mir.field Pair.right type=I32
+# zmeta-contains: mir.type ExportPair layout=C
+# zmeta-contains: mir.field ExportPair.left type=I32
+# zmeta-contains: mir.field ExportPair.right type=I32
+# zmeta-contains: mir.fn consumePair entry=bb0 return=I32
+# zmeta-contains: mir.fn identityPair entry=bb0 return=Pair
+# zmeta-contains: mir.fn makePair entry=bb0 return=Pair
+# zmeta-contains: mir.fn exportedConsumePair entry=bb0 return=I32
+# zmeta-contains: mir.rvalue sumPair expr=call:makePair kind=call callee=@makePair
+# zmeta-contains: mir.rvalue sumPair expr=call:identityPair kind=call callee=@identityPair
+# zmeta-contains: mir.rvalue sumPair expr=call:consumePair kind=call callee=@consumePair
+# zmeta-contains: mir.return identityPair value=name:pair type=Pair
+# zmeta-contains: mir.rvalue makePair expr=struct-literal:Pair kind=struct-literal type=Pair
+# zmeta-contains: mir.rvalue consumePair expr=binary:+ kind=binary op=+
+# zmeta-contains: mir.rvalue exportedConsumePair expr=binary:+ kind=binary op=+
+# zmeta-contains: mir.return exportedConsumePair value=binary:+ type=I32
+# zmeta-contains: llvm.type %Pair layout=Auto
+# zmeta-contains: llvm.field-preview Pair.left type=I32
+# zmeta-contains: llvm.field-preview Pair.right type=I32
+# zmeta-contains: llvm.type %ExportPair layout=C
+# zmeta-contains: llvm.field-preview ExportPair.left type=I32
+# zmeta-contains: llvm.field-preview ExportPair.right type=I32
+# zmeta-contains: llvm.define-preview @consumePair return=I32
+# zmeta-contains: llvm.define-preview @identityPair return=Pair
+# zmeta-contains: llvm.define-preview @makePair return=Pair
+# zmeta-contains: llvm.define-preview @exportedConsumePair return=I32
+# zmeta-contains: llvm.aggregate-preview @makePair type=Pair
+# zmeta-contains: llvm.call-preview @makePair in @sumPair
+# zmeta-contains: llvm.call-preview @identityPair in @sumPair
+# zmeta-contains: llvm.call-preview @consumePair in @sumPair
+# zmeta-contains: llvm.binary-preview @exportedConsumePair op=+
+# emit-contains: %Pair = type { i32, i32 }
+# emit-contains: %ExportPair = type { i32, i32 }
+# emit-contains: define %Pair @makePair(i32 %a, i32 %b)
+# emit-contains: ret %Pair %t1
+# emit-contains: define %Pair @identityPair(%Pair %pair)
+# emit-contains: ret %Pair %pair
+# emit-contains: define i32 @consumePair(%Pair %pair)
+# emit-contains: %t0 = extractvalue %Pair %pair, 0
+# emit-contains: %t1 = extractvalue %Pair %pair, 1
+# emit-contains: %t2 = add i32 %t0, %t1
+# emit-contains: define i32 @sumPair(i32 %a, i32 %b)
+# emit-contains: %t0 = call %Pair @makePair(i32 %a, i32 %b)
+# emit-contains: %t1 = call %Pair @identityPair(%Pair %t0)
+# emit-contains: %t2 = call i32 @consumePair(%Pair %t1)
+# emit-contains: %t0 = call i32 @sumPair(i32 3, i32 4)
+# emit-contains: define i32 @exportedConsumePair(%ExportPair %pair)
+# emit-contains: %t0 = extractvalue %ExportPair %pair, 0
+# emit-contains: %t1 = extractvalue %ExportPair %pair, 1
+# emit-contains: define i32 @zeno_consume_pair(%ExportPair %pair)
+# emit-contains: %ret = call i32 @exportedConsumePair(%ExportPair %pair)
+# object-contains: sumPair
+# object-contains: consumePair
+# object-contains: identityPair
+# object-contains: makePair
+# object-contains: exportedConsumePair
+# object-contains: zeno_consume_pair
+# object-contains: main
+# purpose: a simple I32 struct literal, struct-returning function, aggregate call result, struct parameter, struct parameter returned as an aggregate, field access, and a @layout(C) struct parameter crossing an @export C ABI thunk are represented in AST/HIR/MIR facts and lowered as real LLVM aggregate insertvalue/extractvalue/call instructions into native object and executable output
+
+[package]
+name = "nativeStructApp"
+version = "0.1.0"
+kind = "application"
+entry = "main.main"
+
+[dependencies]
+core = "builtin"
+
+[target]
+triple = "aarch64-apple-darwin"
+profile = "hosted"

@@ -1,13 +1,13 @@
 version = 1
-root = "cAbiRuntime"
+root = "nativeBoolApp"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "cAbiRuntime"
+name = "nativeBoolApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:46efc2f36ffc31c3"
-contentHash = "fnv1a64:871c37262ffd8c20"
+manifestHash = "fnv1a64:893b46d16a1a01b1"
+contentHash = "fnv1a64:ef438350bd6243e7"
 trust = []
 dependencies = [
 ]

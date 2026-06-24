@@ -36,16 +36,34 @@
 # zmeta-contains: hir.expr compute expr=call:observe span=src/lib.zn:29:1
 # zmeta-contains: hir.return compute expr=name:total expected=I32 span=src/lib.zn:30:1
 # zmeta-contains: mirNodes = [
+# zmeta-contains: mir.cfg compute entry=bb0 blocks=bb0 cleanup=none
 # zmeta-contains: mir.fn readHost entry=bb0 return=I32
 # zmeta-contains: mir.return readHost value=trust-block type=I32
 # zmeta-contains: mir.fn compute entry=bb0 return=I32
+# zmeta-contains: mir.local-slot compute %next mutable=false type=I32
+# zmeta-contains: mir.place compute %next kind=local span=src/lib.zn:27:1
+# zmeta-contains: mir.operand compute expr=binary:+ kind=rvalue
+# zmeta-contains: mir.rvalue compute expr=binary:+ kind=binary op=+
+# zmeta-contains: mir.assign compute bb=bb0 place=%next rvalue=binary:+
 # zmeta-contains: mir.local compute.next init=binary:+ mutable=false
+# zmeta-contains: mir.local-slot compute %total mutable=true type=inferred
+# zmeta-contains: mir.operand compute expr=name:next kind=place place=%next
+# zmeta-contains: mir.assign compute bb=bb0 place=%total rvalue=name:next
 # zmeta-contains: mir.local compute.total init=name:next mutable=true
+# zmeta-contains: mir.operand compute expr=call:observe kind=call callee=@observe
+# zmeta-contains: mir.rvalue compute expr=call:observe kind=call callee=@observe
+# zmeta-contains: mir.eval compute bb=bb0 operand=call:observe
 # zmeta-contains: mir.eval compute expr=call:observe
+# zmeta-contains: mir.operand compute expr=name:total kind=place place=%total
+# zmeta-contains: mir.terminator compute bb=bb0 kind=return value=name:total
 # zmeta-contains: mir.return compute value=name:total type=I32
+# zmeta-contains: mir.drop-flags compute state=none-preview
+# zmeta-contains: mir.cleanup-edge compute none
 # zmeta-contains: llvmNodes = [
 # zmeta-contains: llvm.define-preview @readHost return=I32
 # zmeta-contains: llvm.define-preview @compute return=I32
+# zmeta-contains: llvm.lowering-input @compute from=mir.cfg entry=bb0
+# zmeta-contains: llvm.binary-preview @compute op=+
 # zmeta-contains: llvm.call-preview @observe in @compute
 # zmeta-contains: llvm.ret-preview @readHost type=I32 value=trust-block
 # zmeta-contains: llvm.ret-preview @compute type=I32 value=name:total
@@ -62,9 +80,17 @@
 # emit-contains: mir.fn readHost entry=bb0 return=I32
 # emit-contains: hir.return readHost expr=trust-block expected=I32 span=src/lib.zn:17:1
 # emit-contains: mir.return readHost value=trust-block type=I32
+# emit-contains: mir.cfg compute entry=bb0 blocks=bb0 cleanup=none
+# emit-contains: mir.local-slot compute %next mutable=false type=I32
 # emit-contains: hir.local compute.next mode=val expr=binary:+ type=I32 span=src/lib.zn:27:1
+# emit-contains: mir.rvalue compute expr=binary:+ kind=binary op=+
 # emit-contains: mir.local compute.next init=binary:+ mutable=false
+# emit-contains: mir.assign compute bb=bb0 place=%total rvalue=name:next
 # emit-contains: hir.expr compute expr=call:observe span=src/lib.zn:29:1
+# emit-contains: mir.eval compute bb=bb0 operand=call:observe
+# emit-contains: mir.terminator compute bb=bb0 kind=return value=name:total
+# emit-contains: llvm.lowering-input @compute from=mir.cfg entry=bb0
+# emit-contains: llvm.binary-preview @compute op=+
 # emit-contains: llvm.call-preview @observe in @compute
 # emit-contains: mir.return compute value=name:total type=I32
 # purpose: top-level AST node facts enter artifact metadata, emitted MIR preview, and cache keys

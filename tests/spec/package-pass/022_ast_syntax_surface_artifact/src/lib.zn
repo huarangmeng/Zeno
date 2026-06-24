@@ -1,0 +1,215 @@
+module syntax;
+
+import core.option.{Option, Some, None};
+import core.result.{Result, Ok, Err};
+
+const LIMIT: U32 = 4;
+static Seed: U32 = 1;
+
+enum ParseError {
+    Empty,
+    Code(U32),
+}
+
+struct Point: Copy {
+    x: U32,
+    y: U32,
+}
+
+@layout(Source)
+struct Buffer<T, const Capacity: USize> {
+    pub data: USize,
+    count: USize,
+}
+
+type ByteBuffer = Buffer<U8, 4>;
+
+interface Writer: Send, Sync {
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, ParseError>;
+}
+
+impl Writer for Buffer<U8, 4> {
+    const Chunk: USize = 4;
+
+    fn write(mut self, bytes: ArraySlice<U8>) -> Result<USize, ParseError> {
+        return Ok(0);
+    }
+
+    destroy {
+    }
+}
+
+fn parseDigit(value: U32) -> Result<U32, ParseError> {
+    return Ok(value);
+}
+
+fn nextMaybe(value: U32) -> Option<U32> {
+    if value == 0 {
+        return None;
+    }
+    return Some(value - 1);
+}
+
+fn observe(value: U32) {
+    val ignored = value;
+}
+
+fn sumValues(values: ArraySlice<U32>) -> Result<U32, ParseError> {
+    const LocalLimit: U32 = LIMIT;
+    var total: U32 = 0;
+    val point = Point { x: 1, y: 2 };
+    val Point { x, y } = point;
+    for value in values {
+        if value == 0 {
+            continue;
+        }
+        total = total + value;
+    }
+    val parsed = try parseDigit(total);
+    try parseDigit(parsed);
+    val adjust = (x: U32) => x + LIMIT;
+    return Ok(parsed);
+}
+
+fn classify(maybe: Option<U32>) -> U32 {
+    return match maybe {
+        Some(value) => value,
+        None => Seed,
+    };
+}
+
+fn optional(maybe: Option<U32>) -> U32 {
+    if Some(value) = maybe {
+        return value;
+    } else {
+        return maybe.unwrapOr(0);
+    }
+}
+
+fn drain(start: U32) -> U32 {
+    var total: U32 = start;
+    while Some(value) = nextMaybe(total) {
+        if value == 0 {
+            break total;
+        }
+        total = value;
+    }
+    return total;
+}
+
+fn expressions(buffer: USize, values: ArraySlice<U32>) -> U32 {
+    val empty = ();
+    val pair = (1, 2);
+    val ch = 'z';
+    val widened = 1 as U32;
+    val first = values[0];
+    val fresh = Buffer<U8, 4>.withCapacity(4);
+    return first;
+}
+
+fn patternModes(maybe: Option<U32>) -> U32 {
+    if move Some(value) = maybe {
+        return value;
+    }
+    return match move maybe {
+        Some(value) if value > 10 => value,
+        None | Some(0) => 0,
+        Some(1..=10) => 1,
+    };
+}
+
+fn inspectMove(maybe: Option<U32>) {
+    match move maybe {
+        Some(value) => {
+            observe(1);
+        }
+        None => {
+            observe(0);
+        }
+    }
+}
+
+fn touch(maybe: Option<U32>) {
+    match maybe {
+        Some(value) => {
+            observe(1);
+        }
+        None => {
+            observe(0);
+        }
+    }
+}
+
+struct Counter {
+    current: U32,
+    end: U32,
+}
+
+impl Counter {
+    destroy {}
+}
+
+impl Iterator<U32> for Counter {
+    fn next(mut self) -> Option<U32> {
+        return None;
+    }
+}
+
+fn moveIteration(move counter: Counter) -> U32 {
+    var total: U32 = 0;
+    for move value in counter {
+        total = total + value;
+    }
+    return total;
+}
+
+fn closureModes(limit: U32) -> U32 {
+    val moveAdjust = move (x: U32) => x + limit;
+    val blockAdjust = (x: U32) -> U32 { return 0; };
+    return limit;
+}
+
+interface Consumer<T> {
+    fn consume(mut self, value: T) -> Unit;
+}
+
+impl Consumer<U32> for Counter {
+    fn consume(mut self, value: U32) {
+        observe(value);
+    }
+}
+
+fn genericIdentity<T: Copy>(value: T) -> T {
+    return value;
+}
+
+fn staticConsumer<T: Consumer<U32>>(mut consumer: T, value: U32) -> U32 {
+    mut consumer.consume(value);
+    return value;
+}
+
+trust extern "C" fn hostRead(value: I32) -> I32;
+
+fn trustedHostRead(value: I32) -> I32 {
+    return trust {
+        hostRead(value)
+    };
+}
+
+@export("zeno_surface_add", abi: C)
+pub fn exportedAdd(a: I32, b: I32) -> I32 {
+    return a + b;
+}
+
+const NativeOffset: I32 = 5;
+
+fn nativeConstAdd(value: I32) -> I32 {
+    const LocalOffset: I32 = NativeOffset + 2;
+    return value + LocalOffset;
+}
+
+static NativeSeed: I32 = 9;
+
+fn nativeStaticAdd(value: I32) -> I32 {
+    return value + NativeSeed;
+}

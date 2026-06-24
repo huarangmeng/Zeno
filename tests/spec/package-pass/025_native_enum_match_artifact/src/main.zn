@@ -1,0 +1,239 @@
+module main;
+
+enum Mode {
+    Cold,
+    Hot,
+    Done,
+}
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+struct Job {
+    priority: I32,
+}
+
+enum WorkState {
+    Ready(Job),
+    Done,
+}
+
+enum Event {
+    Key(I32),
+    Code(I32),
+    Pair { left: I32, right: I32 },
+    Finished,
+}
+
+fn score(mode: Mode) -> I32 {
+    return match mode {
+        Mode.Cold => 1,
+        Mode.Hot => 7,
+        Mode.Done => 3,
+    };
+}
+
+fn statementScore(mode: Mode) -> I32 {
+    match mode {
+        Mode.Cold => return 2,
+        Mode.Hot => return 5,
+        Mode.Done => return 11,
+    }
+}
+
+fn isHot(mode: Mode) -> Bool {
+    return mode == Mode.Hot;
+}
+
+fn chooseMode() -> Mode {
+    return Mode.Hot;
+}
+
+fn consume(move job: Job) -> I32 {
+    return job.priority;
+}
+
+fn makeReady(priority: I32) -> WorkState {
+    return WorkState.Ready(Job { priority: priority });
+}
+
+fn inspect(state: WorkState) -> I32 {
+    return match state {
+        WorkState.Ready(job) => job.priority,
+        WorkState.Done => 0,
+    };
+}
+
+fn finish(move state: WorkState) -> I32 {
+    return match move state {
+        WorkState.Ready(job) => consume(move job),
+        WorkState.Done => 0,
+    };
+}
+
+fn bump(mut state: WorkState) -> I32 {
+    if mut WorkState.Ready(job) = state {
+        return job.priority + 1;
+    }
+    return 0;
+}
+
+fn unwrapMaybe(maybe: Maybe<I32>) -> I32 {
+    if Maybe.Some(value) = maybe {
+        return value;
+    } else {
+        return 0;
+    }
+}
+
+fn makeMaybe(value: I32) -> Maybe<I32> {
+    return Maybe.Some(value);
+}
+
+fn makeNone() -> Maybe<I32> {
+    return Maybe.None;
+}
+
+fn makeMaybeJob(priority: I32) -> Maybe<Job> {
+    return Maybe.Some(Job { priority: priority });
+}
+
+fn makeNoJob() -> Maybe<Job> {
+    return Maybe.None;
+}
+
+fn unwrapJob(maybe: Maybe<Job>) -> I32 {
+    if Maybe.Some(job) = maybe {
+        return job.priority;
+    } else {
+        return 0;
+    }
+}
+
+fn makeKey(code: I32) -> Event {
+    return Event.Key(code);
+}
+
+fn makeCode(code: I32) -> Event {
+    return Event.Code(code);
+}
+
+fn makePair(left: I32, right: I32) -> Event {
+    return Event.Pair { left: left, right: right };
+}
+
+fn makeFinished() -> Event {
+    return Event.Finished;
+}
+
+fn simpleEventCode(event: Event) -> I32 {
+    return match event {
+        Event.Key(code) => code,
+        Event.Code(code) => code + 1,
+        Event.Pair { left, right } => left + right,
+        Event.Finished => 0,
+    };
+}
+
+fn eventCode(event: Event) -> I32 {
+    return match event {
+        Event.Key(code) if code < 10 => code,
+        Event.Code(10..=20) => 20,
+        Event.Key(code) | Event.Code(code) => code,
+        Event.Pair { left, right } => left + right,
+        Event.Finished => 0,
+    };
+}
+
+fn firstKey(code: I32) -> I32 {
+    while Event.Key(value) = makeKey(code) {
+        return value + 1;
+    }
+    return 0;
+}
+
+fn keyUntil(limit: I32, current: I32) -> Event {
+    if current < limit {
+        return Event.Key(current);
+    }
+    return Event.Finished;
+}
+
+fn sumKeys(limit: I32) -> I32 {
+    var i = 0;
+    var acc = 0;
+    while Event.Key(value) = keyUntil(limit, i) {
+        acc = acc + value;
+        i = i + 1;
+    }
+    return acc;
+}
+
+fn matchMaybe(maybe: Maybe<I32>) -> I32 {
+    return match maybe {
+        Maybe.Some(value) => value,
+        Maybe.None => 0,
+    };
+}
+
+fn matchJob(maybe: Maybe<Job>) -> I32 {
+    return match maybe {
+        Maybe.Some(job) => job.priority,
+        Maybe.None => 0,
+    };
+}
+
+struct Task {
+    priority: I32,
+    cost: I32,
+}
+
+fn makeMaybeTask(priority: I32, cost: I32) -> Maybe<Task> {
+    return Maybe.Some(Task { priority: priority, cost: cost });
+}
+
+fn makeNoTask() -> Maybe<Task> {
+    return Maybe.None;
+}
+
+fn matchTask(maybe: Maybe<Task>) -> I32 {
+    return match maybe {
+        Maybe.Some(task) => task.priority + task.cost,
+        Maybe.None => 0,
+    };
+}
+
+fn maybeUntil(limit: I32, current: I32) -> Maybe<I32> {
+    if current < limit {
+        return Maybe.Some(current);
+    }
+    return Maybe.None;
+}
+
+fn sumMaybe(limit: I32) -> I32 {
+    var i = 0;
+    var acc = 0;
+    while Maybe.Some(value) = maybeUntil(limit, i) {
+        acc = acc + value;
+        i = i + 1;
+    }
+    return acc;
+}
+
+fn main() -> I32 {
+    val ready = makeReady(2);
+    val some = makeMaybe(8);
+    val none = makeNone();
+    val someJob = makeMaybeJob(6);
+    val noJob = makeNoJob();
+    val someTask = makeMaybeTask(4, 5);
+    val noTask = makeNoTask();
+    val key = makeKey(2);
+    val codeInRange = makeCode(12);
+    val codeFallback = makeCode(30);
+    val pair = makePair(1, 2);
+    val finished = makeFinished();
+    return inspect(ready) + bump(ready) + unwrapMaybe(some) + unwrapMaybe(none) + unwrapJob(someJob) + unwrapJob(noJob) + matchMaybe(some) + matchMaybe(none) + matchJob(someJob) + matchJob(noJob) + matchTask(someTask) + matchTask(noTask) + firstKey(4) + sumKeys(4) + sumMaybe(4) + eventCode(key) + eventCode(codeInRange) + eventCode(codeFallback) + eventCode(pair) + eventCode(finished);
+}

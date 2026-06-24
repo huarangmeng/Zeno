@@ -1,15 +1,16 @@
 version = 1
-root = "cAbiRuntime"
+root = "nativeEnumMatchApp"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "cAbiRuntime"
+name = "nativeEnumMatchApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:46efc2f36ffc31c3"
-contentHash = "fnv1a64:871c37262ffd8c20"
+manifestHash = "fnv1a64:447af6ecd195907f"
+contentHash = "fnv1a64:e8108ee190d88714"
 trust = []
 dependencies = [
+  { key = "core", package = "core" },
 ]
 
 [[package]]

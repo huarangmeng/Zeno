@@ -235,7 +235,7 @@ error code
 - `match value` 只读匹配 enum payload，不移动非 `Copy` payload。
 - `match move value` 消耗 enum 并允许移动出被选中 payload。
 - `match mut value` 原地可写匹配 enum payload，不取得 payload 所有权。
-- `if val` / `while val` 支持只读、`move` 和 `mut` pattern 模式。
+- `if pattern` / `while pattern` 支持只读、`move` 和 `mut` pattern 模式。
 - `val` 支持不可失败 tuple / struct 解构。
 - pattern 支持 enum、struct、tuple、literal、range、or、guard 和 nested pattern。
 - guard 分支不参与穷尽证明。
@@ -552,7 +552,7 @@ help: 在移动前读取该值，或只移动一次
 - `replaceAt` 应移动出旧元素并返回，不能生成旧元素 drop。
 - `match` 应降低为 tag switch 或等价分支，不分配、不动态派发。
 - `match move` 中已移动 payload 的 drop flag 必须清除，未移动 payload 必须在分支 cleanup 中销毁。
-- `if val` / `while val` pattern 应降低为普通分支 / 循环头，不分配。
+- `if pattern` / `while pattern` 应降低为普通分支 / 循环头，不分配。
 - literal、range 和 or pattern 应降低为比较、tag switch 或分支合并，不创建 pattern 对象。
 - guard 应降低为 pattern 成功后的条件分支，guard 失败继续尝试后续分支。
 - `okOrElse`、`unwrapOrElse` 和 `mapErr` 的 `OnceFn` 非逃逸闭包应内联成条件分支；成功路径不得构造失败路径值。

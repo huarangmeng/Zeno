@@ -1,0 +1,67 @@
+module main;
+
+fn sumHalfOpen(limit: I32) -> I32 {
+    var acc: I32 = 0;
+    for i in 0..limit {
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn sumClosed(start: I32, end: I32) -> I32 {
+    var acc: I32 = 0;
+    for i in start..=end {
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn emptyHalfOpen(limit: I32) -> I32 {
+    var acc: I32 = 0;
+    for i in limit..limit {
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn singleClosed(value: I32) -> I32 {
+    var acc: I32 = 0;
+    for i in value..=value {
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn sumForSkipBreak(limit: I32) -> I32 {
+    var acc: I32 = 0;
+    for i in 0..limit {
+        if i == 2 {
+            continue;
+        }
+        if i == 5 {
+            break;
+        }
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn sumWhileSkipBreak(limit: I32) -> I32 {
+    var i: I32 = 0;
+    var acc: I32 = 0;
+    while i < limit {
+        i = i + 1;
+        if i == 2 {
+            continue;
+        }
+        if i == 5 {
+            break;
+        }
+        acc = acc + i;
+    }
+    return acc;
+}
+
+fn main() -> I32 {
+    return sumHalfOpen(5) + sumClosed(2, 4) + emptyHalfOpen(3) + singleClosed(3) + sumForSkipBreak(8) + sumWhileSkipBreak(8);
+}

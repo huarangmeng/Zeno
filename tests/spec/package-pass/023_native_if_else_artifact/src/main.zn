@@ -1,0 +1,13 @@
+module main;
+
+pub fn choosePositive(value: I32) -> I32 {
+    if value > 0 {
+        return value;
+    } else {
+        return 7;
+    }
+}
+
+pub fn main() -> I32 {
+    return choosePositive(0);
+}

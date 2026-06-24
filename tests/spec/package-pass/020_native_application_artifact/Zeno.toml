@@ -1,0 +1,107 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 7
+# zmeta-contains: target = "aarch64-apple-darwin"
+# zmeta-contains: profile = "hosted"
+# zmeta-contains: executableFormat = "native-host-executable"
+# zmeta-contains: objectFormat = "native-object"
+# zmeta-contains: llvmIrArtifact = "ir/nativeApp.ll"
+# zmeta-contains: objectArtifact = "obj/nativeApp.o"
+# zmeta-contains: finalArtifact = "bin/nativeApp"
+# zmeta-contains: decl.fn addIfPositive module=main span=src/main.zn:3:1
+# zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:5:1 expr=binary:+ expected=I32
+# zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:7:1 expr=name:delta expected=I32
+# zmeta-contains: decl.fn sumTo module=main span=src/main.zn:10:1
+# zmeta-contains: stmt.var sumTo.i module=main span=src/main.zn:11:1 expr=int-literal:0 type=I32
+# zmeta-contains: stmt.var sumTo.acc module=main span=src/main.zn:12:1 expr=int-literal:0 type=I32
+# zmeta-contains: stmt.while sumTo module=main span=src/main.zn:13:1 condition=compare:<
+# zmeta-contains: stmt.assign sumTo.acc module=main span=src/main.zn:14:1 expr=binary:+
+# zmeta-contains: stmt.assign sumTo.i module=main span=src/main.zn:15:1 expr=binary:+
+# zmeta-contains: stmt.return sumTo module=main span=src/main.zn:17:1 expr=name:acc expected=I32
+# zmeta-contains: stmt.val main.total module=main span=src/main.zn:21:1 expr=call:sumTo type=I32
+# zmeta-contains: stmt.val main.result module=main span=src/main.zn:22:1 expr=call:addIfPositive type=I32
+# zmeta-contains: stmt.return main module=main span=src/main.zn:23:1 expr=name:result expected=I32
+# zmeta-contains: mir.rvalue addIfPositive expr=binary:+ kind=binary op=+
+# zmeta-contains: mir.local sumTo.i init=int-literal:0 mutable=true
+# zmeta-contains: mir.local sumTo.acc init=int-literal:0 mutable=true
+# zmeta-contains: hir.while sumTo condition=compare:< span=src/main.zn:13:1
+# zmeta-contains: hir.assign sumTo.acc expr=binary:+ span=src/main.zn:14:1
+# zmeta-contains: hir.assign sumTo.i expr=binary:+ span=src/main.zn:15:1
+# zmeta-contains: mir.loop sumTo condition=compare:< header=while.cond body=while.body exit=while.exit
+# zmeta-contains: mir.branch sumTo kind=while condition=compare:< then=while.body else=while.exit
+# zmeta-contains: mir.store-preview sumTo place=%acc value=binary:+
+# zmeta-contains: mir.store-preview sumTo place=%i value=binary:+
+# zmeta-contains: mir.rvalue main expr=call:sumTo kind=call callee=@sumTo
+# zmeta-contains: mir.rvalue main expr=call:addIfPositive kind=call callee=@addIfPositive
+# zmeta-contains: mir.terminator main bb=bb0 kind=return value=name:result
+# zmeta-contains: llvm.binary-preview @addIfPositive op=+
+# zmeta-contains: llvm.call-preview @sumTo in @main
+# zmeta-contains: llvm.call-preview @addIfPositive in @main
+# zmeta-contains: llvm.loop-preview @sumTo condition=compare:<
+# zmeta-contains: llvm.branch-preview @sumTo kind=while condition=compare:<
+# zmeta-contains: llvm.store-preview @sumTo %acc value=binary:+
+# zmeta-contains: llvm.store-preview @sumTo %i value=binary:+
+# zmeta-contains: llvm.ret-preview @main type=I32 value=name:result
+# emit-contains: ; module = 'nativeApp'
+# emit-contains: target triple = "aarch64-apple-darwin"
+# emit-contains: ; stage0 pipeline source->ast->hir->mir->llvm-ir->object->artifact
+# emit-contains: define i32 @addIfPositive(i32 %value, i32 %delta)
+# emit-contains: %t0 = icmp sgt i32 %value, 0
+# emit-contains: br i1 %t0, label %if.then.1, label %if.cont.1
+# emit-contains: if.then.1:
+# emit-contains: %t2 = add i32 %value, %delta
+# emit-contains: if.cont.1:
+# emit-contains: ret i32 %delta
+# emit-contains: define i32 @sumTo(i32 %limit)
+# emit-contains: %i.addr = alloca i32
+# emit-contains: store i32 0, ptr %i.addr
+# emit-contains: %acc.addr = alloca i32
+# emit-contains: while.cond.0:
+# emit-contains: %t2 = icmp slt i32 %t1, %limit
+# emit-contains: br i1 %t2, label %while.body.0, label %while.exit.0
+# emit-contains: while.body.0:
+# emit-contains: store i32 %t5, ptr %acc.addr
+# emit-contains: store i32 %t7, ptr %i.addr
+# emit-contains: br label %while.cond.0
+# emit-contains: while.exit.0:
+# emit-contains: ret i32 %t8
+# emit-contains: define i32 @main()
+# emit-contains: %t0 = call i32 @sumTo(i32 4)
+# emit-contains: %total = add i32 0, %t0
+# emit-contains: %t1 = call i32 @addIfPositive(i32 %total, i32 1)
+# emit-contains: %result = add i32 0, %t1
+# emit-contains: ret i32 %result
+# purpose: minimal native application build lowers I32 locals, mutable vars, binary expressions, direct calls, simple if-return control flow, and while loops to real LLVM IR, native object, and host executable
+
+[package]
+name = "nativeApp"
+version = "0.1.0"
+kind = "application"
+
+[target]
+triple = "aarch64-apple-darwin"
+profile = "hosted"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "trap"
+stack = "none"
+
+[oom]
+strategy = "trap"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+dependencyTrust = false

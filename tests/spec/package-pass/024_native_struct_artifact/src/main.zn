@@ -1,0 +1,39 @@
+module main;
+
+struct Pair {
+    left: I32,
+    right: I32,
+}
+
+fn sumPair(a: I32, b: I32) -> I32 {
+    val pair = makePair(a, b);
+    val normalized = identityPair(pair);
+    return consumePair(normalized);
+}
+
+fn consumePair(pair: Pair) -> I32 {
+    return pair.left + pair.right;
+}
+
+fn identityPair(pair: Pair) -> Pair {
+    return pair;
+}
+
+fn makePair(a: I32, b: I32) -> Pair {
+    return Pair { left: a, right: b };
+}
+
+fn main() -> I32 {
+    return sumPair(3, 4);
+}
+
+@layout(C)
+pub struct ExportPair {
+    left: I32,
+    right: I32,
+}
+
+@export("zeno_consume_pair", abi: C)
+pub fn exportedConsumePair(pair: ExportPair) -> I32 {
+    return pair.left + pair.right;
+}

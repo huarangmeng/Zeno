@@ -479,7 +479,7 @@ val owner = file;
 // file 现在不可再用
 ```
 
-`move` 不是普通表达式前缀。它只出现在参数声明、`move self`、调用实参、消费接收者、闭包捕获、`match move`、`if val move`、`while val move` 和 `for move` 这类所有权模式位置。`return move value` 和普通 `val owner = move value` 是无效语法；这些拥有位置直接写 `return value`、`val owner = value`。
+`move` 不是普通表达式前缀。它只出现在参数声明、`move self`、调用实参、消费接收者、闭包捕获、`match move`、`if move pattern = expr`、`while move pattern = expr` 和 `for move` 这类所有权模式位置。`return move value` 和普通 `val owner = move value` 是无效语法；这些拥有位置直接写 `return value`、`val owner = value`。
 
 `Copy` 是显式选择：
 
@@ -1015,23 +1015,23 @@ fn archive(move packet: Packet) -> I32 { ... }
 val sign = if value < 0 { -1 } else { 1 };
 ```
 
-`if val` 和 `while val` 使用第 15 节的 pattern 系统：
+`if pattern = expr` 和 `while pattern = expr` 使用第 15 节的 pattern 系统：
 
 ```zn
-if val Some(value) = maybe {
+if Some(value) = maybe {
     use(value);
 }
 
-while val move Some(item) = iterator.next() {
+while move Some(item) = iterator.next() {
     consume(move item);
 }
 ```
 
-- `if val pattern = expr` 在 pattern 匹配时执行 then 分支，不匹配时跳过或进入 `else`。
-- `while val pattern = expr` 每次循环先求值并匹配，匹配时进入循环体，不匹配时结束循环。
-- `if val move pattern = expr` 和 `while val move pattern = expr` 消耗匹配值。
-- `if val mut pattern = place` 和 `while val mut pattern = place` 要求右侧是可写位置，并给 payload 提供唯一可写访问。
-- `val pattern = expr` 只允许不可失败 pattern；可能失败的 pattern 必须写 `match`、`if val` 或 `while val`。
+- `if pattern = expr` 在 pattern 匹配时执行 then 分支，不匹配时跳过或进入 `else`。
+- `while pattern = expr` 每次循环先求值并匹配，匹配时进入循环体，不匹配时结束循环。
+- `if move pattern = expr` 和 `while move pattern = expr` 消耗匹配值。
+- `if mut pattern = place` 和 `while mut pattern = place` 要求右侧是可写位置，并给 payload 提供唯一可写访问。
+- `val pattern = expr` 只允许不可失败 pattern；可能失败的 pattern 必须写 `match`、`if pattern = expr` 或 `while pattern = expr`。
 
 循环：
 
@@ -1149,11 +1149,11 @@ fn unwrapOr<T: Copy>(value: Option<T>, fallback: T) -> T {
 Zeno 的 pattern 系统用于：
 
 - `match expr { ... }`
-- `if val pattern = expr { ... }`
-- `while val pattern = expr { ... }`
+- `if pattern = expr { ... }`
+- `while pattern = expr { ... }`
 - `val pattern = expr`，仅限不可失败 pattern
 
-`match` 必须穷尽，除非存在通配分支。`match`、`if val` 和 `while val` 的接收模式决定被匹配值内部绑定的所有权：
+`match` 必须穷尽，除非存在通配分支。`match`、`if pattern = expr` 和 `while pattern = expr` 的接收模式决定被匹配值内部绑定的所有权：
 
 ```zn
 match result {
@@ -1177,7 +1177,7 @@ match mut state {
 - `match value` 默认只读匹配。非 `Copy` payload 绑定是短期只读访问，不能被 `move`、返回、保存到字段、集合、逃逸闭包、线程、任务或 async future。
 - `match move value` 消耗整个 enum。被选中分支的 payload 绑定是拥有值，可以进入函数、返回值或新 owner 中。匹配后原 enum 不可再用。
 - `match mut value` 对 enum 做唯一可写匹配。payload 绑定是短期唯一可写访问，可以修改 payload 字段或传给 `mut` 参数，但不能移动出 payload。
-- `if val` 和 `while val` 支持相同模式：`if val move Some(x) = value`、`if val mut Ready(job) = state`。
+- `if` pattern 和 `while` pattern 支持相同模式：`if move Some(x) = value`、`if mut Ready(job) = state`。
 - `val pattern = expr` 没有 `move` / `mut` 前缀；它根据右侧表达式的普通所有权规则初始化绑定。右侧是命名非 `Copy` 值并需要所有权时会自动移动。
 - `Copy` payload 在只读 `match` 中可以复制。
 - `_` 只丢弃当前模式位置，不绑定值；它不会绕过 exhaustiveness 检查之外的所有权规则。
@@ -1250,7 +1250,7 @@ val (left, right) = pair;         // ok
 val Some(value) = maybe;          // error: refutable pattern in val
 ```
 
-不可失败 pattern 包括单个绑定、通配、tuple 的不可失败子 pattern、struct 的字段 pattern，以及对当前类型唯一可能 variant 的 pattern。普通多 variant enum 的 variant pattern 是可失败 pattern，必须写 `match`、`if val` 或 `while val`。
+不可失败 pattern 包括单个绑定、通配、tuple 的不可失败子 pattern、struct 的字段 pattern，以及对当前类型唯一可能 variant 的 pattern。普通多 variant enum 的 variant pattern 是可失败 pattern，必须写 `match`、`if pattern = expr` 或 `while pattern = expr`。
 
 穷尽和不可达：
 

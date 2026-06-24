@@ -15,6 +15,7 @@
 #include <string_view>
 #include <system_error>
 #include <vector>
+#include <sys/wait.h>
 
 #ifndef ZENO_LLVM_VERSION
 #define ZENO_LLVM_VERSION "unavailable"
@@ -85,10 +86,13 @@ struct Metadata {
   std::string target;
   std::string buildArtifact;
   std::string artifactEmit;
+  std::string runExitCode;
   std::vector<std::string> zmetaContains;
   std::vector<std::string> zmetaForbid;
   std::vector<std::string> emitContains;
   std::vector<std::string> emitForbid;
+  std::vector<std::string> objectContains;
+  std::vector<std::string> objectForbid;
 };
 
 struct TestCase {
@@ -421,10 +425,13 @@ Metadata readMetadataFromText(const std::string &text, const fs::path &path) {
       if (key == "target") metadata.target = value;
       if (key == "build-artifact") metadata.buildArtifact = value;
       if (key == "artifact-emit") metadata.artifactEmit = value;
+      if (key == "run-exit-code") metadata.runExitCode = value;
       if (key == "zmeta-contains") metadata.zmetaContains.push_back(value);
       if (key == "zmeta-forbid") metadata.zmetaForbid.push_back(value);
       if (key == "emit-contains") metadata.emitContains.push_back(value);
       if (key == "emit-forbid") metadata.emitForbid.push_back(value);
+      if (key == "object-contains") metadata.objectContains.push_back(value);
+      if (key == "object-forbid") metadata.objectForbid.push_back(value);
     } else if (structuredTomlMetadata) {
       if (auto match = matchRegex(line, sectionPattern)) {
         section = (*match)[1];
@@ -441,10 +448,13 @@ Metadata readMetadataFromText(const std::string &text, const fs::path &path) {
       if (key == "target") metadata.target = value;
       if (key == "build-artifact") metadata.buildArtifact = value;
       if (key == "artifact-emit") metadata.artifactEmit = value;
+      if (key == "run-exit-code") metadata.runExitCode = value;
       if (key == "zmeta-contains") metadata.zmetaContains.push_back(value);
       if (key == "zmeta-forbid") metadata.zmetaForbid.push_back(value);
       if (key == "emit-contains") metadata.emitContains.push_back(value);
       if (key == "emit-forbid") metadata.emitForbid.push_back(value);
+      if (key == "object-contains") metadata.objectContains.push_back(value);
+      if (key == "object-forbid") metadata.objectForbid.push_back(value);
       if (section == "target" && key == "profile") metadata.profile = value;
       if (section == "target" && key == "triple") metadata.target = value;
     }
@@ -677,6 +687,28 @@ std::optional<std::string> parenthesizedContentAt(const std::string &text, std::
   return std::nullopt;
 }
 
+std::optional<std::string> bracedContentAt(const std::string &text, std::size_t openIndex) {
+  if (openIndex >= text.size() || text[openIndex] != '{') return std::nullopt;
+  bool inString = false;
+  int depth = 0;
+  for (std::size_t i = openIndex; i < text.size(); ++i) {
+    const char c = text[i];
+    if (c == '"' && (i == 0 || text[i - 1] != '\\')) {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c == '{') ++depth;
+    if (c == '}') {
+      --depth;
+      if (depth == 0) {
+        return text.substr(openIndex + 1, i - openIndex - 1);
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 std::string normalizeSignatureType(std::string type) {
   type = trim(type);
   if (startsWith(type, "mut ")) type = trim(type.substr(4));
@@ -891,12 +923,12 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
   std::set<std::string> allocatingReachableFunctions;
   std::map<std::string, int> exportedSymbols;
 
-  const std::regex fnPattern(R"(^\s*(?:pub\s+|private\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(?:<[^>]+>)?\s*\(([^)]*)\))");
-  const std::regex topFnPattern(R"(^\s*(pub\s+|private\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?))?)");
-  const std::regex externPattern(R"(^\s*(trust\s+)?extern\s+"C"\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?))?)");
+  const std::regex fnPattern(R"(^\s*(?:pub\s+|private\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(?:<[^()]*>)?\s*\(([^)]*)\))");
+  const std::regex topFnPattern(R"(^\s*(pub\s+|private\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))?)");
+  const std::regex externPattern(R"(^\s*(trust\s+)?extern\s+"C"\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))?)");
   const std::regex structDeclPattern(R"(^\s*(?:pub\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*))");
-  const std::regex enumDeclPattern(R"(^\s*(?:pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*)(?:<[^>]+>)?)");
-  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(\()?[,)]?)");
+  const std::regex enumDeclPattern(R"(^\s*(?:pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*)(?:<[^()]*>)?)");
+  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|\{|,|$))");
   const std::regex valPattern(R"(^\s*val\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+))?\s*=\s*(.+);)");
   const std::regex valTuplePattern(R"(^\s*val\s*\(([^)]*)\)\s*=\s*(.+);)");
   const std::regex valStartPattern(R"(^\s*val\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+))?\s*=)");
@@ -918,7 +950,7 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
   const std::regex staticDeclPattern(R"(^\s*static\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*([^=;]+))");
   const std::regex topLevelValueDeclPattern(R"(^\s*(?:const|static)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:)");
   const std::regex topLevelExecutablePattern(R"(^\s*(?:(?:val|var|return|if|while|for|match|try)\b|trust\s*\{|[A-Za-z_][A-Za-z0-9_]*\s*[=(]))");
-  const std::regex implPattern(R"(^\s*impl(?:<[^>]+>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{)");
+  const std::regex implPattern(R"(^\s*impl(?:<[^()]*>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{)");
   const std::regex traitImplPattern(R"(^\s*(trust\s+)?impl\s+([A-Za-z_][A-Za-z0-9_]*)\s+for\s+([A-Za-z_][A-Za-z0-9_]*))");
   const std::regex genericTraitImplPattern(R"(^\s*impl\s+([A-Za-z_][A-Za-z0-9_]*)<([^>]+)>\s+for\s+([A-Za-z_][A-Za-z0-9_]*))");
 
@@ -1084,6 +1116,11 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
   int trackedFunctionBraceDepth = 0;
   int trackedFunctionStartLine = 0;
   bool trackedFunctionLastTopLevelTerminal = false;
+  bool trackedTopLevelIfActive = false;
+  int trackedTopLevelIfBraceDepth = 0;
+  bool trackedTopLevelIfThenReturns = false;
+  bool trackedTopLevelIfElseSeen = false;
+  bool trackedTopLevelIfElseReturns = false;
   bool inClosureLiteral = false;
   std::string currentClosureName;
   int closureBraceDepth = 0;
@@ -1724,7 +1761,7 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
     };
     auto checkConditionType = [&](const std::string &kind, const std::string &condition) {
       const std::string expr = trim(condition);
-      if (startsWith(expr, "val ")) return;
+      if (matchRegex(expr, std::regex(R"(^(?:(?:move|mut)\s+)?[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\([^)]*\)\s*=\s*.+$)"))) return;
       const auto exprType = simpleExpressionType(expr);
       if (!exprType) {
         checkComparisonExpression(expr);
@@ -1907,7 +1944,7 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
       currentEnum = (*enumDecl)[1];
       enumVariants[currentEnum];
       enumBraceDepth = 0;
-    } else if (inEnum && !contains(trimmed, "}")) {
+    } else if (inEnum && trimmed != "}") {
       if (auto variant = matchRegex(trimmed, enumVariantPattern)) {
         const std::string variantName = (*variant)[1];
         EnumVariantShape shape;
@@ -1918,6 +1955,11 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
           if (afterName < trimmed.size() && trimmed[afterName] == '(') {
             shape.hasPayload = true;
             if (const auto payload = parenthesizedContentAt(trimmed, afterName)) {
+              shape.payloadArity = splitArguments(*payload).size();
+            }
+          } else if (afterName < trimmed.size() && trimmed[afterName] == '{') {
+            shape.hasPayload = true;
+            if (const auto payload = bracedContentAt(trimmed, afterName)) {
               shape.payloadArity = splitArguments(*payload).size();
             }
           }
@@ -1983,6 +2025,11 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
           trackedFunctionReturnType = currentReturnType;
           trackedFunctionBraceDepth = 0;
           trackedFunctionStartLine = lineNo;
+          trackedTopLevelIfActive = false;
+          trackedTopLevelIfBraceDepth = 0;
+          trackedTopLevelIfThenReturns = false;
+          trackedTopLevelIfElseSeen = false;
+          trackedTopLevelIfElseReturns = false;
           const auto open = trimmed.find('{');
           const std::string bodyStart = open == std::string::npos ? "" : trim(std::string_view(trimmed).substr(open + 1));
           trackedFunctionLastTopLevelTerminal = startsWith(bodyStart, "return ") ||
@@ -2167,8 +2214,8 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
          it != std::sregex_iterator(); ++it) {
       constGenericValueNames.insert((*it)[1]);
     }
-    const std::regex valPatternBindingPattern(R"(^\s*(?:if|while)\s+val\s+(?:move\s+|mut\s+)?[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\))");
-    if (auto binding = matchRegex(trimmed, valPatternBindingPattern)) {
+    const std::regex patternBindingPattern(R"(^\s*(?:(?:if\s+)|(?:while\s+))(?:move\s+|mut\s+)?[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*=)");
+    if (auto binding = matchRegex(trimmed, patternBindingPattern)) {
       variableTypes[(*binding)[1]] = "Unknown";
     }
     if (auto forItem = matchRegex(trimmed, forItemPattern)) {
@@ -2278,7 +2325,7 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
       add("E0301", "try on Option in Result function requires explicit okOr or okOrElse");
     }
     if (std::regex_search(trimmed, std::regex(R"(^\s*val\s+(?:move\s+|mut\s+)?[A-Z][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\([^)]*\)\s*=)"))) {
-      add("E0507", "refutable pattern is not allowed in val; use match or if val");
+      add("E0507", "refutable pattern is not allowed in val; use match or if Pattern = value");
     }
     if (freestandingProfile && contains(trimmed, ".withCapacity(") && !contains(trimmed, ".withCapacityIn(")) {
       add("E1002", "no profile default allocator is available; use withCapacityIn");
@@ -2838,11 +2885,12 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
       std::size_t after = static_cast<std::size_t>(it->position() + it->length());
       while (after < trimmed.size() && std::isspace(static_cast<unsigned char>(trimmed[after]))) ++after;
       const bool hasCallPayload = after < trimmed.size() && trimmed[after] == '(';
-      if (!shape.hasPayload && hasCallPayload) {
+      const bool hasRecordPayload = after < trimmed.size() && trimmed[after] == '{';
+      if (!shape.hasPayload && (hasCallPayload || hasRecordPayload)) {
         add("E0201", "variant " + variantName + " does not take payload values");
         continue;
       }
-      if (shape.hasPayload && !hasCallPayload) {
+      if (shape.hasPayload && !hasCallPayload && !hasRecordPayload) {
         std::size_t before = static_cast<std::size_t>(it->position());
         while (before > 0 && std::isspace(static_cast<unsigned char>(trimmed[before - 1]))) --before;
         const char previous = before > 0 ? trimmed[before - 1] : '\0';
@@ -2859,6 +2907,14 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
           if (actualArity != shape.payloadArity) {
             add("E0201", "variant " + variantName + " expects " + std::to_string(shape.payloadArity) +
                              " payload value but got " + std::to_string(actualArity));
+          }
+        }
+      } else if (shape.hasPayload && hasRecordPayload) {
+        if (const auto payload = bracedContentAt(trimmed, after)) {
+          const auto actualArity = splitArguments(*payload).size();
+          if (actualArity != shape.payloadArity) {
+            add("E0201", "variant " + variantName + " expects " + std::to_string(shape.payloadArity) +
+                             " payload field but got " + std::to_string(actualArity));
           }
         }
       }
@@ -3374,10 +3430,37 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
       }
     }
     if (!trackedFunctionName.empty()) {
+      if (trackedTopLevelIfActive) {
+        if (trackedTopLevelIfBraceDepth == 1 && startsWith(trimmed, "return ")) {
+          if (trackedTopLevelIfElseSeen) trackedTopLevelIfElseReturns = true;
+          else trackedTopLevelIfThenReturns = true;
+        }
+        if (trackedTopLevelIfBraceDepth == 1 && trimmed == "} else {") {
+          trackedTopLevelIfElseSeen = true;
+        }
+        trackedTopLevelIfBraceDepth += braceDelta(line);
+        if (trackedTopLevelIfBraceDepth <= 0) {
+          trackedFunctionLastTopLevelTerminal = trackedTopLevelIfThenReturns &&
+                                                trackedTopLevelIfElseSeen &&
+                                                trackedTopLevelIfElseReturns;
+          trackedTopLevelIfActive = false;
+          trackedTopLevelIfBraceDepth = 0;
+          trackedTopLevelIfThenReturns = false;
+          trackedTopLevelIfElseSeen = false;
+          trackedTopLevelIfElseReturns = false;
+        }
+      }
       if (lineNo != trackedFunctionStartLine && trackedFunctionBraceDepth == 1) {
         if (startsWith(trimmed, "return ") || startsWith(trimmed, "panic(") || startsWith(trimmed, "oom(")) {
           trackedFunctionLastTopLevelTerminal = true;
-        } else if (startsWith(trimmed, "match ") || startsWith(trimmed, "if val ")) {
+        } else if (startsWith(trimmed, "if ") && contains(trimmed, "{")) {
+          trackedTopLevelIfActive = true;
+          trackedTopLevelIfBraceDepth = braceDelta(line);
+          trackedTopLevelIfThenReturns = false;
+          trackedTopLevelIfElseSeen = false;
+          trackedTopLevelIfElseReturns = false;
+          trackedFunctionLastTopLevelTerminal = false;
+        } else if (startsWith(trimmed, "match ")) {
           trackedFunctionLastTopLevelTerminal = true;
         } else if (trackedFunctionLastTopLevelTerminal &&
                    (startsWith(trimmed, "+") || startsWith(trimmed, "-") ||
@@ -3398,6 +3481,11 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
         trackedFunctionBraceDepth = 0;
         trackedFunctionStartLine = 0;
         trackedFunctionLastTopLevelTerminal = false;
+        trackedTopLevelIfActive = false;
+        trackedTopLevelIfBraceDepth = 0;
+        trackedTopLevelIfThenReturns = false;
+        trackedTopLevelIfElseSeen = false;
+        trackedTopLevelIfElseReturns = false;
       }
     }
     if (inStruct) {
@@ -3964,17 +4052,100 @@ std::string expressionAstFact(std::string expr) {
   expr = trim(expr);
   if (!expr.empty() && expr.back() == ';') expr.pop_back();
   expr = trim(expr);
+  auto topLevelBinaryOperator = [](const std::string &text) -> std::optional<char> {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    bool inString = false;
+    for (std::size_t offset = text.size(); offset > 0; --offset) {
+      const std::size_t i = offset - 1;
+      const char c = text[i];
+      if (c == '"' && (i == 0 || text[i - 1] != '\\')) {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (c == ')') {
+        ++parenDepth;
+        continue;
+      }
+      if (c == '(') {
+        --parenDepth;
+        continue;
+      }
+      if (c == '}') {
+        ++braceDepth;
+        continue;
+      }
+      if (c == '{') {
+        --braceDepth;
+        continue;
+      }
+      if (parenDepth != 0 || braceDepth != 0) continue;
+      if (std::string("+-*/").find(c) == std::string::npos) continue;
+      if (i == 0 || i + 1 >= text.size()) continue;
+      const std::string left = trim(std::string_view(text).substr(0, i));
+      const std::string right = trim(std::string_view(text).substr(i + 1));
+      if (left.empty() || right.empty()) continue;
+      const char previous = left.back();
+      if ((c == '+' || c == '-') &&
+          (previous == '+' || previous == '-' || previous == '*' || previous == '/' ||
+           previous == '(' || previous == '{')) {
+        continue;
+      }
+      return c;
+    }
+    return std::nullopt;
+  };
   if (expr.empty()) return "unit";
+  if (expr == "()") return "unit";
+  if (startsWith(expr, "async ")) return "async-block";
+  if (startsWith(expr, "await ")) return "await:" + expressionAstFact(expr.substr(6));
   if (startsWith(expr, "trust")) return "trust-block";
+  if (matchRegex(expr, std::regex(R"(^\s*move\s+\([^)]*\)\s*(?:->\s*[^={]+?)?\s*(?:\{|=>))"))) return "closure:move";
+  if (matchRegex(expr, std::regex(R"(^\s*\([^)]*\)\s*->\s*[^={]+?\s*\{)"))) return "closure:block";
+  if (startsWith(expr, "move ")) return "move:" + expressionAstFact(expr.substr(5));
+  if (startsWith(expr, "mut ")) return "mut:" + expressionAstFact(expr.substr(4));
+  if (startsWith(expr, "try ")) return "try:" + expressionAstFact(expr.substr(4));
+  if (startsWith(expr, "match move ")) return "match:move";
+  if (startsWith(expr, "match mut ")) return "match:mut";
+  if (startsWith(expr, "match ")) return "match";
   if (expr == "true" || expr == "false") return "bool-literal:" + expr;
   if (expr.size() >= 2 && expr.front() == '"' && expr.back() == '"') return "string-literal";
+  if (expr.size() >= 3 && expr.front() == '\'' && expr.back() == '\'') return "char-literal";
   if (std::regex_match(expr, std::regex(R"([0-9]+\.[0-9]+)"))) return "float-literal:" + expr;
   if (std::regex_match(expr, std::regex(R"([0-9]+)"))) return "int-literal:" + expr;
+  if (auto cast = matchRegex(expr, std::regex(R"(^(.+)\s+as\s+(.+)$)"))) {
+    return "cast:" + trim(std::string((*cast)[2]));
+  }
+  if (auto tuple = matchRegex(expr, std::regex(R"(^\((.+,.+)\)$)"))) {
+    return "tuple";
+  }
+  if (contains(expr, "=>") ||
+      matchRegex(expr, std::regex(R"(^\s*(move\s+)?\([^)]*\)\s*(?:->\s*[A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)?\s*\{)"))) {
+    return "closure";
+  }
+  if (auto literal = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\s*\{)"))) {
+    return "struct-literal:" + std::string((*literal)[1]);
+  }
+  if (auto typeStatic = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*(?:<[^>]+>)?)\.([A-Za-z_][A-Za-z0-9_]*)\s*\()"))) {
+    return "type-static-call:" + std::string((*typeStatic)[1]) + "." + std::string((*typeStatic)[2]);
+  }
+  if (auto comparison = matchRegex(expr, std::regex(R"(^(.+)\s*(>=|<=|==|!=|>|<)\s*(.+)$)"))) {
+    return "compare:" + std::string((*comparison)[2]);
+  }
+  if (auto index = matchRegex(expr, std::regex(R"(^(.+)\[.+\]$)"))) {
+    return "index:" + trim(std::string((*index)[1]));
+  }
+  if (contains(expr, "..=")) return "range:closed";
+  if (contains(expr, "..")) return "range:half-open";
+  if (auto binary = topLevelBinaryOperator(expr)) {
+    return std::string("binary:") + *binary;
+  }
+  if (auto methodCall = matchRegex(expr, std::regex(R"(^(.+)\.([A-Za-z_][A-Za-z0-9_]*)\s*\()"))) {
+    return "method-call:" + std::string((*methodCall)[2]);
+  }
   if (auto call = matchRegex(expr, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\s*\()"))) {
     return "call:" + std::string((*call)[1]);
-  }
-  if (auto binary = matchRegex(expr, std::regex(R"(^(.+)\s*([+*/-])\s*(.+)$)"))) {
-    return "binary:" + std::string((*binary)[2]);
   }
   if (contains(expr, ".")) return "field:" + expr;
   if (std::regex_match(expr, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) return "name:" + expr;
@@ -3988,15 +4159,33 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
   const std::regex modulePattern(R"(^\s*module\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;)");
   const std::regex importPattern(R"(^\s*import\s+([^;]+)\s*;)");
   const std::regex attrPattern(R"(^\s*(@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?))");
-  const std::regex declPattern(R"(^\s*(pub\s+|private\s+)?(struct|enum|interface)\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?)");
-  const std::regex fnPattern(R"(^\s*(pub\s+|private\s+)?(async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?))?)");
-  const std::regex externPattern(R"re(^\s*(trust\s+)?extern\s+"([^"]+)"\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?))?)re");
-  const std::regex traitImplPattern(R"(^\s*(trust\s+)?impl(?:<[^>]+>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)\s+for\s+([A-Za-z_][A-Za-z0-9_]*))");
-  const std::regex inherentImplPattern(R"(^\s*impl(?:<[^>]+>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)\s*\{)");
+  const std::regex constStaticPattern(R"(^\s*(pub\s+|private\s+)?(const|static)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*(?:=\s*(.+?))?\s*;?\s*$)");
+  const std::regex typeAliasPattern(R"(^\s*(pub\s+|private\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*=\s*([^;]+)\s*;?\s*$)");
+  const std::regex declPattern(R"(^\s*(pub\s+|private\s+)?(struct|enum|interface)\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?)");
+  const std::regex fnPattern(R"(^\s*(pub\s+|private\s+)?(async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([^{;]+?))?\s*(?:\{|;|$))");
+  const std::regex externPattern(R"re(^\s*(trust\s+)?extern\s+"([^"]+)"\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))?)re");
+  const std::regex traitImplPattern(R"(^\s*(trust\s+)?impl(<[^()]*>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?)\s+for\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))");
+  const std::regex inherentImplPattern(R"(^\s*impl(<[^()]*>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?)\s*\{)");
   const std::regex enumPattern(R"(^\s*(pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*))");
-  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|,|$))");
+  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s*(\([^)]*\)|\{.*\}))?\s*,?\s*$)");
+  const std::regex fieldPattern(R"(^\s*(pub\s+|private\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^,]+)\s*,?\s*$)");
+  const std::regex destroyPattern(R"(^\s*destroy\s*\{)");
   const std::regex returnPattern(R"(^\s*return\s+(.+)\s*$)");
+  const std::regex localConstPattern(R"(^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex patternBindingPattern(R"(^\s*(val|var)\s+(.+?)\s*=\s*(.+?)\s*;?\s*$)");
   const std::regex bindingPattern(R"(^\s*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex assignmentPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex breakPattern(R"(^\s*break(?:\s+(.+?))?\s*;?\s*$)");
+  const std::regex continuePattern(R"(^\s*continue\s*;?\s*$)");
+  const std::regex ifPattern(R"(^\s*if\s+(.+?)\s*\{\s*$)");
+  const std::regex ifPatternBindingPattern(R"(^\s*if\s+(?:(move|mut)\s+)?([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\([^)]*\))\s*=\s*(.+?)\s*\{\s*$)");
+  const std::regex elsePattern(R"(^\s*\}?\s*else\s*\{\s*$)");
+  const std::regex whilePattern(R"(^\s*while\s+(.+?)\s*\{\s*$)");
+  const std::regex whilePatternBindingPattern(R"(^\s*while\s+(?:(move|mut)\s+)?([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\([^)]*\))\s*=\s*(.+?)\s*\{\s*$)");
+  const std::regex forPattern(R"(^\s*for\s+(move\s+|mut\s+)?(.+?)\s+in\s+(mut\s+)?(.+?)\s*\{\s*$)");
+  const std::regex matchPattern(R"(^\s*match\s+(?:(move|mut)\s+)?(.+?)\s*\{\s*$)");
+  const std::regex matchArmPattern(R"(^\s*(.+?)(?:\s+if\s+(.+?))?\s*=>\s*(.+?)[,;]?\s*$)");
+  const std::regex tryStatementPattern(R"(^\s*try\s+(.+?)\s*;?\s*$)");
   const std::regex callStatementPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*;?\s*$)");
 
   auto addNode = [&](const fs::path &file,
@@ -4037,6 +4226,8 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
     std::string enumVisibility;
     std::vector<std::string> pendingAttributes;
     std::string pendingLayout;
+    std::string activeContainerKind;
+    std::string activeContainerName;
     std::string activeFunction;
     std::string activeFunctionReturnType;
     int lineNo = 1;
@@ -4055,9 +4246,51 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
           else if (contains(attribute, "@layout(Source)")) pendingLayout = "Source";
           else if (contains(attribute, "@layout(Packed")) pendingLayout = "Packed";
           addNode(file, moduleName, "attribute", attribute, "", lineNo);
+        } else if (auto item = matchRegex(trimmed, constStaticPattern)) {
+          const std::string kind = "decl." + std::string((*item)[2]);
+          addNode(file,
+                  moduleName,
+                  kind,
+                  (*item)[3],
+                  (*item)[1],
+                  lineNo,
+                  pendingAttributes,
+                  "",
+                  (*item)[5].matched ? expressionAstFact((*item)[5]) : "",
+                  (*item)[4].matched ? trim(std::string((*item)[4])) : "",
+                  pendingLayout.empty() ? "Auto" : pendingLayout);
+          pendingAttributes.clear();
+          pendingLayout.clear();
+        } else if (auto alias = matchRegex(trimmed, typeAliasPattern)) {
+          addNode(file,
+                  moduleName,
+                  "decl.type",
+                  (*alias)[2],
+                  (*alias)[1],
+                  lineNo,
+                  pendingAttributes,
+                  (*alias)[3],
+                  trim(std::string((*alias)[4])),
+                  "",
+                  pendingLayout.empty() ? "Auto" : pendingLayout);
+          pendingAttributes.clear();
+          pendingLayout.clear();
         } else if (auto decl = matchRegex(trimmed, declPattern)) {
           const std::string declKind = "decl." + std::string((*decl)[2]);
-          addNode(file, moduleName, declKind, (*decl)[3], (*decl)[1], lineNo, pendingAttributes, (*decl)[4], "", "", pendingLayout.empty() ? "Auto" : pendingLayout);
+          std::string declParams;
+          std::string declReturn;
+          if (declKind == "decl.interface") {
+            if (auto parents = matchRegex(trimmed, std::regex(R"(^\s*(?:pub\s+|private\s+)?interface\s+[A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?\s*:\s*([^{]+)\s*\{)"))) {
+              declParams = trim(std::string((*parents)[1]));
+            }
+          } else if (declKind == "decl.struct" && contains(trimmed, ": Copy")) {
+            declReturn = "Copy";
+          }
+          addNode(file, moduleName, declKind, (*decl)[3], (*decl)[1], lineNo, pendingAttributes, (*decl)[4], declParams, declReturn, pendingLayout.empty() ? "Auto" : pendingLayout);
+          if (contains(trimmed, "{")) {
+            activeContainerKind = declKind;
+            activeContainerName = (*decl)[3];
+          }
           pendingAttributes.clear();
           pendingLayout.clear();
         } else if (auto fn = matchRegex(trimmed, fnPattern)) {
@@ -4072,7 +4305,7 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                   (*fn)[5],
                   (*fn)[6],
                   pendingLayout.empty() ? "Auto" : pendingLayout);
-          if (contains(trimmed, "{")) {
+          if (contains(trimmed, "{") && !contains(trimmed, "}")) {
             activeFunction = (*fn)[3];
             activeFunctionReturnType = normalizeSignatureType((*fn)[6]);
           }
@@ -4095,22 +4328,31 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
           pendingAttributes.clear();
           pendingLayout.clear();
         } else if (auto impl = matchRegex(trimmed, traitImplPattern)) {
+          const std::string implName = std::string((*impl)[3]) + " for " + std::string((*impl)[4]);
           addNode(file,
                   moduleName,
                   "decl.impl",
-                  std::string((*impl)[2]) + " for " + std::string((*impl)[3]),
+                  implName,
                   "",
                   lineNo,
                   pendingAttributes,
-                  "",
+                  (*impl)[2],
                   "",
                   "",
                   pendingLayout.empty() ? "Auto" : pendingLayout,
                   (*impl)[1].matched);
+          if (contains(trimmed, "{")) {
+            activeContainerKind = "decl.impl";
+            activeContainerName = implName;
+          }
           pendingAttributes.clear();
           pendingLayout.clear();
         } else if (auto impl = matchRegex(trimmed, inherentImplPattern)) {
-          addNode(file, moduleName, "decl.impl", (*impl)[1], "", lineNo, pendingAttributes, "", "", "", pendingLayout.empty() ? "Auto" : pendingLayout);
+          addNode(file, moduleName, "decl.impl", (*impl)[2], "", lineNo, pendingAttributes, (*impl)[1], "", "", pendingLayout.empty() ? "Auto" : pendingLayout);
+          if (contains(trimmed, "{")) {
+            activeContainerKind = "decl.impl";
+            activeContainerName = (*impl)[2];
+          }
           pendingAttributes.clear();
           pendingLayout.clear();
         } else if (!trimmed.empty() && !startsWith(trimmed, "@")) {
@@ -4121,9 +4363,68 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
           inEnum = true;
           enumVisibility = (*enumDecl)[1];
         }
-      } else if (inEnum && !contains(trimmed, "}")) {
+      } else if (inEnum && trimmed != "}") {
         if (auto variant = matchRegex(trimmed, enumVariantPattern)) {
-          addNode(file, moduleName, "decl.variant", (*variant)[1], enumVisibility, lineNo);
+          addNode(file, moduleName, "decl.variant", (*variant)[1], enumVisibility, lineNo, {}, "", (*variant)[2], "");
+        }
+      } else if (!activeContainerKind.empty() && activeFunction.empty()) {
+        if (activeContainerKind == "decl.struct") {
+          if (auto field = matchRegex(trimmed, fieldPattern)) {
+            addNode(file,
+                    moduleName,
+                    "decl.field",
+                    activeContainerName + "." + std::string((*field)[2]),
+                    (*field)[1],
+                    lineNo,
+                    {},
+                    "",
+                    "",
+                    trim(std::string((*field)[3])));
+          }
+        } else if (activeContainerKind == "decl.interface") {
+          if (auto method = matchRegex(trimmed, fnPattern)) {
+            addNode(file,
+                    moduleName,
+                    "decl.interface-method",
+                    activeContainerName + "." + std::string((*method)[3]),
+                    (*method)[1],
+                    lineNo,
+                    {},
+                    (*method)[4],
+                    (*method)[5],
+                    (*method)[6]);
+          }
+        } else if (activeContainerKind == "decl.impl") {
+          if (auto method = matchRegex(trimmed, fnPattern)) {
+            const std::string methodName = activeContainerName + "." + std::string((*method)[3]);
+            addNode(file,
+                    moduleName,
+                    "decl.impl-method",
+                    methodName,
+                    (*method)[1],
+                    lineNo,
+                    {},
+                    (*method)[4],
+                    (*method)[5],
+                    (*method)[6]);
+            if (contains(trimmed, "{") && !contains(trimmed, "}")) {
+              activeFunction = methodName;
+              activeFunctionReturnType = normalizeSignatureType((*method)[6]);
+            }
+          } else if (matchRegex(trimmed, destroyPattern)) {
+            addNode(file, moduleName, "decl.destroy", activeContainerName, "", lineNo);
+          } else if (auto item = matchRegex(trimmed, constStaticPattern)) {
+            addNode(file,
+                    moduleName,
+                    "decl.impl-const",
+                    activeContainerName + "." + std::string((*item)[3]),
+                    "",
+                    lineNo,
+                    {},
+                    "",
+                    (*item)[5].matched ? expressionAstFact((*item)[5]) : "",
+                    (*item)[4].matched ? trim(std::string((*item)[4])) : "");
+          }
         }
       } else if (!activeFunction.empty()) {
         if (auto ret = matchRegex(trimmed, returnPattern)) {
@@ -4137,6 +4438,17 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                   "",
                   expressionAstFact((*ret)[1]),
                   activeFunctionReturnType);
+        } else if (auto localConst = matchRegex(trimmed, localConstPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.const",
+                  activeFunction + "." + std::string((*localConst)[1]),
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact((*localConst)[3]),
+                  (*localConst)[2].matched ? trim(std::string((*localConst)[2])) : "");
         } else if (auto binding = matchRegex(trimmed, bindingPattern)) {
           const std::string bindingMode = (*binding)[1];
           const std::string bindingName = (*binding)[2];
@@ -4150,6 +4462,154 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                   "",
                   expressionAstFact((*binding)[4]),
                   (*binding)[3].matched ? trim(std::string((*binding)[3])) : "");
+        } else if (auto patternBinding = matchRegex(trimmed, patternBindingPattern)) {
+          const std::string bindingMode = (*patternBinding)[1];
+          const std::string pattern = trim(std::string((*patternBinding)[2]));
+          if (!std::regex_match(pattern, std::regex(R"([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*[^=;]+)?)"))) {
+            addNode(file,
+                    moduleName,
+                    "stmt.pattern-" + bindingMode,
+                    activeFunction + "." + pattern,
+                    "",
+                    lineNo,
+                    {},
+                    "",
+                    expressionAstFact((*patternBinding)[3]),
+                    pattern);
+          }
+        } else if (auto arm = matchRegex(trimmed, matchArmPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.match-arm",
+                  activeFunction + "." + trim(std::string((*arm)[1])),
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact((*arm)[3]),
+                  (*arm)[2].matched ? expressionAstFact((*arm)[2]) : "");
+        } else if (auto assignment = matchRegex(trimmed, assignmentPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.assign",
+                  activeFunction + "." + std::string((*assignment)[1]),
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact((*assignment)[2]),
+                  "");
+        } else if (auto branch = matchRegex(trimmed, ifPatternBindingPattern)) {
+          const std::string patternMode = (*branch)[1].matched ? trim(std::string((*branch)[1])) : "";
+          const std::string pattern = trim(std::string((*branch)[2]));
+          addNode(file,
+                  moduleName,
+                  "stmt.if-pattern",
+                  activeFunction + "." + pattern,
+                  "",
+                  lineNo,
+                  {},
+                  patternMode,
+                  expressionAstFact((*branch)[3]),
+                  pattern);
+        } else if (auto branch = matchRegex(trimmed, ifPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.if",
+                  activeFunction,
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact((*branch)[1]),
+                  "");
+        } else if (matchRegex(trimmed, elsePattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.else",
+                  activeFunction,
+                  "",
+                  lineNo);
+        } else if (auto loop = matchRegex(trimmed, whilePatternBindingPattern)) {
+          const std::string patternMode = (*loop)[1].matched ? trim(std::string((*loop)[1])) : "";
+          const std::string pattern = trim(std::string((*loop)[2]));
+          addNode(file,
+                  moduleName,
+                  "stmt.while-pattern",
+                  activeFunction + "." + pattern,
+                  "",
+                  lineNo,
+                  {},
+                  patternMode,
+                  expressionAstFact((*loop)[3]),
+                  pattern);
+        } else if (auto loop = matchRegex(trimmed, whilePattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.while",
+                  activeFunction,
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact((*loop)[1]),
+                  "");
+        } else if (auto loop = matchRegex(trimmed, forPattern)) {
+          std::string mode = trim(std::string((*loop)[1]));
+          if (mode.empty()) mode = "read";
+          std::string iterable = trim(std::string((*loop)[4]));
+          if ((*loop)[3].matched) iterable = "mut " + iterable;
+          addNode(file,
+                  moduleName,
+                  "stmt.for",
+                  activeFunction + "." + trim(std::string((*loop)[2])),
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact(iterable),
+                  mode);
+        } else if (auto matchStmt = matchRegex(trimmed, matchPattern)) {
+          const std::string matchMode = (*matchStmt)[1].matched ? trim(std::string((*matchStmt)[1])) : "";
+          addNode(file,
+                  moduleName,
+                  "stmt.match",
+                  activeFunction,
+                  "",
+                  lineNo,
+                  {},
+                  matchMode,
+                  expressionAstFact((*matchStmt)[2]),
+                  "");
+        } else if (auto tryStmt = matchRegex(trimmed, tryStatementPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.try",
+                  activeFunction,
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  expressionAstFact("try " + std::string((*tryStmt)[1])),
+                  "");
+        } else if (auto breakStmt = matchRegex(trimmed, breakPattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.break",
+                  activeFunction,
+                  "",
+                  lineNo,
+                  {},
+                  "",
+                  (*breakStmt)[1].matched ? expressionAstFact((*breakStmt)[1]) : "unit",
+                  "");
+        } else if (matchRegex(trimmed, continuePattern)) {
+          addNode(file,
+                  moduleName,
+                  "stmt.continue",
+                  activeFunction,
+                  "",
+                  lineNo);
         } else if (matchRegex(trimmed, callStatementPattern)) {
           addNode(file,
                   moduleName,
@@ -4167,10 +4627,16 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
         addNode(file, moduleName, "expr.trust", "block", "", lineNo);
       }
       braceDepth += braceDelta(line);
+      if (!activeContainerKind.empty() && !activeFunction.empty() && braceDepth <= 1) {
+        activeFunction.clear();
+        activeFunctionReturnType.clear();
+      }
       if (braceDepth <= 0) {
         braceDepth = 0;
         inEnum = false;
         enumVisibility.clear();
+        activeContainerKind.clear();
+        activeContainerName.clear();
         activeFunction.clear();
         activeFunctionReturnType.clear();
       }
@@ -4423,10 +4889,11 @@ std::vector<Diagnostic> typeNameResolutionDiagnostics(const fs::path &root, cons
   const auto locals = localTypeNames(root, package);
   packageTypes.insert(locals.begin(), locals.end());
 
-  const std::regex structPattern(R"(^\s*(?:pub\s+|private\s+)?struct\s+[A-Za-z_][A-Za-z0-9_]*(<[^>]+>)?)");
-  const std::regex fnPattern(R"(^\s*(?:pub\s+|private\s+)?(?:async\s+)?fn\s+[A-Za-z_][A-Za-z0-9_]*(<[^>]+>)?\s*\(([^)]*)\)\s*(?:->\s*([^;{]+))?)");
+  const std::regex structPattern(R"(^\s*(?:pub\s+|private\s+)?struct\s+[A-Za-z_][A-Za-z0-9_]*(<[^()]*>)?)");
+  const std::regex interfacePattern(R"(^\s*(?:pub\s+|private\s+)?interface\s+[A-Za-z_][A-Za-z0-9_]*(<[^()]*>)?)");
+  const std::regex fnPattern(R"(^\s*(?:pub\s+|private\s+)?(?:async\s+)?fn\s+[A-Za-z_][A-Za-z0-9_]*(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([^;{]+))?)");
   const std::regex fieldPattern(R"(^\s*(?:pub\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([^,;=]+))");
-  const std::regex implPattern(R"(^\s*(?:trust\s+)?impl\s*(<[^>]+>)?\s+)");
+  const std::regex implPattern(R"(^\s*(?:trust\s+)?impl\s*(<[^()]*>)?\s+)");
 
   for (const auto &file : packageSources(root / "src")) {
     if (file.extension() != ".zn") continue;
@@ -4435,10 +4902,13 @@ std::vector<Diagnostic> typeNameResolutionDiagnostics(const fs::path &root, cons
     const auto imports = importedTypeNames(source, package);
     visibleTypes.insert(imports.begin(), imports.end());
     std::set<std::string> activeStructGenerics;
+    std::set<std::string> activeInterfaceGenerics;
     std::set<std::string> activeImplGenerics;
     bool inStruct = false;
+    bool inInterface = false;
     bool inImpl = false;
     int structBraceDepth = 0;
+    int interfaceBraceDepth = 0;
     int implBraceDepth = 0;
     int lineNo = 1;
     for (const auto &rawLine : splitLines(source.text)) {
@@ -4452,6 +4922,7 @@ std::vector<Diagnostic> typeNameResolutionDiagnostics(const fs::path &root, cons
       if (auto fn = matchRegex(trimmed, fnPattern)) {
         std::set<std::string> fnGenerics = genericParameterNames((*fn)[1]);
         fnGenerics.insert(activeImplGenerics.begin(), activeImplGenerics.end());
+        fnGenerics.insert(activeInterfaceGenerics.begin(), activeInterfaceGenerics.end());
         for (const auto &paramType : parameterTypes((*fn)[2])) {
           validateTypeNameUse(source, lineNo, paramType, visibleTypes, fnGenerics, diagnostics);
         }
@@ -4463,6 +4934,10 @@ std::vector<Diagnostic> typeNameResolutionDiagnostics(const fs::path &root, cons
         inStruct = true;
         structBraceDepth = 0;
         activeStructGenerics = genericParameterNames((*structDecl)[1]);
+      } else if (auto interfaceDecl = matchRegex(trimmed, interfacePattern)) {
+        inInterface = true;
+        interfaceBraceDepth = 0;
+        activeInterfaceGenerics = genericParameterNames((*interfaceDecl)[1]);
       } else if (inStruct) {
         if (auto field = matchRegex(trimmed, fieldPattern)) {
           validateTypeNameUse(source, lineNo, (*field)[1], visibleTypes, activeStructGenerics, diagnostics);
@@ -4473,6 +4948,13 @@ std::vector<Diagnostic> typeNameResolutionDiagnostics(const fs::path &root, cons
         if (structBraceDepth <= 0 && contains(trimmed, "}")) {
           inStruct = false;
           activeStructGenerics.clear();
+        }
+      }
+      if (inInterface) {
+        interfaceBraceDepth += braceDelta(line);
+        if (interfaceBraceDepth <= 0 && contains(trimmed, "}")) {
+          inInterface = false;
+          activeInterfaceGenerics.clear();
         }
       }
       if (inImpl) {
@@ -5404,17 +5886,68 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
         fact += node.attributes[i];
       }
     }
-    if ((node.kind == "stmt.return" || node.kind == "stmt.val" || node.kind == "stmt.var" || node.kind == "stmt.expr") &&
-        !node.params.empty()) {
-      fact += " expr=" + node.params;
-      if (node.kind == "stmt.return") {
-        if (!node.returnType.empty()) fact += " expected=" + node.returnType;
-      } else if (!node.returnType.empty()) {
-        fact += " type=" + node.returnType;
-      }
+    if (!node.generic.empty()) {
+      if (startsWith(node.kind, "stmt.")) fact += " mode=" + node.generic;
+      else fact += " generic=" + node.generic;
     }
     if (node.trusted) fact += " trusted=true";
     if (!node.abi.empty()) fact += " abi=" + node.abi;
+    if (node.kind == "decl.fn" || node.kind == "decl.async-fn" ||
+        node.kind == "decl.extern" || node.kind == "decl.interface-method" ||
+        node.kind == "decl.impl-method") {
+      fact += " params=(" + node.params + ")";
+      if (!node.returnType.empty()) fact += " return=" + node.returnType;
+    } else if (node.kind == "decl.field" && !node.returnType.empty()) {
+      fact += " type=" + node.returnType;
+    } else if (node.kind == "decl.variant" && !node.params.empty()) {
+      fact += " payload=" + node.params;
+    } else if (node.kind == "decl.type" && !node.params.empty()) {
+      fact += " target=" + node.params;
+    } else if (node.kind == "decl.interface" && !node.params.empty()) {
+      fact += " parents=" + node.params;
+    } else if (node.kind == "decl.struct" && !node.returnType.empty()) {
+      fact += " marker=" + node.returnType;
+    }
+    if ((node.kind == "decl.const" || node.kind == "decl.static" ||
+         node.kind == "stmt.return" || node.kind == "stmt.val" || node.kind == "stmt.var" ||
+         node.kind == "stmt.const" || node.kind == "stmt.break" ||
+         node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var" ||
+         node.kind == "stmt.assign" || node.kind == "stmt.if" || node.kind == "stmt.if-pattern" ||
+         node.kind == "stmt.while" || node.kind == "stmt.while-pattern" ||
+         node.kind == "stmt.for" || node.kind == "stmt.match" || node.kind == "stmt.match-arm" ||
+         node.kind == "stmt.try" || node.kind == "stmt.expr") &&
+        !node.params.empty()) {
+      if (node.kind == "stmt.if" || node.kind == "stmt.if-pattern" ||
+          node.kind == "stmt.while" || node.kind == "stmt.while-pattern" ||
+          node.kind == "stmt.match") {
+        fact += " condition=" + node.params;
+      } else if (node.kind == "stmt.for") {
+        fact += " iterable=" + node.params;
+      } else {
+        fact += " expr=" + node.params;
+      }
+      if (node.kind == "stmt.return") {
+        if (!node.returnType.empty()) fact += " expected=" + node.returnType;
+      } else if (node.kind == "stmt.match-arm" && !node.returnType.empty()) {
+        fact += " guard=" + node.returnType;
+      } else if (!node.returnType.empty() &&
+                 node.kind != "stmt.if-pattern" && node.kind != "stmt.while-pattern" &&
+                 node.kind != "stmt.for" &&
+                 node.kind != "stmt.pattern-val" && node.kind != "stmt.pattern-var" &&
+                 node.kind != "stmt.match-arm") {
+        fact += " type=" + node.returnType;
+      }
+      if (node.kind == "stmt.for" && !node.returnType.empty()) {
+        fact += " mode=" + node.returnType;
+      }
+      if ((node.kind == "stmt.if-pattern" || node.kind == "stmt.while-pattern" ||
+           node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var") &&
+          !node.returnType.empty()) {
+        fact += " pattern=" + node.returnType;
+      }
+    } else if ((node.kind == "decl.const" || node.kind == "decl.static") && !node.returnType.empty()) {
+      fact += " type=" + node.returnType;
+    }
     nodes.insert(fact);
   }
   return nodes;
@@ -5424,9 +5957,121 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
                                  const std::vector<ParsedAstNode> &ast,
                                  BuildSummary &summary) {
   (void)package;
+  auto functionNameForNode = [](const ParsedAstNode &node) {
+    if (node.kind == "stmt.val" || node.kind == "stmt.var" || node.kind == "stmt.const" || node.kind == "stmt.assign" ||
+        node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var" ||
+        node.kind == "stmt.for" || node.kind == "stmt.if-pattern" || node.kind == "stmt.while-pattern" ||
+        node.kind == "stmt.match-arm") {
+      const std::size_t dot = node.name.find('.');
+      if (dot != std::string::npos) return node.name.substr(0, dot);
+    }
+    return node.name;
+  };
+  auto localNameForNode = [](const ParsedAstNode &node) {
+    const std::size_t dot = node.name.find('.');
+    if (dot == std::string::npos) return node.name;
+    return node.name.substr(dot + 1);
+  };
   auto emitCallPreview = [&](const std::string &expr, const std::string &functionName) {
     if (startsWith(expr, "call:")) {
       summary.llvmNodes.insert("llvm.call-preview @" + expr.substr(5) + " in @" + functionName);
+    }
+  };
+  auto emitMirExpressionFacts = [&](const std::string &functionName, const std::string &expr, const std::string &span) {
+    if (startsWith(expr, "name:")) {
+      summary.mirNodes.insert("mir.place " + functionName + " %" + expr.substr(5) + " kind=local span=" + span);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=place place=%" + expr.substr(5));
+    } else if (startsWith(expr, "field:")) {
+      summary.mirNodes.insert("mir.place " + functionName + " " + expr.substr(6) + " kind=field span=" + span);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=place place=" + expr.substr(6));
+    } else if (startsWith(expr, "int-literal:") || startsWith(expr, "float-literal:") ||
+               startsWith(expr, "bool-literal:") || expr == "string-literal" || expr == "char-literal") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=const");
+    } else if (startsWith(expr, "call:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=call callee=@" + expr.substr(5));
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=call callee=@" + expr.substr(5));
+    } else if (startsWith(expr, "binary:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=rvalue");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=binary op=" + expr.substr(7));
+      summary.llvmNodes.insert("llvm.binary-preview @" + functionName + " op=" + expr.substr(7));
+    } else if (startsWith(expr, "compare:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=condition");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=compare op=" + expr.substr(8));
+      summary.llvmNodes.insert("llvm.compare-preview @" + functionName + " op=" + expr.substr(8));
+    } else if (startsWith(expr, "try:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=try");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=try");
+      summary.mirNodes.insert("mir.cleanup-edge " + functionName + " try-error");
+      summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=try expr=" + expr);
+    } else if (startsWith(expr, "struct-literal:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=aggregate");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=struct-literal type=" + expr.substr(15));
+      summary.llvmNodes.insert("llvm.aggregate-preview @" + functionName + " type=" + expr.substr(15));
+    } else if (startsWith(expr, "type-static-call:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=type-static-call target=" + expr.substr(17));
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=type-static-call target=" + expr.substr(17));
+      summary.llvmNodes.insert("llvm.call-preview @" + functionName + " static=" + expr.substr(17));
+    } else if (startsWith(expr, "method-call:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=method-call method=" + expr.substr(12));
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=method-call method=" + expr.substr(12));
+      summary.llvmNodes.insert("llvm.call-preview @" + functionName + " method=" + expr.substr(12));
+    } else if (startsWith(expr, "cast:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=cast target=" + expr.substr(5));
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=cast target=" + expr.substr(5));
+      summary.llvmNodes.insert("llvm.cast-preview @" + functionName + " target=" + expr.substr(5));
+    } else if (startsWith(expr, "index:")) {
+      summary.mirNodes.insert("mir.place " + functionName + " " + expr.substr(6) + "[...] kind=index span=" + span);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=index base=" + expr.substr(6));
+      summary.llvmNodes.insert("llvm.index-preview @" + functionName + " base=" + expr.substr(6));
+    } else if (startsWith(expr, "range:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=range mode=" + expr.substr(6));
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=range mode=" + expr.substr(6));
+    } else if (expr == "tuple") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=tuple kind=aggregate");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=tuple kind=tuple");
+      summary.llvmNodes.insert("llvm.aggregate-preview @" + functionName + " type=tuple");
+    } else if (expr == "async-block") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=async-block kind=future");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=async-block kind=future-state-machine staged=true");
+      summary.llvmNodes.insert("llvm.async-preview @" + functionName + " staged=true");
+    } else if (startsWith(expr, "await:")) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=await");
+      summary.mirNodes.insert("mir.suspend-preview " + functionName + " operand=" + expr.substr(6));
+      summary.llvmNodes.insert("llvm.await-preview @" + functionName + " staged=true");
+    } else if (startsWith(expr, "move:") || startsWith(expr, "mut:")) {
+      const std::string mode = startsWith(expr, "move:") ? "move" : "mut";
+      const std::string inner = expr.substr(mode.size() + 1);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=access mode=" + mode);
+      summary.mirNodes.insert("mir.access " + functionName + " mode=" + mode + " operand=" + inner);
+      summary.llvmNodes.insert("llvm.access-preview @" + functionName + " mode=" + mode + " operand=" + inner);
+    } else if (expr == "closure") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=closure kind=closure");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=closure kind=closure mayEscape=false");
+      summary.llvmNodes.insert("llvm.closure-preview @" + functionName + " mayEscape=false");
+    } else if (startsWith(expr, "closure:")) {
+      const std::string detail = expr.substr(8);
+      std::string suffix;
+      if (detail == "move") suffix = " mode=move";
+      else if (detail == "block") suffix = " form=block";
+      else suffix = " detail=" + detail;
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=closure" + suffix);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=closure mayEscape=false" + suffix);
+      summary.llvmNodes.insert("llvm.closure-preview @" + functionName + " mayEscape=false" + suffix);
+    } else if (expr == "match") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=match kind=match");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=match kind=match");
+      summary.llvmNodes.insert("llvm.switch-preview @" + functionName + " expr=match");
+    } else if (startsWith(expr, "match:")) {
+      const std::string mode = expr.substr(6);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=match mode=" + mode);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=match mode=" + mode);
+      summary.llvmNodes.insert("llvm.switch-preview @" + functionName + " expr=match mode=" + mode);
+    } else if (expr == "trust-block") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=trust-block kind=trust");
+    } else if (expr == "unit") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=unit kind=const");
+    } else if (!expr.empty()) {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=opaque");
     }
   };
 
@@ -5435,40 +6080,212 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     const std::string span = sourceRelativePathForMetadata(package, node.file) + ":" + std::to_string(node.lineNo) + ":1";
     if (startsWith(node.kind, "decl.")) {
       summary.hirNodes.insert("hir." + node.kind.substr(5) + " " + node.name + " module=" + module + " span=" + span);
+      if (!node.generic.empty()) {
+        summary.hirNodes.insert("hir.generic-params " + node.name + " params=" + node.generic + " span=" + span);
+        summary.mirNodes.insert("mir.generic-input " + node.name + " params=" + node.generic);
+      }
     }
     if (node.kind == "decl.fn" || node.kind == "decl.async-fn") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
+      summary.hirNodes.insert("hir.fn-signature " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
+      summary.mirNodes.insert("mir.cfg " + node.name + " entry=bb0 blocks=bb0 cleanup=none");
       summary.mirNodes.insert("mir.fn " + node.name + " entry=bb0 return=" + returnType);
+      summary.mirNodes.insert("mir.cleanup-edge " + node.name + " none");
+      summary.mirNodes.insert("mir.drop-flags " + node.name + " state=none-preview");
       summary.llvmNodes.insert("llvm.define-preview @" + node.name + " return=" + returnType);
+      summary.llvmNodes.insert("llvm.lowering-input @" + node.name + " from=mir.cfg entry=bb0");
     } else if (node.kind == "decl.extern") {
       summary.hirNodes.insert("hir.extern " + node.name + " abi=" + (node.abi.empty() ? "unknown" : node.abi));
       summary.mirNodes.insert("mir.extern " + node.name + " abi=" + (node.abi.empty() ? "unknown" : node.abi));
       summary.llvmNodes.insert("llvm.declare @" + node.name + " abi=" + (node.abi.empty() ? "unknown" : node.abi));
     } else if (node.kind == "decl.struct") {
       summary.hirNodes.insert("hir.layout-input " + node.name + " layout=" + node.layout);
+      if (!node.returnType.empty()) summary.hirNodes.insert("hir.struct-marker " + node.name + " marker=" + node.returnType);
       summary.mirNodes.insert("mir.type " + node.name + " layout=" + node.layout);
       summary.llvmNodes.insert("llvm.type %" + node.name + " layout=" + node.layout);
+    } else if (node.kind == "decl.interface") {
+      if (!node.params.empty()) {
+        summary.hirNodes.insert("hir.interface-parents " + node.name + " parents=" + node.params);
+        summary.mirNodes.insert("mir.interface-parents " + node.name + " parents=" + node.params);
+      }
+    } else if (node.kind == "decl.field") {
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      summary.hirNodes.insert("hir.field " + node.name + " type=" + type + " span=" + span);
+      summary.mirNodes.insert("mir.field " + node.name + " type=" + type);
+      summary.llvmNodes.insert("llvm.field-preview " + node.name + " type=" + type);
+    } else if (node.kind == "decl.variant") {
+      const std::string payload = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.enum-variant " + node.name + " payload=" + payload + " span=" + span);
+      summary.mirNodes.insert("mir.enum-variant " + node.name + " payload=" + payload);
+      summary.llvmNodes.insert("llvm.variant-preview " + node.name + " payload=" + payload);
+    } else if (node.kind == "decl.interface-method") {
+      const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
+      summary.hirNodes.insert("hir.interface-method " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
+      summary.mirNodes.insert("mir.interface-slot " + node.name + " params=(" + node.params + ") return=" + returnType);
+      summary.llvmNodes.insert("llvm.interface-method-preview " + node.name + " return=" + returnType);
+    } else if (node.kind == "decl.impl-method") {
+      const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
+      summary.hirNodes.insert("hir.impl-method " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
+      summary.mirNodes.insert("mir.impl-method " + node.name + " params=(" + node.params + ") return=" + returnType);
+      summary.llvmNodes.insert("llvm.impl-method-preview " + node.name + " return=" + returnType);
+    } else if (node.kind == "decl.impl-const") {
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      summary.hirNodes.insert("hir.impl-const " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      summary.mirNodes.insert("mir.impl-const " + node.name + " value=" + node.params + " type=" + type);
+    } else if (node.kind == "decl.destroy") {
+      summary.hirNodes.insert("hir.destroy " + node.name + " span=" + span);
+      summary.mirNodes.insert("mir.destroy " + node.name + " cleanup=body-then-fields");
+      summary.llvmNodes.insert("llvm.destroy-preview " + node.name + " cleanup=body-then-fields");
+    } else if (node.kind == "decl.type") {
+      summary.hirNodes.insert("hir.type-alias " + node.name + " target=" + node.params + " span=" + span);
+      summary.mirNodes.insert("mir.type-alias " + node.name + " target=" + node.params);
+    } else if (node.kind == "decl.const" || node.kind == "decl.static") {
+      const std::string itemKind = node.kind.substr(5);
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      summary.hirNodes.insert("hir." + itemKind + " " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      if (itemKind == "const") {
+        summary.mirNodes.insert("mir.const " + node.name + " value=" + node.params + " type=" + type);
+        summary.llvmNodes.insert("llvm.const-preview @" + node.name + " value=" + node.params + " type=" + type);
+      } else {
+        summary.mirNodes.insert("mir.static " + node.name + " init=" + node.params + " type=" + type);
+        summary.llvmNodes.insert("llvm.global-preview @" + node.name + " init=" + node.params + " type=" + type);
+      }
     } else if (node.kind == "expr.trust") {
       summary.hirNodes.insert("hir.trust block span=" + span);
       summary.mirNodes.insert("mir.trust block span=" + span);
     } else if (node.kind == "stmt.return") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.return " + node.name + " expr=" + node.params + " expected=" + returnType + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
       summary.mirNodes.insert("mir.return " + node.name + " value=" + node.params + " type=" + returnType);
+      summary.mirNodes.insert("mir.terminator " + node.name + " bb=bb0 kind=return value=" + node.params);
       emitCallPreview(node.params, node.name);
       summary.llvmNodes.insert("llvm.ret-preview @" + node.name + " type=" + returnType + " value=" + node.params);
     } else if (node.kind == "stmt.val" || node.kind == "stmt.var") {
       const std::string mode = node.kind == "stmt.var" ? "var" : "val";
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
       const std::string mutableFlag = node.kind == "stmt.var" ? "true" : "false";
-      const std::size_t dot = node.name.find('.');
-      const std::string functionName = dot == std::string::npos ? node.name : node.name.substr(0, dot);
+      const std::string functionName = functionNameForNode(node);
+      const std::string localName = localNameForNode(node);
       summary.hirNodes.insert("hir.local " + node.name + " mode=" + mode + " expr=" + node.params + " type=" + type + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.local " + node.name + " init=" + node.params + " mutable=" + mutableFlag);
+      summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=" + mutableFlag + " type=" + type);
+      summary.mirNodes.insert("mir.place " + functionName + " %" + localName + " kind=local span=" + span);
+      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params);
       emitCallPreview(node.params, functionName);
+    } else if (node.kind == "stmt.const") {
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      const std::string functionName = functionNameForNode(node);
+      const std::string localName = localNameForNode(node);
+      summary.hirNodes.insert("hir.local-const " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.local-const " + node.name + " value=" + node.params + " type=" + type);
+      summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=false type=" + type);
+      emitCallPreview(node.params, functionName);
+    } else if (node.kind == "stmt.assign") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string localName = localNameForNode(node);
+      summary.hirNodes.insert("hir.assign " + node.name + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params);
+      summary.mirNodes.insert("mir.store-preview " + functionName + " place=%" + localName + " value=" + node.params);
+      summary.llvmNodes.insert("llvm.store-preview @" + functionName + " %" + localName + " value=" + node.params);
+      emitCallPreview(node.params, functionName);
+    } else if (node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string pattern = localNameForNode(node);
+      const std::string mode = node.kind == "stmt.pattern-var" ? "var" : "val";
+      const std::string mutableFlag = node.kind == "stmt.pattern-var" ? "true" : "false";
+      summary.hirNodes.insert("hir.pattern-local " + functionName + " mode=" + mode + " pattern=" + pattern + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.pattern-bind " + functionName + " pattern=" + pattern + " source=" + node.params + " mutable=" + mutableFlag);
+      summary.llvmNodes.insert("llvm.pattern-preview @" + functionName + " pattern=" + pattern + " source=" + node.params);
+    } else if (node.kind == "stmt.if") {
+      summary.hirNodes.insert("hir.if " + node.name + " condition=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      emitCallPreview(node.params, node.name);
+      summary.mirNodes.insert("mir.branch " + node.name + " kind=if condition=" + node.params + " then=if.then else=if.cont");
+      summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=if condition=" + node.params);
+    } else if (node.kind == "stmt.if-pattern") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string pattern = localNameForNode(node);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.if-pattern " + functionName + " pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.branch " + functionName + " kind=if-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " then=if.then else=if.cont");
+      summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=if-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params);
+    } else if (node.kind == "stmt.else") {
+      summary.hirNodes.insert("hir.else " + node.name + " span=" + span);
+      summary.mirNodes.insert("mir.branch " + node.name + " kind=else target=else.body");
+    } else if (node.kind == "stmt.while") {
+      summary.hirNodes.insert("hir.while " + node.name + " condition=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      emitCallPreview(node.params, node.name);
+      summary.mirNodes.insert("mir.loop " + node.name + " condition=" + node.params + " header=while.cond body=while.body exit=while.exit");
+      summary.mirNodes.insert("mir.branch " + node.name + " kind=while condition=" + node.params + " then=while.body else=while.exit");
+      summary.llvmNodes.insert("llvm.loop-preview @" + node.name + " condition=" + node.params);
+      summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=while condition=" + node.params);
+    } else if (node.kind == "stmt.while-pattern") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string pattern = localNameForNode(node);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.while-pattern " + functionName + " pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.loop " + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " header=while.cond body=while.body exit=while.exit");
+      summary.mirNodes.insert("mir.branch " + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " then=while.body else=while.exit");
+      summary.llvmNodes.insert("llvm.loop-preview @" + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params);
+    } else if (node.kind == "stmt.for") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string localName = localNameForNode(node);
+      const std::string mode = node.returnType.empty() ? "read" : node.returnType;
+      summary.hirNodes.insert("hir.for " + functionName + " item=" + localName + " mode=" + mode + " iterable=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.loop " + functionName + " kind=for item=%" + localName + " mode=" + mode + " iterable=" + node.params);
+      summary.mirNodes.insert("mir.branch " + functionName + " kind=for item=%" + localName + " mode=" + mode + " iterable=" + node.params + " then=for.body else=for.exit");
+      summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=" + std::string(mode == "mut" ? "true" : "false") + " type=iterator-item");
+      summary.llvmNodes.insert("llvm.loop-preview @" + functionName + " kind=for mode=" + mode + " iterable=" + node.params);
+      summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=for mode=" + mode + " iterable=" + node.params);
+    } else if (node.kind == "stmt.match") {
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.match " + node.name + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      summary.mirNodes.insert("mir.switch " + node.name + " mode=" + mode + " scrutinee=" + node.params + " arms=preview");
+      summary.llvmNodes.insert("llvm.switch-preview @" + node.name + " mode=" + mode + " scrutinee=" + node.params);
+    } else if (node.kind == "stmt.match-arm") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string pattern = localNameForNode(node);
+      const std::string guard = node.returnType.empty() ? "none" : node.returnType;
+      summary.hirNodes.insert("hir.match-arm " + functionName + " pattern=" + pattern + " guard=" + guard + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      if (!node.returnType.empty()) emitMirExpressionFacts(functionName, node.returnType, span);
+      summary.mirNodes.insert("mir.match-arm " + functionName + " pattern=" + pattern + " guard=" + guard + " body=" + node.params);
+      if (!node.returnType.empty()) {
+        summary.mirNodes.insert("mir.branch " + functionName + " kind=match-guard pattern=" + pattern + " condition=" + node.returnType);
+        summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=match-guard pattern=" + pattern + " condition=" + node.returnType);
+      }
+    } else if (node.kind == "stmt.try") {
+      summary.hirNodes.insert("hir.try " + node.name + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      summary.mirNodes.insert("mir.try " + node.name + " expr=" + node.params + " ok=continue err=return");
+      summary.mirNodes.insert("mir.cleanup-edge " + node.name + " try-error");
+      summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=try expr=" + node.params);
+    } else if (node.kind == "stmt.break") {
+      summary.hirNodes.insert("hir.break " + node.name + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
+      summary.mirNodes.insert("mir.terminator " + node.name + " kind=break target=loop.exit value=" + node.params);
+      summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=break target=loop.exit");
+    } else if (node.kind == "stmt.continue") {
+      summary.hirNodes.insert("hir.continue " + node.name + " span=" + span);
+      summary.mirNodes.insert("mir.terminator " + node.name + " kind=continue target=loop.header");
+      summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=continue target=loop.header");
     } else if (node.kind == "stmt.expr") {
       summary.hirNodes.insert("hir.expr " + node.name + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(node.name, node.params, span);
       summary.mirNodes.insert("mir.eval " + node.name + " expr=" + node.params);
+      summary.mirNodes.insert("mir.eval " + node.name + " bb=bb0 operand=" + node.params);
       emitCallPreview(node.params, node.name);
     }
   }
@@ -5491,6 +6308,8 @@ std::vector<TopLevelDeclaration> collectTopLevelDeclarations(const BuildPackage 
     else if (node.kind == "decl.fn" || node.kind == "decl.async-fn") kind = "fn";
     else if (node.kind == "decl.extern") kind = "extern";
     else if (node.kind == "decl.impl") kind = "impl";
+    else if (node.kind == "decl.const") kind = "const";
+    else if (node.kind == "decl.static") kind = "static";
     else continue;
 
     declarations.push_back(TopLevelDeclaration{
@@ -5556,6 +6375,10 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
           decl.returnType != "String" && decl.returnType != "Unit") {
         summary.staticInterfaceReturns.insert(decl.name + "->" + decl.returnType);
       }
+    } else if (decl.kind == "const" || decl.kind == "static") {
+      summary.declarations.insert(declarationMetadataFact(package, decl.file, decl.moduleName, decl.kind, decl.name, decl.visibility, decl.returnType + "=" + decl.params, decl.lineNo));
+      if (decl.visibility == "pub ") summary.publicApi.insert(decl.kind + " " + decl.name);
+      else if (decl.visibility != "private ") summary.packageApi.insert(decl.kind + " " + decl.name);
     } else if (decl.kind == "extern") {
       summary.declarations.insert(declarationMetadataFact(package, decl.file, decl.moduleName, decl.kind, decl.name, decl.visibility, decl.generic + overloadKey(decl.name, decl.params), decl.lineNo));
       if (decl.trusted) summary.trustCapabilities.insert("ffi");
@@ -5796,13 +6619,2393 @@ std::string arMember(const std::string &name, const std::string &content) {
   return out;
 }
 
-std::string stage0StaticArchive(const BuildPackage &package, const std::string &target, const std::string &buildHash) {
-  const std::string object =
-      "zeno-stage0-preview-object\n"
-      "package=" + package.name + "\n"
-      "target=" + target + "\n"
-      "buildFingerprint=" + buildHash + "\n";
+std::string stage0StaticArchive(const std::string &object) {
   return "!<arch>\n" + arMember("zeno-stage0.o/", object);
+}
+
+std::string shellQuote(const std::string &value) {
+  std::string out = "'";
+  for (char c : value) {
+    if (c == '\'') {
+      out += "'\\''";
+    } else {
+      out.push_back(c);
+    }
+  }
+  out += "'";
+  return out;
+}
+
+bool runShellCommand(const std::string &command, const fs::path &logPath) {
+  fs::create_directories(logPath.parent_path());
+  const std::string fullCommand = command + " > " + shellQuote(logPath.string()) + " 2>&1";
+  return std::system(fullCommand.c_str()) == 0;
+}
+
+int runShellCommandExitCode(const std::string &command, const fs::path &logPath) {
+  fs::create_directories(logPath.parent_path());
+  const std::string fullCommand = command + " > " + shellQuote(logPath.string()) + " 2>&1";
+  const int status = std::system(fullCommand.c_str());
+  if (status == -1) return -1;
+  if (WIFEXITED(status)) return WEXITSTATUS(status);
+  if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+  return -1;
+}
+
+struct NativeI32Expr {
+  bool ok = false;
+  std::string code;
+  std::string value;
+};
+
+struct NativeI32Condition {
+  bool ok = false;
+  std::string code;
+  std::string value;
+};
+
+struct NativeI32Local {
+  bool mutableLocal = false;
+  std::string value;
+};
+
+struct NativeI32StructType {
+  std::vector<std::string> fields;
+};
+
+struct NativeI32EnumType {
+  std::vector<std::string> variants;
+  std::map<std::string, int> discriminants;
+};
+
+struct NativePayloadEnumVariant {
+  std::vector<std::string> payloadTypes;
+  std::vector<std::string> payloadNames;
+};
+
+struct NativePayloadEnumType {
+  std::string sourceName;
+  std::vector<std::string> variants;
+  std::map<std::string, int> discriminants;
+  std::map<std::string, NativePayloadEnumVariant> variantPayloads;
+  std::size_t maxPayloadSlots = 0;
+};
+
+struct NativeGenericPayloadEnumTemplate {
+  std::vector<std::string> typeParams;
+  NativePayloadEnumType enumType;
+};
+
+struct NativeI32StructLocal {
+  std::string typeName;
+  std::string value;
+};
+
+struct NativeI32StructExpr {
+  bool ok = false;
+  std::string code;
+  std::string typeName;
+  std::string value;
+};
+
+std::string nativeLlvmTypeName(const std::string &typeName) {
+  std::string out;
+  for (const char c : typeName) {
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
+      out += c;
+    } else if (!out.empty() && out.back() != '_') {
+      out += '_';
+    }
+  }
+  while (!out.empty() && out.back() == '_') out.pop_back();
+  return out.empty() ? "anon" : out;
+}
+
+std::string nativeLlvmTypeRef(const std::string &typeName) {
+  return "%" + nativeLlvmTypeName(typeName);
+}
+
+std::optional<std::pair<std::string, std::string>> nativeSingleGenericInstance(const std::string &typeName) {
+  if (auto generic = matchRegex(typeName, std::regex(R"(^([A-Z][A-Za-z0-9_]*)<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>$)"))) {
+    return std::make_pair(std::string((*generic)[1]), std::string((*generic)[2]));
+  }
+  return std::nullopt;
+}
+
+std::optional<std::pair<std::string, std::vector<std::string>>> nativeGenericInstance(const std::string &typeName) {
+  if (auto generic = matchRegex(typeName, std::regex(R"(^([A-Z][A-Za-z0-9_]*)<\s*(.*?)\s*>$)"))) {
+    std::vector<std::string> args;
+    for (const auto &arg : splitArguments((*generic)[2])) {
+      const std::string normalized = normalizeSignatureType(arg);
+      if (!std::regex_match(normalized, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) return std::nullopt;
+      args.push_back(normalized);
+    }
+    if (args.empty()) return std::nullopt;
+    return std::make_pair(std::string((*generic)[1]), args);
+  }
+  return std::nullopt;
+}
+
+std::string resolveNativePayloadEnumTypeName(const std::string &patternEnumName,
+                                             const std::string &activeTypeName,
+                                             const std::map<std::string, NativePayloadEnumType> &payloadEnumTypes) {
+  if (payloadEnumTypes.count(patternEnumName)) return patternEnumName;
+  if (!activeTypeName.empty()) {
+    auto active = payloadEnumTypes.find(activeTypeName);
+    if (active != payloadEnumTypes.end() && active->second.sourceName == patternEnumName) {
+      return activeTypeName;
+    }
+  }
+  std::string resolved;
+  for (const auto &[typeName, enumType] : payloadEnumTypes) {
+    if (enumType.sourceName != patternEnumName) continue;
+    if (!resolved.empty()) return "";
+    resolved = typeName;
+  }
+  return resolved;
+}
+
+struct NativeMatchPatternAlt {
+  std::string enumName;
+  std::string variantName;
+  std::vector<std::string> bindingNames;
+  bool hasRange = false;
+  int rangeStart = 0;
+  int rangeEnd = 0;
+  bool rangeInclusive = false;
+};
+
+struct NativeMatchArm {
+  bool ok = false;
+  std::vector<NativeMatchPatternAlt> alternatives;
+  std::string guard;
+  std::string expr;
+};
+
+bool isSimpleLlvmGlobalName(const std::string &name) {
+  return std::regex_match(name, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"));
+}
+
+int nativeStructFieldIndex(const NativeI32StructType &type, const std::string &fieldName) {
+  for (std::size_t i = 0; i < type.fields.size(); ++i) {
+    if (type.fields[i] == fieldName) return static_cast<int>(i);
+  }
+  return -1;
+}
+
+std::string nativeAccessName(std::string name) {
+  name = trim(name);
+  if (startsWith(name, "move ")) name = trim(name.substr(5));
+  if (startsWith(name, "mut ")) name = trim(name.substr(4));
+  return name;
+}
+
+std::vector<std::string> splitTopLevel(const std::string &text, char delimiter) {
+  std::vector<std::string> parts;
+  int parenDepth = 0;
+  int braceDepth = 0;
+  bool inString = false;
+  std::size_t start = 0;
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    const char c = text[i];
+    if (c == '"' && (i == 0 || text[i - 1] != '\\')) {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c == '(') ++parenDepth;
+    else if (c == ')') --parenDepth;
+    else if (c == '{') ++braceDepth;
+    else if (c == '}') --braceDepth;
+    else if (c == delimiter && parenDepth == 0 && braceDepth == 0) {
+      parts.push_back(trim(std::string_view(text).substr(start, i - start)));
+      start = i + 1;
+    }
+  }
+  parts.push_back(trim(std::string_view(text).substr(start)));
+  return parts;
+}
+
+std::optional<std::size_t> findTopLevelToken(const std::string &text, const std::string &token) {
+  int parenDepth = 0;
+  int braceDepth = 0;
+  bool inString = false;
+  for (std::size_t i = 0; i + token.size() <= text.size(); ++i) {
+    const char c = text[i];
+    if (c == '"' && (i == 0 || text[i - 1] != '\\')) {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c == '(') {
+      ++parenDepth;
+      continue;
+    }
+    if (c == ')') {
+      --parenDepth;
+      continue;
+    }
+    if (c == '{') {
+      ++braceDepth;
+      continue;
+    }
+    if (c == '}') {
+      --braceDepth;
+      continue;
+    }
+    if (parenDepth == 0 && braceDepth == 0 && text.compare(i, token.size(), token) == 0) {
+      return i;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::pair<std::string, int>> nativeEnumDiscriminant(
+    const std::string &expr,
+    const std::map<std::string, NativeI32EnumType> &enumTypes) {
+  auto variant = matchRegex(trim(expr), std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$)"));
+  if (!variant) return std::nullopt;
+  const std::string enumName = (*variant)[1];
+  const std::string variantName = (*variant)[2];
+  auto enumType = enumTypes.find(enumName);
+  if (enumType == enumTypes.end()) return std::nullopt;
+  auto discriminant = enumType->second.discriminants.find(variantName);
+  if (discriminant == enumType->second.discriminants.end()) return std::nullopt;
+  return std::make_pair(enumName, discriminant->second);
+}
+
+std::optional<std::size_t> findTopLevelNativeBinaryOperator(const std::string &expr, const std::string &operators) {
+  int parenDepth = 0;
+  int braceDepth = 0;
+  bool inString = false;
+  for (std::size_t offset = expr.size(); offset > 0; --offset) {
+    const std::size_t i = offset - 1;
+    const char c = expr[i];
+    if (c == '"' && (i == 0 || expr[i - 1] != '\\')) {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c == ')') {
+      ++parenDepth;
+      continue;
+    }
+    if (c == '(') {
+      --parenDepth;
+      continue;
+    }
+    if (c == '}') {
+      ++braceDepth;
+      continue;
+    }
+    if (c == '{') {
+      --braceDepth;
+      continue;
+    }
+    if (parenDepth != 0 || braceDepth != 0 || operators.find(c) == std::string::npos) continue;
+    if (i == 0) continue;
+    const std::string left = trim(std::string_view(expr).substr(0, i));
+    const std::string right = trim(std::string_view(expr).substr(i + 1));
+    if (left.empty() || right.empty()) continue;
+    const char previous = left.empty() ? '\0' : left.back();
+    if ((c == '+' || c == '-') && (previous == '+' || previous == '-' || previous == '*' || previous == '/' || previous == '(' || previous == '{')) {
+      continue;
+    }
+    return i;
+  }
+  return std::nullopt;
+}
+
+std::string nativeI32ExportThunk(const std::string &symbol,
+                                 const std::string &functionName,
+                                 const std::string &functionParams) {
+  if (!isSimpleLlvmGlobalName(symbol) || !isSimpleLlvmGlobalName(functionName)) return "";
+  std::vector<std::string> arguments;
+  for (const auto &param : splitArguments(functionParams)) {
+    const std::string trimmedParam = trim(param);
+    if (trimmedParam.empty()) continue;
+    if (auto parsed = matchRegex(trimmedParam, std::regex(R"(^(i32|%[A-Za-z_][A-Za-z0-9_]*)\s+(%[A-Za-z_][A-Za-z0-9_]*)$)"))) {
+      arguments.push_back(std::string((*parsed)[1]) + " " + std::string((*parsed)[2]));
+    } else {
+      return "";
+    }
+  }
+
+  std::string out = "\ndefine i32 @" + symbol + "(" + functionParams + ") {\nentry:\n";
+  out += "  %ret = call i32 @" + functionName + "(";
+  for (std::size_t i = 0; i < arguments.size(); ++i) {
+    if (i != 0) out += ", ";
+    out += arguments[i];
+  }
+  out += ")\n";
+  out += "  ret i32 %ret\n";
+  out += "}\n";
+  return out;
+}
+
+bool nativeI32ParameterList(std::string params, std::string *llvmParams) {
+  std::string out;
+  for (const auto &param : splitArguments(params)) {
+    const std::string trimmedParam = trim(param);
+    if (trimmedParam.empty()) continue;
+    const auto colon = trimmedParam.rfind(':');
+    if (colon == std::string::npos) return false;
+    if (normalizeSignatureType(trimmedParam.substr(colon + 1)) != "I32") return false;
+    if (!out.empty()) out += ", ";
+    out += "i32";
+  }
+  *llvmParams = out;
+  return true;
+}
+
+bool nativeParameterList(std::string params,
+                         const std::map<std::string, NativeI32StructType> &structTypes,
+                         const std::map<std::string, NativeI32EnumType> &enumTypes,
+                         std::vector<std::pair<std::string, std::string>> *parsedParams,
+                         std::string *llvmParams) {
+  std::vector<std::pair<std::string, std::string>> parsed;
+  std::string out;
+  for (const auto &param : splitArguments(params)) {
+    const std::string trimmedParam = trim(param);
+    if (trimmedParam.empty()) continue;
+    const auto colon = trimmedParam.rfind(':');
+    if (colon == std::string::npos) return false;
+    std::string name = trim(trimmedParam.substr(0, colon));
+    if (startsWith(name, "move ")) name = trim(name.substr(5));
+    if (startsWith(name, "mut ")) name = trim(name.substr(4));
+    if (!std::regex_match(name, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) return false;
+    const std::string type = normalizeSignatureType(trimmedParam.substr(colon + 1));
+    std::string llvmType;
+    if (type == "I32") llvmType = "i32";
+    else if (enumTypes.count(type)) llvmType = "i32";
+    else if (structTypes.count(type)) llvmType = nativeLlvmTypeRef(type);
+    else return false;
+    if (!out.empty()) out += ", ";
+    out += llvmType + " %" + name;
+    parsed.push_back({name, type});
+  }
+  *parsedParams = parsed;
+  *llvmParams = out;
+  return true;
+}
+
+NativeI32Expr lowerNativeI32Expr(const std::string &rawExpr,
+                                 const std::map<std::string, NativeI32Local> &locals,
+                                 const std::map<std::string, NativeI32StructLocal> &structLocals,
+                                 const std::map<std::string, NativeI32StructType> &structTypes,
+                                 const std::map<std::string, NativeI32EnumType> &enumTypes,
+                                 const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                                 const std::set<std::string> &candidateCallees,
+                                 int &tempId) {
+  std::string expr = trim(rawExpr);
+  if (!expr.empty() && expr.back() == ';') expr.pop_back();
+  expr = trim(expr);
+  if (std::regex_match(expr, std::regex(R"([0-9]+)"))) {
+    return NativeI32Expr{true, "", expr};
+  }
+  if (auto enumValue = nativeEnumDiscriminant(expr, enumTypes)) {
+    return NativeI32Expr{true, "", std::to_string(enumValue->second)};
+  }
+  if (auto field = matchRegex(expr, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$)"))) {
+    auto aggregate = structLocals.find((*field)[1]);
+    if (aggregate == structLocals.end()) return {};
+    auto type = structTypes.find(aggregate->second.typeName);
+    if (type == structTypes.end()) return {};
+    const int index = nativeStructFieldIndex(type->second, (*field)[2]);
+    if (index < 0) return {};
+    const std::string temp = "%t" + std::to_string(tempId++);
+    return NativeI32Expr{true,
+                         "  " + temp + " = extractvalue " + nativeLlvmTypeRef(aggregate->second.typeName) + " " + aggregate->second.value + ", " + std::to_string(index) + "\n",
+                         temp};
+  }
+  std::optional<std::size_t> binaryIndex = findTopLevelNativeBinaryOperator(expr, "+-");
+  if (!binaryIndex) binaryIndex = findTopLevelNativeBinaryOperator(expr, "*/");
+  if (binaryIndex) {
+    const std::string op(1, expr[*binaryIndex]);
+    auto left = lowerNativeI32Expr(expr.substr(0, *binaryIndex), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    auto right = lowerNativeI32Expr(expr.substr(*binaryIndex + 1), locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    if (!left.ok || !right.ok) return {};
+    std::string llvmOp;
+    if (op == "+") llvmOp = "add";
+    else if (op == "-") llvmOp = "sub";
+    else if (op == "*") llvmOp = "mul";
+    else if (op == "/") llvmOp = "sdiv";
+    else return {};
+    const std::string temp = "%t" + std::to_string(tempId++);
+    return NativeI32Expr{true,
+                         left.code + right.code + "  " + temp + " = " + llvmOp + " i32 " + left.value + ", " + right.value + "\n",
+                         temp};
+  }
+  if (std::regex_match(expr, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) {
+    auto local = locals.find(expr);
+    if (local == locals.end()) return {};
+    if (!local->second.mutableLocal) {
+      return NativeI32Expr{true, "", local->second.value};
+    }
+    const std::string temp = "%t" + std::to_string(tempId++);
+    return NativeI32Expr{true, "  " + temp + " = load i32, ptr " + local->second.value + "\n", temp};
+  }
+  if (auto call = matchRegex(expr, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$)"))) {
+    const std::string callee = (*call)[1];
+    if (!candidateCallees.count(callee)) return {};
+    const auto rawArgs = splitArguments((*call)[2]);
+    std::vector<std::string> paramTypes;
+    auto signature = candidateFunctionParamTypes.find(callee);
+    if (signature != candidateFunctionParamTypes.end()) {
+      paramTypes = signature->second;
+      if (paramTypes.size() != rawArgs.size()) return {};
+    } else {
+      paramTypes.assign(rawArgs.size(), "I32");
+    }
+    std::string code;
+    std::vector<std::string> arguments;
+    for (std::size_t i = 0; i < rawArgs.size(); ++i) {
+      const std::string arg = trim(rawArgs[i]);
+      const std::string paramType = paramTypes[i];
+      if (paramType == "I32") {
+        auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+        if (!lowered.ok) return {};
+        code += lowered.code;
+        arguments.push_back("i32 " + lowered.value);
+      } else if (enumTypes.count(paramType)) {
+        auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+        if (!lowered.ok) return {};
+        code += lowered.code;
+        arguments.push_back("i32 " + lowered.value);
+      } else if (structTypes.count(paramType)) {
+        auto localStruct = structLocals.find(arg);
+        if (localStruct == structLocals.end() || localStruct->second.typeName != paramType) return {};
+        arguments.push_back(nativeLlvmTypeRef(paramType) + " " + localStruct->second.value);
+      } else {
+        return {};
+      }
+    }
+    const std::string temp = "%t" + std::to_string(tempId++);
+    code += "  " + temp + " = call i32 @" + callee + "(";
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+      if (i != 0) code += ", ";
+      code += arguments[i];
+    }
+    code += ")\n";
+    return NativeI32Expr{true, code, temp};
+  }
+  return {};
+}
+
+NativeI32Condition lowerNativeI32Condition(const std::string &rawCondition,
+                                           const std::map<std::string, NativeI32Local> &locals,
+                                           const std::map<std::string, NativeI32StructLocal> &structLocals,
+                                           const std::map<std::string, NativeI32StructType> &structTypes,
+                                           const std::map<std::string, NativeI32EnumType> &enumTypes,
+                                           const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                                           const std::set<std::string> &candidateCallees,
+                                           const std::set<std::string> &candidateBoolCallees,
+                                           int &tempId) {
+  std::string condition = trim(rawCondition);
+  const std::regex comparisonPattern(R"(^(.+)\s*(>=|<=|==|!=|>|<)\s*(.+)$)");
+  if (auto comparison = matchRegex(condition, comparisonPattern)) {
+    auto left = lowerNativeI32Expr((*comparison)[1], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    auto right = lowerNativeI32Expr((*comparison)[3], locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    if (!left.ok || !right.ok) return {};
+    const std::string op = (*comparison)[2];
+    std::string predicate;
+    if (op == ">") predicate = "sgt";
+    else if (op == ">=") predicate = "sge";
+    else if (op == "<") predicate = "slt";
+    else if (op == "<=") predicate = "sle";
+    else if (op == "==") predicate = "eq";
+    else if (op == "!=") predicate = "ne";
+    else return {};
+    const std::string temp = "%t" + std::to_string(tempId++);
+    return NativeI32Condition{true,
+                              left.code + right.code + "  " + temp + " = icmp " + predicate + " i32 " + left.value + ", " + right.value + "\n",
+                              temp};
+  }
+  if (condition == "true") return NativeI32Condition{true, "", "true"};
+  if (condition == "false") return NativeI32Condition{true, "", "false"};
+  if (auto call = matchRegex(condition, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$)"))) {
+    const std::string callee = (*call)[1];
+    if (!candidateBoolCallees.count(callee)) return {};
+    std::string code;
+    std::vector<std::string> arguments;
+    for (const auto &arg : splitArguments((*call)[2])) {
+      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+      if (!lowered.ok) return {};
+      code += lowered.code;
+      arguments.push_back(lowered.value);
+    }
+    const std::string temp = "%t" + std::to_string(tempId++);
+    code += "  " + temp + " = call i1 @" + callee + "(";
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+      if (i != 0) code += ", ";
+      code += "i32 " + arguments[i];
+    }
+    code += ")\n";
+    return NativeI32Condition{true, code, temp};
+  }
+  return {};
+}
+
+NativeI32StructExpr lowerNativeI32StructLiteral(const std::string &rawExpr,
+                                                const std::map<std::string, NativeI32Local> &locals,
+                                                const std::map<std::string, NativeI32StructLocal> &structLocals,
+                                                const std::map<std::string, NativeI32StructType> &structTypes,
+                                                const std::map<std::string, NativeI32EnumType> &enumTypes,
+                                                const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                                                const std::set<std::string> &candidateCallees,
+                                                int &tempId) {
+  std::string expr = trim(rawExpr);
+  if (!expr.empty() && expr.back() == ';') expr.pop_back();
+  expr = trim(expr);
+  auto literal = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\s*\{\s*(.*)\s*\}$)"));
+  if (!literal) return {};
+  const std::string structName = (*literal)[1];
+  auto structType = structTypes.find(structName);
+  if (structType == structTypes.end()) return {};
+
+  std::map<std::string, std::string> fieldExprs;
+  for (const auto &fieldInit : splitArguments((*literal)[2])) {
+    if (auto field = matchRegex(fieldInit, std::regex(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$)"))) {
+      fieldExprs[(*field)[1]] = (*field)[2];
+    } else {
+      return {};
+    }
+  }
+
+  std::string code;
+  std::string aggregateValue = "undef";
+  for (std::size_t i = 0; i < structType->second.fields.size(); ++i) {
+    const std::string &fieldName = structType->second.fields[i];
+    auto fieldExpr = fieldExprs.find(fieldName);
+    if (fieldExpr == fieldExprs.end()) return {};
+    auto lowered = lowerNativeI32Expr(fieldExpr->second, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+    if (!lowered.ok) return {};
+    const std::string temp = "%t" + std::to_string(tempId++);
+    code += lowered.code;
+    code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(structName) + " " + aggregateValue + ", i32 " + lowered.value + ", " + std::to_string(i) + "\n";
+    aggregateValue = temp;
+  }
+  return NativeI32StructExpr{true, code, structName, aggregateValue};
+}
+
+NativeI32StructExpr lowerNativePayloadEnumConstructor(const std::string &rawExpr,
+                                                      const std::map<std::string, NativeI32Local> &locals,
+                                                      const std::map<std::string, NativeI32StructLocal> &structLocals,
+                                                      const std::map<std::string, NativeI32StructType> &structTypes,
+                                                      const std::map<std::string, NativeI32EnumType> &enumTypes,
+                                                      const std::map<std::string, NativePayloadEnumType> &payloadEnumTypes,
+                                                      const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                                                      const std::set<std::string> &candidateCallees,
+                                                      const std::string &expectedTypeName,
+                                                      int &tempId) {
+  std::string expr = trim(rawExpr);
+  if (!expr.empty() && expr.back() == ';') expr.pop_back();
+  expr = trim(expr);
+  std::string enumName;
+  std::string variantName;
+  std::vector<std::string> explicitArgs;
+  std::map<std::string, std::string> recordArgs;
+  if (auto recordCtor = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\{\s*(.*)\s*\}$)"))) {
+    enumName = (*recordCtor)[1];
+    variantName = (*recordCtor)[2];
+    for (const auto &fieldInit : splitArguments((*recordCtor)[3])) {
+      if (auto field = matchRegex(fieldInit, std::regex(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$)"))) {
+        recordArgs[(*field)[1]] = (*field)[2];
+      } else {
+        return {};
+      }
+    }
+  } else if (auto ctor = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:\s*\((.*)\))?$)"))) {
+    enumName = (*ctor)[1];
+    variantName = (*ctor)[2];
+    explicitArgs = (*ctor)[3].matched ? splitArguments((*ctor)[3]) : std::vector<std::string>{};
+  } else {
+    return {};
+  }
+  const std::string resolvedEnumName = resolveNativePayloadEnumTypeName(enumName, expectedTypeName, payloadEnumTypes);
+  if (resolvedEnumName.empty()) return {};
+  enumName = resolvedEnumName;
+  auto enumType = payloadEnumTypes.find(enumName);
+  if (enumType == payloadEnumTypes.end()) return {};
+  auto discriminant = enumType->second.discriminants.find(variantName);
+  if (discriminant == enumType->second.discriminants.end()) return {};
+  const auto payload = enumType->second.variantPayloads.find(variantName);
+  const std::vector<std::string> payloadTypes = payload == enumType->second.variantPayloads.end()
+                                                    ? std::vector<std::string>{}
+                                                    : payload->second.payloadTypes;
+  std::vector<std::string> args = explicitArgs;
+  if (!recordArgs.empty()) {
+    args.clear();
+    if (payload == enumType->second.variantPayloads.end() ||
+        payload->second.payloadNames.size() != payloadTypes.size()) {
+      return {};
+    }
+    for (const auto &fieldName : payload->second.payloadNames) {
+      auto field = recordArgs.find(fieldName);
+      if (field == recordArgs.end()) return {};
+      args.push_back(field->second);
+    }
+  }
+  if (args.size() != payloadTypes.size()) return {};
+
+  std::string code;
+  std::string aggregateValue = "undef";
+  std::string temp = "%t" + std::to_string(tempId++);
+  code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", i32 " + std::to_string(discriminant->second) + ", 0\n";
+  aggregateValue = temp;
+  std::size_t slot = 1;
+  for (std::size_t i = 0; i < payloadTypes.size(); ++i) {
+    const std::string payloadType = payloadTypes[i];
+    const std::string arg = trim(args[i]);
+    if (payloadType == "I32") {
+      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+      if (!lowered.ok) return {};
+      temp = "%t" + std::to_string(tempId++);
+      code += lowered.code;
+      code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", i32 " + lowered.value + ", " + std::to_string(slot++) + "\n";
+      aggregateValue = temp;
+    } else {
+      NativeI32StructExpr loweredStruct;
+      if (auto localStruct = structLocals.find(arg);
+          localStruct != structLocals.end() && localStruct->second.typeName == payloadType) {
+        loweredStruct = NativeI32StructExpr{true, "", localStruct->second.typeName, localStruct->second.value};
+      } else {
+        loweredStruct = lowerNativeI32StructLiteral(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+      }
+      auto structType = structTypes.find(payloadType);
+      if (!loweredStruct.ok || loweredStruct.typeName != payloadType || structType == structTypes.end()) return {};
+      code += loweredStruct.code;
+      for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+        const std::string fieldTemp = "%t" + std::to_string(tempId++);
+        temp = "%t" + std::to_string(tempId++);
+        code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(payloadType) + " " + loweredStruct.value + ", " + std::to_string(field) + "\n";
+        code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", i32 " + fieldTemp + ", " + std::to_string(slot++) + "\n";
+        aggregateValue = temp;
+      }
+    }
+  }
+  return NativeI32StructExpr{true, code, enumName, aggregateValue};
+}
+
+NativeI32StructExpr lowerNativeAggregateExpr(const std::string &rawExpr,
+                                             const std::map<std::string, NativeI32Local> &locals,
+                                             const std::map<std::string, NativeI32StructLocal> &structLocals,
+                                             const std::map<std::string, NativeI32StructType> &structTypes,
+                                             const std::map<std::string, NativeI32EnumType> &enumTypes,
+                                             const std::map<std::string, NativePayloadEnumType> &payloadEnumTypes,
+                                             const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                                             const std::set<std::string> &candidateCallees,
+                                             const std::map<std::string, std::string> &candidateStructCallees,
+                                             int &tempId) {
+  std::string expr = trim(rawExpr);
+  if (!expr.empty() && expr.back() == ';') expr.pop_back();
+  expr = trim(expr);
+  if (auto localStruct = structLocals.find(expr); localStruct != structLocals.end()) {
+    return NativeI32StructExpr{true, "", localStruct->second.typeName, localStruct->second.value};
+  }
+  if (auto lowered = lowerNativePayloadEnumConstructor(expr,
+                                                       locals,
+                                                       structLocals,
+                                                       structTypes,
+                                                       enumTypes,
+                                                       payloadEnumTypes,
+                                                       candidateFunctionParamTypes,
+                                                       candidateCallees,
+                                                       "",
+                                                       tempId);
+      lowered.ok) {
+    return lowered;
+  }
+  if (auto lowered = lowerNativeI32StructLiteral(expr,
+                                                 locals,
+                                                 structLocals,
+                                                 structTypes,
+                                                 enumTypes,
+                                                 candidateFunctionParamTypes,
+                                                 candidateCallees,
+                                                 tempId);
+      lowered.ok) {
+    return lowered;
+  }
+  auto call = matchRegex(expr, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$)"));
+  if (!call) return {};
+  const std::string callee = (*call)[1];
+  auto structCallee = candidateStructCallees.find(callee);
+  if (structCallee == candidateStructCallees.end()) return {};
+  const auto rawArgs = splitArguments((*call)[2]);
+  std::vector<std::string> paramTypes;
+  auto signature = candidateFunctionParamTypes.find(callee);
+  if (signature != candidateFunctionParamTypes.end()) {
+    paramTypes = signature->second;
+    if (paramTypes.size() != rawArgs.size()) return {};
+  } else {
+    paramTypes.assign(rawArgs.size(), "I32");
+  }
+  std::string code;
+  std::vector<std::string> arguments;
+  for (std::size_t i = 0; i < rawArgs.size(); ++i) {
+    const std::string arg = trim(rawArgs[i]);
+    const std::string paramType = paramTypes[i];
+    if (paramType == "I32" || enumTypes.count(paramType)) {
+      auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
+      if (!lowered.ok) return {};
+      code += lowered.code;
+      arguments.push_back("i32 " + lowered.value);
+    } else if (structTypes.count(paramType)) {
+      auto localStruct = structLocals.find(arg);
+      if (localStruct == structLocals.end() || localStruct->second.typeName != paramType) return {};
+      arguments.push_back(nativeLlvmTypeRef(paramType) + " " + localStruct->second.value);
+    } else {
+      return {};
+    }
+  }
+  const std::string temp = "%t" + std::to_string(tempId++);
+  code += "  " + temp + " = call " + nativeLlvmTypeRef(structCallee->second) + " @" + callee + "(";
+  for (std::size_t i = 0; i < arguments.size(); ++i) {
+    if (i != 0) code += ", ";
+    code += arguments[i];
+  }
+  code += ")\n";
+  return NativeI32StructExpr{true, code, structCallee->second, temp};
+}
+
+NativeI32Expr lowerNativePayloadEnumTag(const NativeI32StructLocal &aggregate, int &tempId) {
+  const std::string temp = "%t" + std::to_string(tempId++);
+  return NativeI32Expr{true,
+                       "  " + temp + " = extractvalue " + nativeLlvmTypeRef(aggregate.typeName) + " " + aggregate.value + ", 0\n",
+                       temp};
+}
+
+bool bindNativePayloadEnumArm(const NativePayloadEnumType &enumType,
+                              const std::string &enumName,
+                              const std::string &variantName,
+                              const std::vector<std::string> &bindingNames,
+                              const std::string &aggregateValue,
+                              const std::map<std::string, NativeI32StructType> &structTypes,
+                              std::map<std::string, NativeI32Local> &armLocals,
+                              std::map<std::string, NativeI32StructLocal> &armStructLocals,
+                              std::string &code,
+                              int &tempId) {
+  if (bindingNames.empty()) return true;
+  auto payload = enumType.variantPayloads.find(variantName);
+  if (payload == enumType.variantPayloads.end()) return false;
+  const bool allI32Payloads = std::all_of(payload->second.payloadTypes.begin(),
+                                          payload->second.payloadTypes.end(),
+                                          [](const std::string &type) { return type == "I32"; });
+  if (allI32Payloads && bindingNames.size() == payload->second.payloadTypes.size()) {
+    std::size_t slot = 1;
+    for (std::size_t i = 0; i < bindingNames.size(); ++i) {
+      const std::string payloadType = payload->second.payloadTypes[i];
+      if (payloadType != "I32" || !isSimpleLlvmGlobalName(bindingNames[i])) return false;
+      const std::string temp = "%t" + std::to_string(tempId++);
+      code += "  " + temp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(slot++) + "\n";
+      armLocals[bindingNames[i]] = NativeI32Local{false, temp};
+    }
+    return true;
+  }
+  if (bindingNames.size() != 1 || payload->second.payloadTypes.size() != 1) return false;
+  const std::string bindingName = bindingNames.front();
+  const std::string payloadType = payload->second.payloadTypes.front();
+  if (!isSimpleLlvmGlobalName(bindingName)) return false;
+  if (payloadType == "I32") {
+    const std::string temp = "%t" + std::to_string(tempId++);
+    code += "  " + temp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", 1\n";
+    armLocals[bindingName] = NativeI32Local{false, temp};
+    return true;
+  }
+  auto structType = structTypes.find(payloadType);
+  if (structType == structTypes.end()) return false;
+  std::string structValue = "undef";
+  for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+    const std::string fieldTemp = "%t" + std::to_string(tempId++);
+    const std::string aggregateTemp = "%t" + std::to_string(tempId++);
+    code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(field + 1) + "\n";
+    code += "  " + aggregateTemp + " = insertvalue " + nativeLlvmTypeRef(payloadType) + " " + structValue + ", i32 " + fieldTemp + ", " + std::to_string(field) + "\n";
+    structValue = aggregateTemp;
+  }
+  armStructLocals[bindingName] = NativeI32StructLocal{payloadType, structValue};
+  return true;
+}
+
+std::optional<NativeMatchPatternAlt> parseNativeMatchPatternAlt(const std::string &rawPattern) {
+  const std::string pattern = trim(rawPattern);
+  NativeMatchPatternAlt alt;
+  if (auto record = matchRegex(pattern, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\{\s*(.*?)\s*\}$)"))) {
+    alt.enumName = (*record)[1];
+    alt.variantName = (*record)[2];
+    for (const auto &binding : splitArguments((*record)[3])) {
+      const std::string name = trim(binding);
+      if (!isSimpleLlvmGlobalName(name)) return std::nullopt;
+      alt.bindingNames.push_back(name);
+    }
+    return alt;
+  }
+  if (auto tuple = matchRegex(pattern, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)$)"))) {
+    alt.enumName = (*tuple)[1];
+    alt.variantName = (*tuple)[2];
+    const auto args = splitArguments((*tuple)[3]);
+    if (args.size() == 1) {
+      const std::string arg = trim(args.front());
+      if (auto closedRange = matchRegex(arg, std::regex(R"(^([0-9]+)\s*\.\.=\s*([0-9]+)$)"))) {
+        alt.hasRange = true;
+        alt.rangeStart = std::stoi((*closedRange)[1]);
+        alt.rangeEnd = std::stoi((*closedRange)[2]);
+        alt.rangeInclusive = true;
+        return alt;
+      }
+      if (auto halfOpenRange = matchRegex(arg, std::regex(R"(^([0-9]+)\s*\.\.\s*([0-9]+)$)"))) {
+        alt.hasRange = true;
+        alt.rangeStart = std::stoi((*halfOpenRange)[1]);
+        alt.rangeEnd = std::stoi((*halfOpenRange)[2]);
+        alt.rangeInclusive = false;
+        return alt;
+      }
+    }
+    for (const auto &binding : args) {
+      const std::string name = trim(binding);
+      if (!isSimpleLlvmGlobalName(name)) return std::nullopt;
+      alt.bindingNames.push_back(name);
+    }
+    return alt;
+  }
+  if (auto unit = matchRegex(pattern, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$)"))) {
+    alt.enumName = (*unit)[1];
+    alt.variantName = (*unit)[2];
+    return alt;
+  }
+  return std::nullopt;
+}
+
+NativeMatchArm parseNativeMatchArmLine(const std::string &rawLine, bool returnExpressionMatch) {
+  std::string line = trim(rawLine);
+  if (!line.empty() && (line.back() == ',' || line.back() == ';')) line.pop_back();
+  line = trim(line);
+  const auto arrow = findTopLevelToken(line, "=>");
+  if (!arrow) return {};
+  std::string lhs = trim(std::string_view(line).substr(0, *arrow));
+  std::string rhs = trim(std::string_view(line).substr(*arrow + 2));
+  if (!returnExpressionMatch) {
+    if (!startsWith(rhs, "return ")) return {};
+    rhs = trim(rhs.substr(7));
+  }
+  NativeMatchArm arm;
+  arm.expr = rhs;
+  if (const auto guard = findTopLevelToken(lhs, " if ")) {
+    arm.guard = trim(std::string_view(lhs).substr(*guard + 4));
+    lhs = trim(std::string_view(lhs).substr(0, *guard));
+  }
+  for (const auto &alternative : splitTopLevel(lhs, '|')) {
+    auto parsed = parseNativeMatchPatternAlt(alternative);
+    if (!parsed) return {};
+    arm.alternatives.push_back(*parsed);
+  }
+  arm.ok = !arm.alternatives.empty() && !arm.expr.empty();
+  return arm;
+}
+
+bool nativePayloadAltNeedsSameLayout(const NativePayloadEnumType &enumType,
+                                     const NativeMatchPatternAlt &reference,
+                                     const NativeMatchPatternAlt &candidate) {
+  auto referencePayload = enumType.variantPayloads.find(reference.variantName);
+  auto candidatePayload = enumType.variantPayloads.find(candidate.variantName);
+  if (referencePayload == enumType.variantPayloads.end() ||
+      candidatePayload == enumType.variantPayloads.end()) {
+    return false;
+  }
+  return referencePayload->second.payloadTypes == candidatePayload->second.payloadTypes &&
+         reference.bindingNames == candidate.bindingNames;
+}
+
+bool appendNativeMatchArmIr(const NativeMatchArm &arm,
+                            const std::string &matchValue,
+                            const std::string &matchAggregateValue,
+                            const std::map<std::string, NativeI32Local> &locals,
+                            const std::map<std::string, NativeI32StructLocal> &structLocals,
+                            const std::map<std::string, NativeI32StructType> &nativeStructs,
+                            const std::map<std::string, NativeI32EnumType> &nativeEnums,
+                            const std::map<std::string, NativePayloadEnumType> &nativePayloadEnums,
+                            const std::map<std::string, std::vector<std::string>> &candidateFunctionParamTypes,
+                            const std::set<std::string> &candidateCallees,
+                            const std::set<std::string> &candidateBoolCallees,
+                            std::string &currentArmLabel,
+                            std::string &matchArmCode,
+                            std::string &matchEnumType,
+                            int &tempId) {
+  if (!arm.ok || arm.alternatives.empty()) return false;
+  const std::string enumName = arm.alternatives.front().enumName;
+  for (const auto &alt : arm.alternatives) {
+    if (alt.enumName != enumName) return false;
+  }
+  const std::string payloadEnumName = resolveNativePayloadEnumTypeName(enumName, matchEnumType, nativePayloadEnums);
+  const bool isPayloadEnum = !payloadEnumName.empty();
+  const bool isPlainEnum = nativeEnums.count(enumName) != 0;
+  const std::string effectiveEnumName = isPayloadEnum ? payloadEnumName : enumName;
+  if (!matchEnumType.empty() && matchEnumType != effectiveEnumName) return false;
+  matchEnumType = effectiveEnumName;
+
+  if (!isPayloadEnum && !isPlainEnum) return false;
+  if (isPayloadEnum && matchAggregateValue.empty()) return false;
+
+  const std::string afterArmLabel = "match.arm." + std::to_string(tempId++);
+  matchArmCode += currentArmLabel + ":\n";
+  std::string armCaseBodies;
+
+  for (std::size_t i = 0; i < arm.alternatives.size(); ++i) {
+    const auto &alt = arm.alternatives[i];
+    int discriminant = -1;
+    if (isPayloadEnum) {
+      const auto enumType = nativePayloadEnums.find(effectiveEnumName);
+      auto discriminantIt = enumType->second.discriminants.find(alt.variantName);
+      if (discriminantIt == enumType->second.discriminants.end()) return false;
+      discriminant = discriminantIt->second;
+      if (i > 0 && (!nativePayloadAltNeedsSameLayout(enumType->second, arm.alternatives.front(), alt) &&
+                    (!alt.bindingNames.empty() || !arm.alternatives.front().bindingNames.empty()))) {
+        return false;
+      }
+    } else {
+      auto enumType = nativeEnums.find(enumName);
+      auto discriminantIt = enumType->second.discriminants.find(alt.variantName);
+      if (discriminantIt == enumType->second.discriminants.end()) return false;
+      if (!alt.bindingNames.empty() || alt.hasRange) return false;
+      discriminant = discriminantIt->second;
+    }
+
+    const std::string caseLabel = "match.case." + std::to_string(tempId++);
+    const std::string nextTestLabel = "match.test." + std::to_string(tempId++);
+    const std::string discrTemp = "%t" + std::to_string(tempId++);
+    matchArmCode += "  " + discrTemp + " = icmp eq i32 " + matchValue + ", " + std::to_string(discriminant) + "\n";
+    matchArmCode += "  br i1 " + discrTemp + ", label %" + caseLabel + ", label %" + nextTestLabel + "\n";
+    matchArmCode += nextTestLabel + ":\n";
+    if (i + 1 == arm.alternatives.size()) {
+      matchArmCode += "  br label %" + afterArmLabel + "\n";
+    }
+
+    std::map<std::string, NativeI32Local> armLocals = locals;
+    std::map<std::string, NativeI32StructLocal> armStructLocals = structLocals;
+    std::string caseCode = caseLabel + ":\n";
+    if (isPayloadEnum) {
+      const auto &payloadEnum = nativePayloadEnums.find(effectiveEnumName)->second;
+      if (!bindNativePayloadEnumArm(payloadEnum,
+                                    effectiveEnumName,
+                                    alt.variantName,
+                                    alt.bindingNames,
+                                    matchAggregateValue,
+                                    nativeStructs,
+                                    armLocals,
+                                    armStructLocals,
+                                    caseCode,
+                                    tempId)) {
+        return false;
+      }
+      if (alt.hasRange) {
+        auto payload = payloadEnum.variantPayloads.find(alt.variantName);
+        if (payload == payloadEnum.variantPayloads.end() ||
+            payload->second.payloadTypes.size() != 1 ||
+            payload->second.payloadTypes.front() != "I32") {
+          return false;
+        }
+        const std::string payloadTemp = "%t" + std::to_string(tempId++);
+        const std::string lowTemp = "%t" + std::to_string(tempId++);
+        const std::string highTemp = "%t" + std::to_string(tempId++);
+        const std::string rangeTemp = "%t" + std::to_string(tempId++);
+        const std::string rangePassLabel = "match.range.pass." + std::to_string(tempId++);
+        caseCode += "  " + payloadTemp + " = extractvalue " + nativeLlvmTypeRef(effectiveEnumName) + " " + matchAggregateValue + ", 1\n";
+        caseCode += "  " + lowTemp + " = icmp sge i32 " + payloadTemp + ", " + std::to_string(alt.rangeStart) + "\n";
+        caseCode += "  " + highTemp + " = icmp " + std::string(alt.rangeInclusive ? "sle" : "slt") + " i32 " + payloadTemp + ", " + std::to_string(alt.rangeEnd) + "\n";
+        caseCode += "  " + rangeTemp + " = and i1 " + lowTemp + ", " + highTemp + "\n";
+        caseCode += "  br i1 " + rangeTemp + ", label %" + rangePassLabel + ", label %" + afterArmLabel + "\n";
+        caseCode += rangePassLabel + ":\n";
+      }
+    }
+    if (!arm.guard.empty()) {
+      auto guard = lowerNativeI32Condition(arm.guard,
+                                           armLocals,
+                                           armStructLocals,
+                                           nativeStructs,
+                                           nativeEnums,
+                                           candidateFunctionParamTypes,
+                                           candidateCallees,
+                                           candidateBoolCallees,
+                                           tempId);
+      if (!guard.ok) return false;
+      const std::string guardPassLabel = "match.guard.pass." + std::to_string(tempId++);
+      caseCode += guard.code;
+      caseCode += "  br i1 " + guard.value + ", label %" + guardPassLabel + ", label %" + afterArmLabel + "\n";
+      caseCode += guardPassLabel + ":\n";
+    }
+    auto lowered = lowerNativeI32Expr(arm.expr,
+                                      armLocals,
+                                      armStructLocals,
+                                      nativeStructs,
+                                      nativeEnums,
+                                      candidateFunctionParamTypes,
+                                      candidateCallees,
+                                      tempId);
+    if (!lowered.ok) return false;
+    caseCode += lowered.code;
+    caseCode += "  ret i32 " + lowered.value + "\n";
+    armCaseBodies += caseCode;
+  }
+  matchArmCode += armCaseBodies;
+  currentArmLabel = afterArmLabel;
+  return true;
+}
+
+std::string entryFunctionName(const BuildPackage &package) {
+  const std::size_t dot = package.entry.rfind('.');
+  if (dot == std::string::npos) return package.entry.empty() ? "main" : package.entry;
+  return package.entry.substr(dot + 1);
+}
+
+std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPackage &package) {
+  std::map<std::string, std::string> out;
+  const std::regex fnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*I32\s*\{?)");
+  const std::regex boolFnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*Bool\s*\{?)");
+  const std::regex structFnPattern(R"(^\s*(pub\s+|private\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]+>)?)\s*\{?)");
+  const std::regex localConstPattern(R"(^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*I32)?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex bindingPattern(R"(^\s*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*I32)?\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex assignmentPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*$)");
+  const std::regex returnPattern(R"(^\s*return\s+(.+?)\s*;?\s*$)");
+  const std::regex ifPattern(R"(^\s*if\s+(.+?)\s*\{\s*$)");
+  const std::regex whilePattern(R"(^\s*while\s+(.+?)\s*\{\s*$)");
+  const std::regex parameterPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*I32\s*$)");
+  const std::regex exportPattern(R"re(^\s*@export\s*\(\s*"([^"]+)"\s*,\s*abi:\s*C\s*\)\s*$)re");
+  std::set<std::string> candidateCallees;
+  std::set<std::string> candidateBoolCallees;
+  std::map<std::string, NativeI32Local> nativeConstants;
+  std::map<std::string, NativeI32Local> nativeGlobals;
+  std::map<std::string, NativeI32StructType> nativeStructs;
+  std::map<std::string, NativeI32EnumType> nativeEnums;
+  std::map<std::string, NativePayloadEnumType> nativePayloadEnums;
+  std::map<std::string, NativeGenericPayloadEnumTemplate> genericPayloadEnums;
+  std::map<std::string, std::string> candidateStructCallees;
+  std::map<std::string, std::vector<std::string>> candidateFunctionParamTypes;
+  std::map<std::string, std::vector<std::pair<std::string, std::string>>> nativeStructFields;
+  std::set<std::string> nonNativeStructs;
+  const std::regex enumDeclPattern(R"(^\s*(?:pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{?)");
+  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*,?\s*$)");
+  for (const auto &file : buildSourceFiles(package)) {
+    if (file.extension() != ".zn") continue;
+    const SourceText source = loadSource(file);
+    bool inNativeEnum = false;
+    bool nativeEnumValid = false;
+    int enumBraceDepth = 0;
+    std::string enumName;
+    NativeI32EnumType enumType;
+    for (const auto &rawLine : splitLines(source.text)) {
+      const std::string line = stripLineComment(rawLine);
+      const std::string trimmedLine = trim(line);
+      if (!inNativeEnum) {
+        if (auto decl = matchRegex(trimmedLine, enumDeclPattern)) {
+          enumName = (*decl)[1];
+          inNativeEnum = true;
+          nativeEnumValid = isSimpleLlvmGlobalName(enumName);
+          enumBraceDepth = braceDelta(line);
+          enumType = NativeI32EnumType{};
+        }
+      } else {
+        if (trimmedLine != "}" && !trimmedLine.empty()) {
+          if (auto variant = matchRegex(trimmedLine, enumVariantPattern)) {
+            const std::string variantName = (*variant)[1];
+            if (isSimpleLlvmGlobalName(variantName)) {
+              enumType.discriminants[variantName] = static_cast<int>(enumType.variants.size());
+              enumType.variants.push_back(variantName);
+            } else {
+              nativeEnumValid = false;
+            }
+          } else {
+            nativeEnumValid = false;
+          }
+        }
+        enumBraceDepth += braceDelta(line);
+        if (enumBraceDepth <= 0) {
+          if (nativeEnumValid && !enumName.empty() && !enumType.variants.empty()) {
+            nativeEnums[enumName] = enumType;
+          }
+          inNativeEnum = false;
+          nativeEnumValid = false;
+          enumBraceDepth = 0;
+          enumName.clear();
+          enumType = NativeI32EnumType{};
+        }
+      }
+    }
+  }
+  const auto astNodes = parseTopLevelAst(package.root, package.name, buildSourceFiles(package));
+  for (const auto &node : astNodes) {
+    if (node.kind == "decl.field") {
+      const std::size_t dot = node.name.find('.');
+      if (dot == std::string::npos) continue;
+      const std::string structName = node.name.substr(0, dot);
+      const std::string fieldName = node.name.substr(dot + 1);
+      if (!isSimpleLlvmGlobalName(structName) || !isSimpleLlvmGlobalName(fieldName) ||
+          normalizeSignatureType(node.returnType) != "I32") {
+        nonNativeStructs.insert(structName);
+      } else {
+        nativeStructFields[structName].push_back({fieldName, normalizeSignatureType(node.returnType)});
+      }
+      continue;
+    }
+    if (node.kind == "decl.const" && normalizeSignatureType(node.returnType) == "I32") {
+      std::string constantValue = node.params;
+      if (startsWith(constantValue, "int-literal:")) constantValue = constantValue.substr(12);
+      if (std::regex_match(constantValue, std::regex(R"([0-9]+)"))) {
+        nativeConstants[node.name] = NativeI32Local{false, constantValue};
+      }
+    } else if (node.kind == "decl.static" && normalizeSignatureType(node.returnType) == "I32") {
+      std::string initialValue = node.params;
+      if (startsWith(initialValue, "int-literal:")) initialValue = initialValue.substr(12);
+      if (std::regex_match(initialValue, std::regex(R"([0-9]+)")) && isSimpleLlvmGlobalName(node.name)) {
+        nativeGlobals[node.name] = NativeI32Local{true, "@" + node.name};
+        out[node.name] = "\n@" + node.name + " = internal global i32 " + initialValue + "\n";
+      }
+    } else if (node.kind == "decl.fn" && normalizeSignatureType(node.returnType) == "I32") {
+      candidateCallees.insert(node.name);
+    } else if (node.kind == "decl.fn" && nativeEnums.count(normalizeSignatureType(node.returnType))) {
+      candidateCallees.insert(node.name);
+    } else if (node.kind == "decl.fn" && normalizeSignatureType(node.returnType) == "Bool") {
+      candidateBoolCallees.insert(node.name);
+    } else if (node.kind == "decl.extern" && node.abi == "C" && normalizeSignatureType(node.returnType) == "I32") {
+      std::string externParams;
+      if (nativeI32ParameterList(node.params, &externParams)) {
+        candidateCallees.insert(node.name);
+        out[node.name] = "\ndeclare i32 @" + node.name + "(" + externParams + ")\n";
+      }
+    }
+  }
+  for (const auto &[structName, fields] : nativeStructFields) {
+    if (nonNativeStructs.count(structName) || fields.empty()) continue;
+    NativeI32StructType type;
+    std::string llvmType = "\n" + nativeLlvmTypeRef(structName) + " = type { ";
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+      if (i != 0) llvmType += ", ";
+      llvmType += "i32";
+      type.fields.push_back(fields[i].first);
+    }
+    llvmType += " }\n";
+    nativeStructs[structName] = type;
+    out[nativeLlvmTypeRef(structName)] = llvmType;
+  }
+  const std::regex payloadEnumDeclPattern(R"(^\s*(?:pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?\s*\{?)");
+  const std::regex payloadEnumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s*(\(([^)]*)\)|\{\s*(.*?)\s*\}))?\s*,?\s*$)");
+  for (const auto &file : buildSourceFiles(package)) {
+    if (file.extension() != ".zn") continue;
+    const SourceText source = loadSource(file);
+    bool inEnum = false;
+    bool enumValid = false;
+    bool enumGeneric = false;
+    bool enumHasPayload = false;
+    int enumBraceDepth = 0;
+    std::string enumName;
+    std::vector<std::string> enumGenericParams;
+    NativePayloadEnumType enumType;
+    for (const auto &rawLine : splitLines(source.text)) {
+      const std::string line = stripLineComment(rawLine);
+      const std::string trimmedLine = trim(line);
+      if (!inEnum) {
+        if (auto decl = matchRegex(trimmedLine, payloadEnumDeclPattern)) {
+          enumName = (*decl)[1];
+          inEnum = true;
+          enumGeneric = false;
+          enumGenericParams.clear();
+          if ((*decl)[2].matched) {
+            std::string genericText = trim(std::string((*decl)[2]));
+            if (genericText.size() >= 2 && genericText.front() == '<' && genericText.back() == '>') {
+              genericText = trim(genericText.substr(1, genericText.size() - 2));
+              bool validGenericParams = true;
+              for (const auto &param : splitArguments(genericText)) {
+                const std::string genericParam = trim(param);
+                if (!isSimpleLlvmGlobalName(genericParam)) {
+                  validGenericParams = false;
+                  break;
+                }
+                enumGenericParams.push_back(genericParam);
+              }
+              if (validGenericParams && !enumGenericParams.empty()) {
+                enumGeneric = true;
+              }
+            }
+          }
+          enumValid = isSimpleLlvmGlobalName(enumName) && (!(*decl)[2].matched || enumGeneric);
+          enumHasPayload = false;
+          enumBraceDepth = braceDelta(line);
+          enumType = NativePayloadEnumType{};
+          enumType.sourceName = enumName;
+        }
+      } else {
+        if (trimmedLine != "}" && !trimmedLine.empty()) {
+          if (auto variant = matchRegex(trimmedLine, payloadEnumVariantPattern)) {
+            const std::string variantName = (*variant)[1];
+            if (!isSimpleLlvmGlobalName(variantName)) {
+              enumValid = false;
+            } else {
+              enumType.discriminants[variantName] = static_cast<int>(enumType.variants.size());
+              enumType.variants.push_back(variantName);
+              NativePayloadEnumVariant payload;
+              if ((*variant)[3].matched) {
+                enumHasPayload = true;
+                for (const auto &rawType : splitArguments((*variant)[3])) {
+                  const std::string payloadType = normalizeSignatureType(rawType);
+                  const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
+                  if (payloadType != "I32" && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
+                  payload.payloadTypes.push_back(payloadType);
+                }
+              } else if ((*variant)[4].matched) {
+                enumHasPayload = true;
+                for (const auto &field : splitArguments((*variant)[4])) {
+                  auto parsedField = matchRegex(field, std::regex(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$)"));
+                  if (!parsedField) {
+                    enumValid = false;
+                    continue;
+                  }
+                  const std::string payloadType = normalizeSignatureType((*parsedField)[2]);
+                  const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
+                  if (payloadType != "I32" && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
+                  payload.payloadNames.push_back((*parsedField)[1]);
+                  payload.payloadTypes.push_back(payloadType);
+                }
+              }
+              std::size_t slots = 0;
+              for (const auto &payloadType : payload.payloadTypes) {
+                const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
+                if (payloadType == "I32" || genericPayload) slots += 1;
+                else if (nativeStructs.count(payloadType)) slots += nativeStructs[payloadType].fields.size();
+                else enumValid = false;
+              }
+              enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
+              enumType.variantPayloads[variantName] = payload;
+            }
+          } else {
+            enumValid = false;
+          }
+        }
+        enumBraceDepth += braceDelta(line);
+        if (enumBraceDepth <= 0) {
+          if (enumValid && enumHasPayload && !enumName.empty() && !enumType.variants.empty()) {
+            if (enumGeneric) {
+              genericPayloadEnums[enumName] = NativeGenericPayloadEnumTemplate{enumGenericParams, enumType};
+            } else {
+              nativePayloadEnums[enumName] = enumType;
+              NativeI32StructType aggregateType;
+              aggregateType.fields.push_back("tag");
+              std::string llvmType = "\n" + nativeLlvmTypeRef(enumName) + " = type { i32";
+              for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+                llvmType += ", i32";
+                aggregateType.fields.push_back("payload" + std::to_string(slot));
+              }
+              llvmType += " }\n";
+              nativeStructs[enumName] = aggregateType;
+              out[nativeLlvmTypeRef(enumName)] = llvmType;
+            }
+          }
+          inEnum = false;
+          enumValid = false;
+          enumGeneric = false;
+          enumHasPayload = false;
+          enumBraceDepth = 0;
+          enumName.clear();
+          enumGenericParams.clear();
+          enumType = NativePayloadEnumType{};
+        }
+      }
+    }
+  }
+  std::set<std::string> genericPayloadInstances;
+  auto collectGenericPayloadInstance = [&](const std::string &typeName) {
+    const std::string normalized = normalizeSignatureType(typeName);
+    auto instance = nativeGenericInstance(normalized);
+    if (!instance) return;
+    if (!genericPayloadEnums.count(instance->first)) return;
+    const auto genericTemplate = genericPayloadEnums.find(instance->first);
+    if (genericTemplate == genericPayloadEnums.end()) return;
+    if (genericTemplate->second.typeParams.size() != instance->second.size()) return;
+    for (const auto &arg : instance->second) {
+      if (arg != "I32" && !nativeStructs.count(arg)) return;
+    }
+    genericPayloadInstances.insert(normalized);
+  };
+  for (const auto &node : astNodes) {
+    collectGenericPayloadInstance(node.returnType);
+    if (node.kind == "decl.fn" || node.kind == "decl.extern") {
+      for (const auto &paramType : parameterTypes(node.params)) {
+        collectGenericPayloadInstance(paramType);
+      }
+    }
+  }
+  for (const auto &instanceTypeName : genericPayloadInstances) {
+    const auto instance = nativeGenericInstance(instanceTypeName);
+    if (!instance) continue;
+    auto genericTemplate = genericPayloadEnums.find(instance->first);
+    if (genericTemplate == genericPayloadEnums.end()) continue;
+    if (genericTemplate->second.typeParams.size() != instance->second.size()) continue;
+    std::map<std::string, std::string> typeSubstitutions;
+    for (std::size_t i = 0; i < instance->second.size(); ++i) {
+      typeSubstitutions[genericTemplate->second.typeParams[i]] = instance->second[i];
+    }
+    NativePayloadEnumType enumType;
+    enumType.sourceName = instance->first;
+    enumType.variants = genericTemplate->second.enumType.variants;
+    enumType.discriminants = genericTemplate->second.enumType.discriminants;
+    bool validInstance = true;
+    for (const auto &[variantName, genericPayload] : genericTemplate->second.enumType.variantPayloads) {
+      NativePayloadEnumVariant payload;
+      payload.payloadNames = genericPayload.payloadNames;
+      for (const auto &payloadType : genericPayload.payloadTypes) {
+        if (typeSubstitutions.count(payloadType)) {
+          payload.payloadTypes.push_back(typeSubstitutions[payloadType]);
+        } else {
+          payload.payloadTypes.push_back(payloadType);
+        }
+      }
+      std::size_t slots = 0;
+      for (const auto &payloadType : payload.payloadTypes) {
+        if (payloadType == "I32") slots += 1;
+        else if (nativeStructs.count(payloadType)) slots += nativeStructs[payloadType].fields.size();
+        else validInstance = false;
+      }
+      enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
+      enumType.variantPayloads[variantName] = payload;
+    }
+    if (!validInstance || enumType.variants.empty()) continue;
+    nativePayloadEnums[instanceTypeName] = enumType;
+    NativeI32StructType aggregateType;
+    aggregateType.fields.push_back("tag");
+    std::string llvmType = "\n" + nativeLlvmTypeRef(instanceTypeName) + " = type { i32";
+    for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+      llvmType += ", i32";
+      aggregateType.fields.push_back("payload" + std::to_string(slot));
+    }
+    llvmType += " }\n";
+    nativeStructs[instanceTypeName] = aggregateType;
+    out[nativeLlvmTypeRef(instanceTypeName)] = llvmType;
+  }
+  for (const auto &node : astNodes) {
+    const std::string returnType = normalizeSignatureType(node.returnType);
+    if (node.kind == "decl.fn" || (node.kind == "decl.extern" && node.abi == "C")) {
+      std::vector<std::pair<std::string, std::string>> parsedParams;
+      std::string llvmParams;
+      if (nativeParameterList(node.params, nativeStructs, nativeEnums, &parsedParams, &llvmParams)) {
+        std::vector<std::string> paramTypes;
+        for (const auto &[paramName, paramType] : parsedParams) paramTypes.push_back(paramType);
+        candidateFunctionParamTypes[node.name] = paramTypes;
+      }
+    }
+    if (node.kind == "decl.fn" && nativeStructs.count(returnType)) {
+      candidateStructCallees[node.name] = returnType;
+    }
+  }
+
+  for (const auto &file : buildSourceFiles(package)) {
+    if (file.extension() != ".zn") continue;
+    const SourceText source = loadSource(file);
+    bool active = false;
+    bool activeBool = false;
+    std::string activeStructReturnType;
+    std::string activeEnumReturnType;
+    bool valid = false;
+    bool returned = false;
+    int braceDepth = 0;
+    int tempId = 0;
+    std::string functionName;
+    std::string functionParams;
+    std::string pendingExportSymbol;
+    std::string functionExportSymbol;
+    std::string body;
+    std::map<std::string, NativeI32Local> locals;
+    std::map<std::string, NativeI32StructLocal> structLocals;
+    bool inIf = false;
+    bool inElse = false;
+    bool ifReturned = false;
+    std::string ifContLabel;
+    bool ifHasScopedBindings = false;
+    std::map<std::string, NativeI32Local> ifOuterLocals;
+    std::map<std::string, NativeI32StructLocal> ifOuterStructLocals;
+    bool inWhile = false;
+    bool inTrustReturn = false;
+    bool inMatch = false;
+    std::string whileCondLabel;
+    std::string whileBodyLabel;
+    std::string whileExitLabel;
+    bool whileReturned = false;
+    bool whileHasScopedBindings = false;
+    std::map<std::string, NativeI32Local> whileOuterLocals;
+    std::map<std::string, NativeI32StructLocal> whileOuterStructLocals;
+    bool inFor = false;
+    bool forReturned = false;
+    std::string forCondLabel;
+    std::string forBodyLabel;
+    std::string forStepLabel;
+    std::string forExitLabel;
+    std::string forIndexPtr;
+    std::string forCurrentValue;
+    std::map<std::string, NativeI32Local> forOuterLocals;
+    std::map<std::string, NativeI32StructLocal> forOuterStructLocals;
+    std::string matchPrefixCode;
+    std::string matchValue;
+    std::string matchCases;
+    std::string matchBodies;
+    std::string matchDefaultLabel;
+    std::string matchEnumType;
+    std::string matchAggregateValue;
+    std::string matchNextArmLabel;
+    bool matchIsReturnExpr = false;
+    const std::regex matchPattern(R"(^\s*match\s+(.+?)\s*\{\s*$)");
+    const std::regex returnMatchPattern(R"(^\s*return\s+match\s+(.+?)\s*\{\s*$)");
+    const std::regex ifPatternBindingPattern(R"(^\s*if\s+(?:(move|mut)\s+)?(.+?)\s+=\s+(.+?)\s*\{\s*$)");
+    const std::regex whilePatternBindingPattern(R"(^\s*while\s+(?:(move|mut)\s+)?(.+?)\s+=\s+(.+?)\s*\{\s*$)");
+    const std::regex forRangePattern(R"(^\s*for\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+?)(\.\.=|\.\.)(.+?)\s*\{\s*$)");
+    const std::regex breakPattern(R"(^\s*break(?:\s+(.+?))?\s*;?\s*$)");
+    const std::regex continuePattern(R"(^\s*continue\s*;?\s*$)");
+    const std::regex tryStatementPattern(R"(^\s*try\s+(.+?)\s*;?\s*$)");
+    const std::regex matchReturnArmPattern(R"(^\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:(?:\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\))|(?:\s*\{\s*(.*?)\s*\}))?\s*=>\s*return\s+(.+?)\s*[,;]?\s*$)");
+    const std::regex matchExprArmPattern(R"(^\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:(?:\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\))|(?:\s*\{\s*(.*?)\s*\}))?\s*=>\s*(.+?)\s*[,;]?\s*$)");
+    for (const auto &rawLine : splitLines(source.text)) {
+      const std::string line = stripLineComment(rawLine);
+      const std::string trimmedLine = trim(line);
+      if (!active) {
+        if (auto exportAttr = matchRegex(trimmedLine, exportPattern)) {
+          pendingExportSymbol = (*exportAttr)[1];
+          braceDepth += braceDelta(line);
+          continue;
+        }
+        if (braceDepth == 0) {
+          if (auto fn = matchRegex(trimmedLine, fnPattern)) {
+            active = contains(trimmedLine, "{");
+            activeBool = false;
+            activeStructReturnType.clear();
+            activeEnumReturnType.clear();
+            valid = active;
+            returned = false;
+            tempId = 0;
+            functionName = (*fn)[2];
+            functionParams.clear();
+            functionExportSymbol = pendingExportSymbol;
+            pendingExportSymbol.clear();
+            body.clear();
+            locals = nativeConstants;
+            locals.insert(nativeGlobals.begin(), nativeGlobals.end());
+            structLocals.clear();
+            std::vector<std::pair<std::string, std::string>> parsedParams;
+            if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
+              for (const auto &[paramName, paramType] : parsedParams) {
+                if (paramType == "I32") {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                } else if (nativeEnums.count(paramType)) {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                } else {
+                  structLocals[paramName] = NativeI32StructLocal{paramType, "%" + paramName};
+                }
+              }
+            } else {
+              valid = false;
+            }
+          } else if (auto fn = matchRegex(trimmedLine, boolFnPattern)) {
+            active = contains(trimmedLine, "{");
+            activeBool = true;
+            activeStructReturnType.clear();
+            activeEnumReturnType.clear();
+            valid = active;
+            returned = false;
+            tempId = 0;
+            functionName = (*fn)[2];
+            functionParams.clear();
+            functionExportSymbol = pendingExportSymbol;
+            pendingExportSymbol.clear();
+            body.clear();
+            locals = nativeConstants;
+            locals.insert(nativeGlobals.begin(), nativeGlobals.end());
+            structLocals.clear();
+            std::vector<std::pair<std::string, std::string>> parsedParams;
+            if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
+              for (const auto &[paramName, paramType] : parsedParams) {
+                if (paramType == "I32") {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                } else if (nativeEnums.count(paramType)) {
+                  locals[paramName] = NativeI32Local{false, "%" + paramName};
+                } else {
+                  structLocals[paramName] = NativeI32StructLocal{paramType, "%" + paramName};
+                }
+              }
+            } else {
+              valid = false;
+            }
+          } else if (auto fn = matchRegex(trimmedLine, structFnPattern)) {
+            const std::string returnType = normalizeSignatureType((*fn)[4]);
+            if (nativeStructs.count(returnType) || nativeEnums.count(returnType)) {
+              active = contains(trimmedLine, "{");
+              activeBool = false;
+              activeStructReturnType = nativeStructs.count(returnType) ? returnType : "";
+              activeEnumReturnType = nativeEnums.count(returnType) ? returnType : "";
+              valid = active;
+              returned = false;
+              tempId = 0;
+              functionName = (*fn)[2];
+              functionParams.clear();
+              functionExportSymbol = pendingExportSymbol;
+              pendingExportSymbol.clear();
+              body.clear();
+              locals = nativeConstants;
+              locals.insert(nativeGlobals.begin(), nativeGlobals.end());
+              structLocals.clear();
+              std::vector<std::pair<std::string, std::string>> parsedParams;
+              if (nativeParameterList((*fn)[3], nativeStructs, nativeEnums, &parsedParams, &functionParams)) {
+                for (const auto &[paramName, paramType] : parsedParams) {
+                  if (paramType == "I32") {
+                    locals[paramName] = NativeI32Local{false, "%" + paramName};
+                  } else if (nativeEnums.count(paramType)) {
+                    locals[paramName] = NativeI32Local{false, "%" + paramName};
+                  } else {
+                    structLocals[paramName] = NativeI32StructLocal{paramType, "%" + paramName};
+                  }
+                }
+              } else {
+                valid = false;
+              }
+            }
+          }
+        }
+      } else if (!activeBool && inIf && trimmedLine == "} else {") {
+        if (!ifReturned) valid = false;
+        body += ifContLabel + ":\n";
+        inIf = false;
+        inElse = true;
+        ifReturned = false;
+        if (ifHasScopedBindings) {
+          locals = ifOuterLocals;
+          structLocals = ifOuterStructLocals;
+          ifOuterLocals.clear();
+          ifOuterStructLocals.clear();
+          ifHasScopedBindings = false;
+        }
+      } else if (!activeBool && inIf && trimmedLine == "}") {
+        if (!ifReturned) valid = false;
+        body += ifContLabel + ":\n";
+        inIf = false;
+        ifReturned = false;
+        ifContLabel.clear();
+        if (ifHasScopedBindings) {
+          locals = ifOuterLocals;
+          structLocals = ifOuterStructLocals;
+          ifOuterLocals.clear();
+          ifOuterStructLocals.clear();
+          ifHasScopedBindings = false;
+        }
+      } else if (!activeBool && inElse && trimmedLine == "}") {
+        if (!ifReturned) valid = false;
+        inElse = false;
+        ifReturned = false;
+        ifContLabel.clear();
+        returned = true;
+      } else if (!activeBool && inWhile && trimmedLine == "}") {
+        if (!whileReturned) body += "  br label %" + whileCondLabel + "\n";
+        body += whileExitLabel + ":\n";
+        inWhile = false;
+        whileReturned = false;
+        if (whileHasScopedBindings) {
+          locals = whileOuterLocals;
+          structLocals = whileOuterStructLocals;
+          whileOuterLocals.clear();
+          whileOuterStructLocals.clear();
+          whileHasScopedBindings = false;
+        }
+        whileCondLabel.clear();
+        whileBodyLabel.clear();
+        whileExitLabel.clear();
+      } else if (!activeBool && inFor && trimmedLine == "}") {
+        const std::string nextTemp = "%t" + std::to_string(tempId++);
+        if (!forReturned) body += "  br label %" + forStepLabel + "\n";
+        body += forStepLabel + ":\n";
+        body += "  " + nextTemp + " = add i32 " + forCurrentValue + ", 1\n";
+        body += "  store i32 " + nextTemp + ", ptr " + forIndexPtr + "\n";
+        body += "  br label %" + forCondLabel + "\n";
+        body += forExitLabel + ":\n";
+        inFor = false;
+        forReturned = false;
+        locals = forOuterLocals;
+        structLocals = forOuterStructLocals;
+        forOuterLocals.clear();
+        forOuterStructLocals.clear();
+        forCondLabel.clear();
+        forBodyLabel.clear();
+        forStepLabel.clear();
+        forExitLabel.clear();
+        forIndexPtr.clear();
+        forCurrentValue.clear();
+      } else if (!activeBool && inMatch && (trimmedLine == "}" || (matchIsReturnExpr && trimmedLine == "};"))) {
+        if (matchCases.empty() || matchValue.empty() || matchDefaultLabel.empty() || matchNextArmLabel.empty()) {
+          valid = false;
+        } else {
+          body += matchPrefixCode;
+          body += matchCases;
+          body += matchNextArmLabel + ":\n";
+          body += "  br label %" + matchDefaultLabel + "\n";
+          body += matchDefaultLabel + ":\n";
+          body += "  ret i32 0\n";
+          returned = true;
+        }
+        inMatch = false;
+        matchPrefixCode.clear();
+        matchValue.clear();
+        matchCases.clear();
+        matchBodies.clear();
+        matchDefaultLabel.clear();
+        matchEnumType.clear();
+        matchAggregateValue.clear();
+        matchNextArmLabel.clear();
+        matchIsReturnExpr = false;
+      } else if (!activeBool && inMatch) {
+        const auto arm = parseNativeMatchArmLine(trimmedLine, matchIsReturnExpr);
+        if (arm.ok) {
+          if (!appendNativeMatchArmIr(arm,
+                                     matchValue,
+                                     matchAggregateValue,
+                                     locals,
+                                     structLocals,
+                                     nativeStructs,
+                                     nativeEnums,
+                                     nativePayloadEnums,
+                                     candidateFunctionParamTypes,
+                                     candidateCallees,
+                                     candidateBoolCallees,
+                                     matchNextArmLabel,
+                                     matchCases,
+                                     matchEnumType,
+                                     tempId)) {
+            valid = false;
+          }
+        } else {
+          valid = false;
+        }
+      } else if (!activeBool && inTrustReturn && (trimmedLine == "};" || trimmedLine == "}")) {
+        inTrustReturn = false;
+      } else if (!activeBool && inTrustReturn && !trimmedLine.empty()) {
+        auto lowered = lowerNativeI32Expr(trimmedLine, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+        if (!lowered.ok) {
+          valid = false;
+        } else {
+          body += lowered.code;
+          body += "  ret i32 " + lowered.value + "\n";
+          returned = true;
+        }
+      } else if (!returned && !trimmedLine.empty() && trimmedLine != "}") {
+        if (activeBool) {
+          if (auto ret = matchRegex(trimmedLine, returnPattern)) {
+            auto lowered = lowerNativeI32Condition((*ret)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, candidateBoolCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              body += "  ret i1 " + lowered.value + "\n";
+              returned = true;
+            }
+          } else {
+            valid = false;
+          }
+        } else if (startsWith(trimmedLine, "return trust {")) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            inTrustReturn = true;
+          }
+        } else
+        if (auto returnMatch = matchRegex(trimmedLine, returnMatchPattern)) {
+          if (inIf || inElse || inWhile || inFor || inMatch || !activeStructReturnType.empty() || !activeEnumReturnType.empty()) {
+            valid = false;
+          } else {
+            const std::string scrutinee = nativeAccessName((*returnMatch)[1]);
+            NativeI32Expr lowered;
+            std::string payloadEnumScrutineeType;
+            std::string payloadEnumScrutineeValue;
+            if (auto aggregate = structLocals.find(scrutinee);
+                aggregate != structLocals.end() && nativePayloadEnums.count(aggregate->second.typeName)) {
+              lowered = lowerNativePayloadEnumTag(aggregate->second, tempId);
+              payloadEnumScrutineeType = aggregate->second.typeName;
+              payloadEnumScrutineeValue = aggregate->second.value;
+            } else {
+              lowered = lowerNativeI32Expr((*returnMatch)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            }
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              const int labelId = tempId++;
+              matchPrefixCode = lowered.code;
+              matchValue = lowered.value;
+              matchCases.clear();
+              matchBodies.clear();
+              matchDefaultLabel = "match.default." + std::to_string(labelId);
+              matchNextArmLabel = "match.arm." + std::to_string(labelId);
+              matchCases = "  br label %" + matchNextArmLabel + "\n";
+              matchEnumType.clear();
+              matchAggregateValue.clear();
+              matchIsReturnExpr = true;
+              if (!payloadEnumScrutineeType.empty()) {
+                matchEnumType = payloadEnumScrutineeType;
+                matchAggregateValue = payloadEnumScrutineeValue;
+              } else if (auto enumValue = nativeEnumDiscriminant((*returnMatch)[1], nativeEnums)) {
+                matchEnumType = enumValue->first;
+              }
+              inMatch = true;
+            }
+          }
+        } else
+        if (auto localConst = matchRegex(trimmedLine, localConstPattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            const std::string localName = (*localConst)[1];
+            auto lowered = lowerNativeI32Expr((*localConst)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              locals[localName] = NativeI32Local{false, lowered.value};
+            }
+          }
+        } else
+        if (auto binding = matchRegex(trimmedLine, bindingPattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+          const std::string mode = (*binding)[1];
+          const std::string localName = (*binding)[2];
+          std::string rawBindingExpr = trim(std::string((*binding)[3]));
+          if (!rawBindingExpr.empty() && rawBindingExpr.back() == ';') rawBindingExpr.pop_back();
+          rawBindingExpr = trim(rawBindingExpr);
+          bool handledStructBinding = false;
+          bool handledTryBinding = false;
+          if (mode == "val" && startsWith(rawBindingExpr, "try ")) {
+            handledTryBinding = true;
+            const std::string tryExpr = trim(rawBindingExpr.substr(4));
+            if (activeStructReturnType.empty() || !nativePayloadEnums.count(activeStructReturnType)) {
+              valid = false;
+            } else {
+              auto resultEnum = nativePayloadEnums.find(activeStructReturnType);
+              const auto okDiscriminant = resultEnum->second.discriminants.find("Ok");
+              const auto errDiscriminant = resultEnum->second.discriminants.find("Err");
+              auto aggregate = lowerNativeAggregateExpr(tryExpr,
+                                                        locals,
+                                                        structLocals,
+                                                        nativeStructs,
+                                                        nativeEnums,
+                                                        nativePayloadEnums,
+                                                        candidateFunctionParamTypes,
+                                                        candidateCallees,
+                                                        candidateStructCallees,
+                                                        tempId);
+              if (!aggregate.ok || aggregate.typeName != activeStructReturnType ||
+                  okDiscriminant == resultEnum->second.discriminants.end() ||
+                  errDiscriminant == resultEnum->second.discriminants.end()) {
+                valid = false;
+              } else {
+                const int labelId = tempId++;
+                const std::string tagTemp = "%t" + std::to_string(tempId++);
+                const std::string errTemp = "%t" + std::to_string(tempId++);
+                const std::string okLabel = "try.ok." + std::to_string(labelId);
+                const std::string errLabel = "try.err." + std::to_string(labelId);
+                body += aggregate.code;
+                body += "  " + tagTemp + " = extractvalue " + nativeLlvmTypeRef(activeStructReturnType) + " " + aggregate.value + ", 0\n";
+                body += "  " + errTemp + " = icmp eq i32 " + tagTemp + ", " + std::to_string(errDiscriminant->second) + "\n";
+                body += "  br i1 " + errTemp + ", label %" + errLabel + ", label %" + okLabel + "\n";
+                body += errLabel + ":\n";
+                body += "  ret " + nativeLlvmTypeRef(activeStructReturnType) + " " + aggregate.value + "\n";
+                body += okLabel + ":\n";
+                std::map<std::string, NativeI32Local> okLocals = locals;
+                std::map<std::string, NativeI32StructLocal> okStructLocals = structLocals;
+                std::string payloadCode;
+                if (!bindNativePayloadEnumArm(resultEnum->second,
+                                              activeStructReturnType,
+                                              "Ok",
+                                              std::vector<std::string>{localName},
+                                              aggregate.value,
+                                              nativeStructs,
+                                              okLocals,
+                                              okStructLocals,
+                                              payloadCode,
+                                              tempId)) {
+                  valid = false;
+                } else {
+                  body += payloadCode;
+                  locals = okLocals;
+                  structLocals = okStructLocals;
+                }
+              }
+            }
+          }
+          if (mode == "val") {
+            if (auto call = matchRegex(rawBindingExpr, std::regex(R"(^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$)"));
+                !handledTryBinding && call) {
+              const std::string callee = (*call)[1];
+              auto structCallee = candidateStructCallees.find(callee);
+              if (structCallee != candidateStructCallees.end()) {
+                handledStructBinding = true;
+                const auto rawArgs = splitArguments((*call)[2]);
+                std::vector<std::string> paramTypes;
+                auto signature = candidateFunctionParamTypes.find(callee);
+                if (signature != candidateFunctionParamTypes.end()) {
+                  paramTypes = signature->second;
+                  if (paramTypes.size() != rawArgs.size()) valid = false;
+                } else {
+                  paramTypes.assign(rawArgs.size(), "I32");
+                }
+                std::string code;
+                std::vector<std::string> arguments;
+                for (std::size_t i = 0; valid && i < rawArgs.size(); ++i) {
+                  const std::string arg = trim(rawArgs[i]);
+                  const std::string paramType = paramTypes[i];
+                  if (paramType == "I32") {
+                    auto lowered = lowerNativeI32Expr(arg, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+                    if (!lowered.ok) {
+                      valid = false;
+                      break;
+                    }
+                    code += lowered.code;
+                    arguments.push_back("i32 " + lowered.value);
+                  } else if (nativeEnums.count(paramType)) {
+                    auto lowered = lowerNativeI32Expr(arg, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+                    if (!lowered.ok) {
+                      valid = false;
+                      break;
+                    }
+                    code += lowered.code;
+                    arguments.push_back("i32 " + lowered.value);
+                  } else if (nativeStructs.count(paramType)) {
+                    auto localStruct = structLocals.find(arg);
+                    if (localStruct == structLocals.end() || localStruct->second.typeName != paramType) {
+                      valid = false;
+                      break;
+                    }
+                    arguments.push_back(nativeLlvmTypeRef(paramType) + " " + localStruct->second.value);
+                  } else {
+                    valid = false;
+                    break;
+                  }
+                }
+                if (valid) {
+                  const std::string temp = "%t" + std::to_string(tempId++);
+                  code += "  " + temp + " = call " + nativeLlvmTypeRef(structCallee->second) + " @" + callee + "(";
+                  for (std::size_t i = 0; i < arguments.size(); ++i) {
+                    if (i != 0) code += ", ";
+                    code += arguments[i];
+                  }
+                  code += ")\n";
+                  body += code;
+                  structLocals[localName] = NativeI32StructLocal{structCallee->second, temp};
+                }
+              }
+            }
+            if (!handledTryBinding && !handledStructBinding && matchRegex(rawBindingExpr, std::regex(R"(^([A-Z][A-Za-z0-9_]*)\s*\{\s*(.*)\s*\}$)"))) {
+              handledStructBinding = true;
+              auto lowered = lowerNativeI32StructLiteral(rawBindingExpr, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+              if (!lowered.ok) {
+                valid = false;
+              } else {
+                body += lowered.code;
+                structLocals[localName] = NativeI32StructLocal{lowered.typeName, lowered.value};
+              }
+            }
+          }
+          if (!handledTryBinding && !handledStructBinding) {
+            auto lowered = lowerNativeI32Expr(rawBindingExpr, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              if (mode == "var") {
+                const std::string localPtr = "%" + localName + ".addr";
+                body += "  " + localPtr + " = alloca i32\n";
+                body += "  store i32 " + lowered.value + ", ptr " + localPtr + "\n";
+                locals[localName] = NativeI32Local{true, localPtr};
+              } else {
+                const std::string localValue = "%" + localName;
+                body += "  " + localValue + " = add i32 0, " + lowered.value + "\n";
+                locals[localName] = NativeI32Local{false, localValue};
+              }
+            }
+          }
+          }
+        } else if (auto ifPatternMatch = matchRegex(trimmedLine, ifPatternBindingPattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            const std::string rawPattern = trim(std::string((*ifPatternMatch)[2]));
+            const std::string scrutinee = nativeAccessName((*ifPatternMatch)[3]);
+            const auto pattern = parseNativeMatchPatternAlt(rawPattern);
+            auto aggregate = structLocals.find(scrutinee);
+            const std::string enumTypeName = pattern && aggregate != structLocals.end()
+                                               ? resolveNativePayloadEnumTypeName(pattern->enumName, aggregate->second.typeName, nativePayloadEnums)
+                                               : "";
+            if (!pattern || pattern->hasRange || aggregate == structLocals.end() ||
+                enumTypeName.empty() ||
+                aggregate->second.typeName != enumTypeName) {
+              valid = false;
+            } else {
+              auto payloadEnum = nativePayloadEnums.find(enumTypeName);
+              auto discriminant = payloadEnum->second.discriminants.find(pattern->variantName);
+              if (discriminant == payloadEnum->second.discriminants.end()) {
+                valid = false;
+              } else {
+                std::map<std::string, NativeI32Local> armLocals = locals;
+                std::map<std::string, NativeI32StructLocal> armStructLocals = structLocals;
+                std::string payloadCode;
+                if (!bindNativePayloadEnumArm(payloadEnum->second,
+                                              enumTypeName,
+                                              pattern->variantName,
+                                              pattern->bindingNames,
+                                              aggregate->second.value,
+                                              nativeStructs,
+                                              armLocals,
+                                              armStructLocals,
+                                              payloadCode,
+                                              tempId)) {
+                  valid = false;
+                } else {
+                  auto loweredTag = lowerNativePayloadEnumTag(aggregate->second, tempId);
+                  const int labelId = tempId++;
+                  const std::string conditionTemp = "%t" + std::to_string(tempId++);
+                  const std::string thenLabel = "if.then." + std::to_string(labelId);
+                  ifContLabel = "if.cont." + std::to_string(labelId);
+                  body += loweredTag.code;
+                  body += "  " + conditionTemp + " = icmp eq i32 " + loweredTag.value + ", " + std::to_string(discriminant->second) + "\n";
+                  body += "  br i1 " + conditionTemp + ", label %" + thenLabel + ", label %" + ifContLabel + "\n";
+                  body += thenLabel + ":\n";
+                  body += payloadCode;
+                  ifOuterLocals = locals;
+                  ifOuterStructLocals = structLocals;
+                  ifHasScopedBindings = true;
+                  locals = armLocals;
+                  structLocals = armStructLocals;
+                  inIf = true;
+                  ifReturned = false;
+                }
+              }
+            }
+          }
+        } else if (auto ifMatch = matchRegex(trimmedLine, ifPattern)) {
+          if (inIf || inElse) {
+            valid = false;
+          } else {
+            auto lowered = lowerNativeI32Condition((*ifMatch)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, candidateBoolCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              const int labelId = tempId++;
+              const std::string thenLabel = "if.then." + std::to_string(labelId);
+              ifContLabel = "if.cont." + std::to_string(labelId);
+              body += lowered.code;
+              body += "  br i1 " + lowered.value + ", label %" + thenLabel + ", label %" + ifContLabel + "\n";
+              body += thenLabel + ":\n";
+              inIf = true;
+              ifReturned = false;
+            }
+          }
+        } else if (auto breakStmt = matchRegex(trimmedLine, breakPattern)) {
+          if ((*breakStmt)[1].matched || (!inWhile && !inFor)) {
+            valid = false;
+          } else {
+            body += "  br label %" + (inFor ? forExitLabel : whileExitLabel) + "\n";
+            if (inIf || inElse) {
+              ifReturned = true;
+            } else if (inFor) {
+              forReturned = true;
+            } else {
+              whileReturned = true;
+            }
+          }
+        } else if (matchRegex(trimmedLine, continuePattern)) {
+          if (!inWhile && !inFor) {
+            valid = false;
+          } else {
+            body += "  br label %" + (inFor ? forStepLabel : whileCondLabel) + "\n";
+            if (inIf || inElse) {
+              ifReturned = true;
+            } else if (inFor) {
+              forReturned = true;
+            } else {
+              whileReturned = true;
+            }
+          }
+        } else if (auto whilePatternMatch = matchRegex(trimmedLine, whilePatternBindingPattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            const std::string rawPattern = trim(std::string((*whilePatternMatch)[2]));
+            const std::string rawScrutinee = trim(std::string((*whilePatternMatch)[3]));
+            const auto pattern = parseNativeMatchPatternAlt(rawPattern);
+            if (!pattern || pattern->hasRange) {
+              valid = false;
+            } else {
+              auto aggregate = lowerNativeAggregateExpr(rawScrutinee,
+                                                        locals,
+                                                        structLocals,
+                                                        nativeStructs,
+                                                        nativeEnums,
+                                                        nativePayloadEnums,
+                                                        candidateFunctionParamTypes,
+                                                        candidateCallees,
+                                                        candidateStructCallees,
+                                                        tempId);
+              const std::string enumTypeName = aggregate.ok
+                                                 ? resolveNativePayloadEnumTypeName(pattern->enumName, aggregate.typeName, nativePayloadEnums)
+                                                 : "";
+              if (!aggregate.ok || enumTypeName.empty() || aggregate.typeName != enumTypeName) {
+                valid = false;
+              } else {
+                auto payloadEnum = nativePayloadEnums.find(enumTypeName);
+                auto discriminant = payloadEnum->second.discriminants.find(pattern->variantName);
+                if (discriminant == payloadEnum->second.discriminants.end()) {
+                  valid = false;
+                } else {
+                  const int labelId = tempId++;
+                  whileCondLabel = "while.cond." + std::to_string(labelId);
+                  whileBodyLabel = "while.body." + std::to_string(labelId);
+                  whileExitLabel = "while.exit." + std::to_string(labelId);
+                  body += "  br label %" + whileCondLabel + "\n";
+                  body += whileCondLabel + ":\n";
+                  std::map<std::string, NativeI32Local> armLocals = locals;
+                  std::map<std::string, NativeI32StructLocal> armStructLocals = structLocals;
+                  std::string payloadCode;
+                  if (!bindNativePayloadEnumArm(payloadEnum->second,
+                                                enumTypeName,
+                                                pattern->variantName,
+                                                pattern->bindingNames,
+                                                aggregate.value,
+                                                nativeStructs,
+                                                armLocals,
+                                                armStructLocals,
+                                                payloadCode,
+                                                tempId)) {
+                    valid = false;
+                  } else {
+                    const std::string tagTemp = "%t" + std::to_string(tempId++);
+                    const std::string conditionTemp = "%t" + std::to_string(tempId++);
+                    body += aggregate.code;
+                    body += "  " + tagTemp + " = extractvalue " + nativeLlvmTypeRef(aggregate.typeName) + " " + aggregate.value + ", 0\n";
+                    body += "  " + conditionTemp + " = icmp eq i32 " + tagTemp + ", " + std::to_string(discriminant->second) + "\n";
+                    body += "  br i1 " + conditionTemp + ", label %" + whileBodyLabel + ", label %" + whileExitLabel + "\n";
+                    body += whileBodyLabel + ":\n";
+                    body += payloadCode;
+                    whileOuterLocals = locals;
+                    whileOuterStructLocals = structLocals;
+                    whileHasScopedBindings = true;
+                    locals = armLocals;
+                    structLocals = armStructLocals;
+                    inWhile = true;
+                    whileReturned = false;
+                  }
+                }
+              }
+            }
+          }
+        } else if (auto whileMatch = matchRegex(trimmedLine, whilePattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            const int labelId = tempId++;
+            whileCondLabel = "while.cond." + std::to_string(labelId);
+            whileBodyLabel = "while.body." + std::to_string(labelId);
+            whileExitLabel = "while.exit." + std::to_string(labelId);
+            body += "  br label %" + whileCondLabel + "\n";
+            body += whileCondLabel + ":\n";
+            auto lowered = lowerNativeI32Condition((*whileMatch)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, candidateBoolCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              body += "  br i1 " + lowered.value + ", label %" + whileBodyLabel + ", label %" + whileExitLabel + "\n";
+              body += whileBodyLabel + ":\n";
+              inWhile = true;
+            }
+          }
+        } else if (auto forMatch = matchRegex(trimmedLine, forRangePattern)) {
+          if (inIf || inElse || inWhile || inFor) {
+            valid = false;
+          } else {
+            auto start = lowerNativeI32Expr((*forMatch)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            auto end = lowerNativeI32Expr((*forMatch)[4], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            if (!start.ok || !end.ok) {
+              valid = false;
+            } else {
+              const int labelId = tempId++;
+              const std::string itemName = (*forMatch)[1];
+              const std::string compareTemp = "%t" + std::to_string(tempId++);
+              forCurrentValue = "%t" + std::to_string(tempId++);
+              forIndexPtr = "%" + itemName + ".range." + std::to_string(labelId) + ".addr";
+              forCondLabel = "for.cond." + std::to_string(labelId);
+              forBodyLabel = "for.body." + std::to_string(labelId);
+              forStepLabel = "for.step." + std::to_string(labelId);
+              forExitLabel = "for.exit." + std::to_string(labelId);
+              body += start.code;
+              body += end.code;
+              body += "  " + forIndexPtr + " = alloca i32\n";
+              body += "  store i32 " + start.value + ", ptr " + forIndexPtr + "\n";
+              body += "  br label %" + forCondLabel + "\n";
+              body += forCondLabel + ":\n";
+              body += "  " + forCurrentValue + " = load i32, ptr " + forIndexPtr + "\n";
+              body += "  " + compareTemp + " = icmp " + std::string((*forMatch)[3] == "..=" ? "sle" : "slt") + " i32 " + forCurrentValue + ", " + end.value + "\n";
+              body += "  br i1 " + compareTemp + ", label %" + forBodyLabel + ", label %" + forExitLabel + "\n";
+              body += forBodyLabel + ":\n";
+              forOuterLocals = locals;
+              forOuterStructLocals = structLocals;
+              locals[itemName] = NativeI32Local{false, forCurrentValue};
+              inFor = true;
+              forReturned = false;
+            }
+          }
+        } else if (auto matchStart = matchRegex(trimmedLine, matchPattern)) {
+          if (inIf || inElse || inWhile || inFor || inMatch) {
+            valid = false;
+          } else {
+            const std::string scrutinee = nativeAccessName((*matchStart)[1]);
+            NativeI32Expr lowered;
+            std::string payloadEnumScrutineeType;
+            std::string payloadEnumScrutineeValue;
+            if (auto aggregate = structLocals.find(scrutinee);
+                aggregate != structLocals.end() && nativePayloadEnums.count(aggregate->second.typeName)) {
+              lowered = lowerNativePayloadEnumTag(aggregate->second, tempId);
+              payloadEnumScrutineeType = aggregate->second.typeName;
+              payloadEnumScrutineeValue = aggregate->second.value;
+            } else {
+              lowered = lowerNativeI32Expr((*matchStart)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            }
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              const int labelId = tempId++;
+              matchPrefixCode = lowered.code;
+              matchValue = lowered.value;
+              matchCases.clear();
+              matchBodies.clear();
+              matchDefaultLabel = "match.default." + std::to_string(labelId);
+              matchNextArmLabel = "match.arm." + std::to_string(labelId);
+              matchCases = "  br label %" + matchNextArmLabel + "\n";
+              matchEnumType.clear();
+              matchAggregateValue.clear();
+              matchIsReturnExpr = false;
+              if (!payloadEnumScrutineeType.empty()) {
+                matchEnumType = payloadEnumScrutineeType;
+                matchAggregateValue = payloadEnumScrutineeValue;
+              } else if (auto enumValue = nativeEnumDiscriminant((*matchStart)[1], nativeEnums)) {
+                matchEnumType = enumValue->first;
+              }
+              inMatch = true;
+            }
+          }
+        } else if (auto tryStmt = matchRegex(trimmedLine, tryStatementPattern)) {
+          if (inIf || inElse || inWhile || inFor || activeStructReturnType.empty() || !nativePayloadEnums.count(activeStructReturnType)) {
+            valid = false;
+          } else {
+            auto resultEnum = nativePayloadEnums.find(activeStructReturnType);
+            const auto errDiscriminant = resultEnum->second.discriminants.find("Err");
+            auto aggregate = lowerNativeAggregateExpr(trim(std::string((*tryStmt)[1])),
+                                                      locals,
+                                                      structLocals,
+                                                      nativeStructs,
+                                                      nativeEnums,
+                                                      nativePayloadEnums,
+                                                      candidateFunctionParamTypes,
+                                                      candidateCallees,
+                                                      candidateStructCallees,
+                                                      tempId);
+            if (!aggregate.ok || aggregate.typeName != activeStructReturnType ||
+                errDiscriminant == resultEnum->second.discriminants.end()) {
+              valid = false;
+            } else {
+              const int labelId = tempId++;
+              const std::string tagTemp = "%t" + std::to_string(tempId++);
+              const std::string errTemp = "%t" + std::to_string(tempId++);
+              const std::string okLabel = "try.ok." + std::to_string(labelId);
+              const std::string errLabel = "try.err." + std::to_string(labelId);
+              body += aggregate.code;
+              body += "  " + tagTemp + " = extractvalue " + nativeLlvmTypeRef(activeStructReturnType) + " " + aggregate.value + ", 0\n";
+              body += "  " + errTemp + " = icmp eq i32 " + tagTemp + ", " + std::to_string(errDiscriminant->second) + "\n";
+              body += "  br i1 " + errTemp + ", label %" + errLabel + ", label %" + okLabel + "\n";
+              body += errLabel + ":\n";
+              body += "  ret " + nativeLlvmTypeRef(activeStructReturnType) + " " + aggregate.value + "\n";
+              body += okLabel + ":\n";
+            }
+          }
+        } else if (auto assignment = matchRegex(trimmedLine, assignmentPattern)) {
+          if (inIf || inElse) {
+            valid = false;
+          } else {
+            const std::string localName = (*assignment)[1];
+            auto local = locals.find(localName);
+            if (local == locals.end() || !local->second.mutableLocal) {
+              valid = false;
+            } else {
+              auto lowered = lowerNativeI32Expr((*assignment)[2], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+              if (!lowered.ok) {
+                valid = false;
+              } else {
+                body += lowered.code;
+                body += "  store i32 " + lowered.value + ", ptr " + local->second.value + "\n";
+              }
+            }
+          }
+        } else if (auto ret = matchRegex(trimmedLine, returnPattern)) {
+          if (!activeStructReturnType.empty()) {
+            const std::string rawReturnExpr = (*ret)[1];
+            NativeI32StructExpr loweredStruct;
+            if (nativePayloadEnums.count(activeStructReturnType)) {
+              loweredStruct = lowerNativePayloadEnumConstructor(rawReturnExpr,
+                                                                locals,
+                                                                structLocals,
+                                                                nativeStructs,
+                                                                nativeEnums,
+                                                                nativePayloadEnums,
+                                                                candidateFunctionParamTypes,
+                                                                candidateCallees,
+                                                                activeStructReturnType,
+                                                                tempId);
+            }
+            if (!loweredStruct.ok) {
+              loweredStruct = lowerNativeI32StructLiteral(rawReturnExpr, locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            }
+            if (loweredStruct.ok && loweredStruct.typeName == activeStructReturnType) {
+              body += loweredStruct.code;
+              body += "  ret " + nativeLlvmTypeRef(activeStructReturnType) + " " + loweredStruct.value + "\n";
+              if (inIf || inElse) {
+                ifReturned = true;
+              } else if (inWhile) {
+                whileReturned = true;
+              } else if (inFor) {
+                forReturned = true;
+              } else {
+                returned = true;
+              }
+            } else {
+              const std::string returnName = trim(std::string(rawReturnExpr));
+              auto localStruct = structLocals.find(returnName);
+              if (localStruct == structLocals.end() || localStruct->second.typeName != activeStructReturnType) {
+                valid = false;
+              } else {
+                body += "  ret " + nativeLlvmTypeRef(activeStructReturnType) + " " + localStruct->second.value + "\n";
+                if (inIf || inElse) {
+                  ifReturned = true;
+                } else if (inWhile) {
+                  whileReturned = true;
+                } else if (inFor) {
+                  forReturned = true;
+                } else {
+                  returned = true;
+                }
+              }
+            }
+          } else if (!activeEnumReturnType.empty()) {
+            auto lowered = lowerNativeI32Expr((*ret)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              body += "  ret i32 " + lowered.value + "\n";
+              if (inIf || inElse) {
+                ifReturned = true;
+              } else if (inWhile) {
+                whileReturned = true;
+              } else if (inFor) {
+                forReturned = true;
+              } else {
+                returned = true;
+              }
+            }
+          } else {
+            auto lowered = lowerNativeI32Expr((*ret)[1], locals, structLocals, nativeStructs, nativeEnums, candidateFunctionParamTypes, candidateCallees, tempId);
+            if (!lowered.ok) {
+              valid = false;
+            } else {
+              body += lowered.code;
+              body += "  ret i32 " + lowered.value + "\n";
+              if (inIf || inElse) {
+                ifReturned = true;
+              } else if (inWhile) {
+                whileReturned = true;
+              } else if (inFor) {
+                forReturned = true;
+              } else {
+                returned = true;
+              }
+            }
+          }
+        } else {
+          valid = false;
+        }
+      }
+      braceDepth += braceDelta(line);
+      if (active && braceDepth <= 0) {
+        if (valid && returned && !functionName.empty()) {
+          const std::string llvmReturnType = activeBool ? "i1" : (activeStructReturnType.empty() ? "i32" : nativeLlvmTypeRef(activeStructReturnType));
+          out[functionName] = "\ndefine " + llvmReturnType + " @" + functionName + "(" + functionParams + ") {\nentry:\n" + body + "}\n";
+          if (!activeBool && activeStructReturnType.empty() && !functionExportSymbol.empty() && functionExportSymbol != functionName) {
+            const std::string thunk = nativeI32ExportThunk(functionExportSymbol, functionName, functionParams);
+            if (!thunk.empty()) out[functionExportSymbol] = thunk;
+          }
+        }
+        active = false;
+        activeBool = false;
+        activeStructReturnType.clear();
+        activeEnumReturnType.clear();
+        valid = false;
+        returned = false;
+        braceDepth = 0;
+        functionName.clear();
+        functionParams.clear();
+        functionExportSymbol.clear();
+        activeStructReturnType.clear();
+        activeEnumReturnType.clear();
+        body.clear();
+        locals.clear();
+        structLocals.clear();
+        inIf = false;
+        inElse = false;
+        ifReturned = false;
+        ifContLabel.clear();
+        ifHasScopedBindings = false;
+        ifOuterLocals.clear();
+        ifOuterStructLocals.clear();
+        inWhile = false;
+        whileReturned = false;
+        whileHasScopedBindings = false;
+        whileOuterLocals.clear();
+        whileOuterStructLocals.clear();
+        inTrustReturn = false;
+        inMatch = false;
+        matchIsReturnExpr = false;
+        whileCondLabel.clear();
+        whileBodyLabel.clear();
+        whileExitLabel.clear();
+        matchPrefixCode.clear();
+        matchValue.clear();
+        matchCases.clear();
+        matchBodies.clear();
+        matchDefaultLabel.clear();
+        matchEnumType.clear();
+        matchAggregateValue.clear();
+      }
+    }
+  }
+  bool changed = true;
+  const std::regex callPattern(R"(call (?:i[0-9]+|%[A-Za-z_][A-Za-z0-9_]*) @([A-Za-z_][A-Za-z0-9_]*)\()");
+  while (changed) {
+    changed = false;
+    for (auto it = out.begin(); it != out.end();) {
+      bool missingCallee = false;
+      auto begin = std::sregex_iterator(it->second.begin(), it->second.end(), callPattern);
+      auto end = std::sregex_iterator();
+      for (auto call = begin; call != end; ++call) {
+        if (!out.count((*call)[1])) {
+          missingCallee = true;
+          break;
+        }
+      }
+      if (missingCallee) {
+        it = out.erase(it);
+        changed = true;
+      } else {
+        ++it;
+      }
+    }
+  }
+  return out;
 }
 
 std::string lockPackageBlock(const std::string &name,
@@ -6045,6 +9248,9 @@ int commandBuild(const Options &options, std::ostream *statusOut = &std::cout) {
   const std::string costHash = setFingerprint(summary.costInputs);
   const std::string runtimeHash = setFingerprint(summary.runtimeNeeds);
   const std::string linkRuntimeHash = setFingerprint(linkRuntime);
+  const std::map<std::string, std::string> nativeFunctions = nativeI32FunctionIrDefinitions(package);
+  const bool canLinkNativeExecutable = package.kind == "application" && target == hostTriple() &&
+                                       nativeFunctions.count(entryFunctionName(package)) != 0;
   const std::string buildHash = buildFingerprint(package,
                                                  target,
                                                  profile,
@@ -6101,8 +9307,13 @@ int commandBuild(const Options &options, std::ostream *statusOut = &std::cout) {
        << "builtinPackages = " << joinedSet(builtinFacts) << "\n"
        << "builtinPublicApi = " << joinedSet(builtinApiFacts) << "\n"
        << "artifactFormat = \"stage0-preview\"\n"
-       << "archiveFormat = \"" << (package.kind == "library" ? "ar-stage0-preview-object" : "none") << "\"\n"
-       << "executableFormat = \"" << (package.kind == "application" ? "sh-stage0-preview-launcher" : "none") << "\"\n"
+       << "archiveFormat = \"" << (package.kind == "library" ? "ar-native-object" : "none") << "\"\n"
+       << "executableFormat = \"" << (canLinkNativeExecutable ? "native-host-executable" : "none") << "\"\n"
+       << "objectFormat = \"native-object\"\n"
+       << "mirArtifact = \"mir/" << package.name << ".mir\"\n"
+       << "llvmIrArtifact = \"ir/" << package.name << ".ll\"\n"
+       << "objectArtifact = \"obj/" << package.name << ".o\"\n"
+       << "finalArtifact = \"" << (package.kind == "library" ? "lib/lib" + package.name + ".a" : (canLinkNativeExecutable ? "bin/" + package.name : "obj/" + package.name + ".o")) << "\"\n"
        << "manifestTarget = \"" << package.manifestTarget << "\"\n"
        << "manifestProfile = \"" << package.manifestProfile << "\"\n"
        << "buildPolicy = " << joinedSet(policy) << "\n"
@@ -6153,76 +9364,93 @@ int commandBuild(const Options &options, std::ostream *statusOut = &std::cout) {
        << "costInputs = " << joinedSet(summary.costInputs) << "\n";
   writeFile(outRoot / "meta" / (package.name + ".zmeta"), meta.str());
 
+  const std::string mirArtifact =
+      "module " + package.name + "\n"
+      "kind " + package.kind + "\n"
+      "entry " + package.entry + "\n"
+      "sourceFingerprint " + sourceHash + "\n"
+      "astFingerprint " + astHash + "\n"
+      "hirFingerprint " + hirHash + "\n"
+      "mirFingerprint " + mirHash + "\n"
+      "llvmFingerprint " + llvmHash + "\n"
+      "declarationFingerprint " + declarationHash + "\n"
+      "layoutFingerprint " + layoutHash + "\n"
+      "dropFingerprint " + dropHash + "\n"
+      "sendSyncFingerprint " + sendSyncHash + "\n"
+      "interfaceFingerprint " + interfaceHash + "\n"
+      "abiFingerprint " + abiHash + "\n"
+      "trustFingerprint " + trustHash + "\n"
+      "dependencyFingerprint " + dependencyHash + "\n"
+      "dependencyPackageFingerprint " + dependencyPackageHash + "\n"
+      "costFingerprint " + costHash + "\n"
+      "runtimeFingerprint " + runtimeHash + "\n"
+      "linkRuntimeFingerprint " + linkRuntimeHash + "\n"
+      "lockFingerprint " + lockHash + "\n"
+      "buildFingerprint " + buildHash + "\n"
+      "stage0.pipeline source->ast->hir->mir->llvm-ir->object->artifact\n"
+      "stage0.pipeline ast->hir->mir->llvm\n"
+      "hirNodes " + joinedSet(summary.hirNodes) + "\n"
+      "mirNodes " + joinedSet(summary.mirNodes) + "\n"
+      "llvmNodes " + joinedSet(summary.llvmNodes) + "\n";
+  const std::string llvmIrArtifact =
+      "; module = '" + package.name + "'\n"
+      "source_filename = \"" + package.name + "\"\n"
+      "target triple = \"" + target + "\"\n"
+      "; sourceFingerprint = \"" + sourceHash + "\"\n"
+      "; astFingerprint = \"" + astHash + "\"\n"
+      "; hirFingerprint = \"" + hirHash + "\"\n"
+      "; mirFingerprint = \"" + mirHash + "\"\n"
+      "; llvmFingerprint = \"" + llvmHash + "\"\n"
+      "; declarationFingerprint = \"" + declarationHash + "\"\n"
+      "; layoutFingerprint = \"" + layoutHash + "\"\n"
+      "; dropFingerprint = \"" + dropHash + "\"\n"
+      "; sendSyncFingerprint = \"" + sendSyncHash + "\"\n"
+      "; interfaceFingerprint = \"" + interfaceHash + "\"\n"
+      "; abiFingerprint = \"" + abiHash + "\"\n"
+      "; trustFingerprint = \"" + trustHash + "\"\n"
+      "; dependencyFingerprint = \"" + dependencyHash + "\"\n"
+      "; dependencyPackageFingerprint = \"" + dependencyPackageHash + "\"\n"
+      "; costFingerprint = \"" + costHash + "\"\n"
+      "; runtimeFingerprint = \"" + runtimeHash + "\"\n"
+      "; linkRuntimeFingerprint = \"" + linkRuntimeHash + "\"\n"
+      "; lockFingerprint = \"" + lockHash + "\"\n"
+      "; buildFingerprint = \"" + buildHash + "\"\n"
+      "; llvmNodes = " + joinedSet(summary.llvmNodes) + "\n"
+      "; stage0 pipeline source->ast->hir->mir->llvm-ir->object->artifact\n";
+  std::string nativeIrDefinitions;
+  for (const auto &[functionName, definition] : nativeFunctions) {
+    (void)functionName;
+    nativeIrDefinitions += definition;
+  }
+  writeFile(outRoot / "mir" / (package.name + ".mir"), mirArtifact);
+  writeFile(outRoot / "ir" / (package.name + ".ll"), llvmIrArtifact + nativeIrDefinitions);
+
+  const fs::path objectPath = outRoot / "obj" / (package.name + ".o");
+  const fs::path clangLog = outRoot / "obj" / (package.name + ".clang.log");
+  const std::string compileCommand = "clang -target " + shellQuote(target) +
+                                     " -c " + shellQuote((outRoot / "ir" / (package.name + ".ll")).string()) +
+                                     " -o " + shellQuote(objectPath.string());
+  if (!runShellCommand(compileCommand, clangLog)) {
+    std::cerr << "zeno build: native object generation failed\n" << readFile(clangLog);
+    return 1;
+  }
+
   if (package.kind == "library") {
-    writeFile(outRoot / "lib" / ("lib" + package.name + ".a"), stage0StaticArchive(package, target, buildHash));
-  } else {
+    writeFile(outRoot / "lib" / ("lib" + package.name + ".a"), stage0StaticArchive(readFile(objectPath)));
+  } else if (canLinkNativeExecutable) {
     const fs::path executable = outRoot / "bin" / package.name;
-    writeFile(executable,
-              "#!/bin/sh\n"
-              "# zeno-stage0-preview-executable\n"
-              "# package=" + package.name + "\n"
-              "# target=" + target + "\n"
-              "# buildFingerprint=" + buildHash + "\n"
-              "printf '%s\\n' 'zeno stage0 executable " + package.name + "'\n");
+    const std::string linkCommand = "clang -target " + shellQuote(target) +
+                                    " " + shellQuote(objectPath.string()) +
+                                    " -o " + shellQuote(executable.string());
+    if (!runShellCommand(linkCommand, outRoot / "bin" / (package.name + ".clang.log"))) {
+      std::cerr << "zeno build: native executable link failed\n" << readFile(outRoot / "bin" / (package.name + ".clang.log"));
+      return 1;
+    }
     fs::permissions(executable,
                     fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                     fs::perm_options::add);
   }
 
-  if (options.emit == "mir") {
-    writeFile(outRoot / "mir" / (package.name + ".mir"),
-              "module " + package.name + "\n"
-              "kind " + package.kind + "\n"
-              "entry " + package.entry + "\n"
-              "sourceFingerprint " + sourceHash + "\n"
-              "astFingerprint " + astHash + "\n"
-              "hirFingerprint " + hirHash + "\n"
-              "mirFingerprint " + mirHash + "\n"
-              "llvmFingerprint " + llvmHash + "\n"
-              "declarationFingerprint " + declarationHash + "\n"
-              "layoutFingerprint " + layoutHash + "\n"
-              "dropFingerprint " + dropHash + "\n"
-              "sendSyncFingerprint " + sendSyncHash + "\n"
-              "interfaceFingerprint " + interfaceHash + "\n"
-              "abiFingerprint " + abiHash + "\n"
-              "trustFingerprint " + trustHash + "\n"
-              "dependencyFingerprint " + dependencyHash + "\n"
-              "dependencyPackageFingerprint " + dependencyPackageHash + "\n"
-              "costFingerprint " + costHash + "\n"
-              "runtimeFingerprint " + runtimeHash + "\n"
-              "linkRuntimeFingerprint " + linkRuntimeHash + "\n"
-              "lockFingerprint " + lockHash + "\n"
-              "buildFingerprint " + buildHash + "\n"
-              "stage0.pipeline ast->hir->mir->llvm\n"
-              "hirNodes " + joinedSet(summary.hirNodes) + "\n"
-              "mirNodes " + joinedSet(summary.mirNodes) + "\n"
-              "llvmNodes " + joinedSet(summary.llvmNodes) + "\n");
-  } else if (options.emit == "llvm-ir") {
-    writeFile(outRoot / "ir" / (package.name + ".ll"),
-              "; module = '" + package.name + "'\n"
-              "target triple = \"" + target + "\"\n"
-              "; sourceFingerprint = \"" + sourceHash + "\"\n"
-              "; astFingerprint = \"" + astHash + "\"\n"
-              "; hirFingerprint = \"" + hirHash + "\"\n"
-              "; mirFingerprint = \"" + mirHash + "\"\n"
-              "; llvmFingerprint = \"" + llvmHash + "\"\n"
-              "; declarationFingerprint = \"" + declarationHash + "\"\n"
-              "; layoutFingerprint = \"" + layoutHash + "\"\n"
-              "; dropFingerprint = \"" + dropHash + "\"\n"
-              "; sendSyncFingerprint = \"" + sendSyncHash + "\"\n"
-              "; interfaceFingerprint = \"" + interfaceHash + "\"\n"
-              "; abiFingerprint = \"" + abiHash + "\"\n"
-              "; trustFingerprint = \"" + trustHash + "\"\n"
-              "; dependencyFingerprint = \"" + dependencyHash + "\"\n"
-              "; dependencyPackageFingerprint = \"" + dependencyPackageHash + "\"\n"
-              "; costFingerprint = \"" + costHash + "\"\n"
-              "; runtimeFingerprint = \"" + runtimeHash + "\"\n"
-              "; linkRuntimeFingerprint = \"" + linkRuntimeHash + "\"\n"
-              "; lockFingerprint = \"" + lockHash + "\"\n"
-              "; buildFingerprint = \"" + buildHash + "\"\n"
-              "; llvmNodes = " + joinedSet(summary.llvmNodes) + "\n"
-              "; stage0 preview IR: object lowering still pending real MIR\n");
-  }
   if (statusOut) {
     *statusOut << "built " << package.name << " -> " << (outRoot / "meta" / (package.name + ".zmeta")).string() << "\n";
   }
@@ -6773,6 +10001,28 @@ bool hasAnyExecBit(fs::perms permissions) {
   return (permissions & (fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec)) != fs::perms::none;
 }
 
+bool hasNativeObjectMagic(const std::string &bytes) {
+  if (bytes.size() < 4) return false;
+  const unsigned char b0 = static_cast<unsigned char>(bytes[0]);
+  const unsigned char b1 = static_cast<unsigned char>(bytes[1]);
+  const unsigned char b2 = static_cast<unsigned char>(bytes[2]);
+  const unsigned char b3 = static_cast<unsigned char>(bytes[3]);
+  if (b0 == 0x7f && b1 == 'E' && b2 == 'L' && b3 == 'F') return true;
+  if (b0 == 0xcf && b1 == 0xfa && b2 == 0xed && b3 == 0xfe) return true;
+  if (b0 == 0xfe && b1 == 0xed && b2 == 0xfa && b3 == 0xcf) return true;
+  if (b0 == 0xca && b1 == 0xfe && b2 == 0xba && b3 == 0xbe) return true;
+  return false;
+}
+
+bool containsNativeObjectMagic(const std::string &bytes) {
+  return bytes.find(std::string("\x7f"
+                                "ELF",
+                                4)) != std::string::npos ||
+         bytes.find(std::string("\xcf\xfa\xed\xfe", 4)) != std::string::npos ||
+         bytes.find(std::string("\xfe\xed\xfa\xcf", 4)) != std::string::npos ||
+         bytes.find(std::string("\xca\xfe\xba\xbe", 4)) != std::string::npos;
+}
+
 bool verifyBuildArtifact(const TestCase &test, const Options &options, std::string &failure) {
   if (test.metadata.buildArtifact.empty()) return true;
   if (!test.directoryCase) {
@@ -6819,6 +10069,28 @@ bool verifyBuildArtifact(const TestCase &test, const Options &options, std::stri
       return false;
     }
   }
+  const fs::path objectPath = outRoot / "obj" / (package.name + ".o");
+  if (!fs::is_regular_file(objectPath)) {
+    failure = "build did not write native object obj/" + package.name + ".o";
+    return false;
+  }
+  const std::string objectBytes = readFile(objectPath);
+  if (!hasNativeObjectMagic(objectBytes) || contains(objectBytes, "zeno-stage0-preview-object")) {
+    failure = "object artifact is not a native object file";
+    return false;
+  }
+  for (const auto &expectedFact : test.metadata.objectContains) {
+    if (!contains(objectBytes, expectedFact)) {
+      failure = "native object is missing expected bytes: " + expectedFact;
+      return false;
+    }
+  }
+  for (const auto &forbiddenFact : test.metadata.objectForbid) {
+    if (contains(objectBytes, forbiddenFact)) {
+      failure = "native object contains forbidden bytes: " + forbiddenFact;
+      return false;
+    }
+  }
   if (!test.metadata.artifactEmit.empty()) {
     const fs::path emitPath = test.metadata.artifactEmit == "mir"
         ? outRoot / "mir" / (package.name + ".mir")
@@ -6847,6 +10119,9 @@ bool verifyBuildArtifact(const TestCase &test, const Options &options, std::stri
       failure = "build-artifact application case resolved as " + package.kind;
       return false;
     }
+    if (target != hostTriple()) {
+      return true;
+    }
     const fs::path executable = outRoot / "bin" / package.name;
     if (!fs::is_regular_file(executable)) {
       failure = "application build did not write bin/" + package.name;
@@ -6858,15 +10133,26 @@ bool verifyBuildArtifact(const TestCase &test, const Options &options, std::stri
       failure = "application artifact is not executable";
       return false;
     }
-    const std::string executableText = readFile(executable);
-    if (!startsWith(executableText, "#!/bin/sh\n") ||
-        !contains(executableText, "# zeno-stage0-preview-executable\n") ||
-        !contains(executableText, "# package=" + package.name + "\n") ||
-        !contains(executableText, "# target=" + target + "\n") ||
-        !contains(executableText, "# buildFingerprint=") ||
-        !contains(executableText, "zeno stage0 executable " + package.name)) {
-      failure = "application artifact does not carry the stage0 executable launcher";
+    const std::string executableBytes = readFile(executable);
+    if (!hasNativeObjectMagic(executableBytes) || startsWith(executableBytes, "#!/bin/sh\n")) {
+      failure = "application artifact is not a native executable";
       return false;
+    }
+    if (!test.metadata.runExitCode.empty()) {
+      int expectedExitCode = 0;
+      try {
+        expectedExitCode = std::stoi(test.metadata.runExitCode);
+      } catch (...) {
+        failure = "invalid run-exit-code metadata: " + test.metadata.runExitCode;
+        return false;
+      }
+      const fs::path runLog = outRoot / "bin" / (package.name + ".run.log");
+      const int actualExitCode = runShellCommandExitCode(shellQuote(executable.string()), runLog);
+      if (actualExitCode != expectedExitCode) {
+        failure = "application executable exit code " + std::to_string(actualExitCode) +
+                  " did not match expected " + std::to_string(expectedExitCode);
+        return false;
+      }
     }
     return true;
   }
@@ -6886,10 +10172,9 @@ bool verifyBuildArtifact(const TestCase &test, const Options &options, std::stri
     return false;
   }
   if (!contains(archiveText, "zeno-stage0.o/") ||
-      !contains(archiveText, "zeno-stage0-preview-object\n") ||
-      !contains(archiveText, "package=" + package.name + "\n") ||
-      !contains(archiveText, "buildFingerprint=")) {
-    failure = "library artifact is missing the deterministic stage0 object member";
+      !containsNativeObjectMagic(archiveText) ||
+      contains(archiveText, "zeno-stage0-preview-object")) {
+    failure = "library artifact is missing the native stage0 object member";
     return false;
   }
   return true;

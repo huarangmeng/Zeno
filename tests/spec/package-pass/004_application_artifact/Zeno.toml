@@ -8,7 +8,9 @@
 # zmeta-contains: runtimeFingerprint = "fnv1a64:
 # zmeta-contains: declarations=fnv1a64:
 # zmeta-contains: runtime=fnv1a64:
-# zmeta-contains: executableFormat = "sh-stage0-preview-launcher"
+# zmeta-contains: executableFormat = "none"
+# zmeta-contains: objectFormat = "native-object"
+# zmeta-contains: finalArtifact = "obj/artifactApp.o"
 # zmeta-contains: fn main stableNodeId=fnv1a64:
 # zmeta-contains: module=main visibility=pub span=src/main.zn:3:1
 # zmeta-contains: stmt.return main module=main span=src/main.zn:4:1 expr=int-literal:0 expected=I32
@@ -19,6 +21,7 @@
 # emit-contains: kind application
 # emit-contains: declarationFingerprint fnv1a64:
 # emit-contains: buildFingerprint fnv1a64:
+# emit-contains: stage0.pipeline source->ast->hir->mir->llvm-ir->object->artifact
 # emit-contains: stage0.pipeline ast->hir->mir->llvm
 # emit-contains: mir.return main value=int-literal:0 type=I32
 # purpose: application package builds produce an executable launcher and zmeta

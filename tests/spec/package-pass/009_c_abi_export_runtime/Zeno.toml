@@ -3,11 +3,16 @@
 # target: x86_64-unknown-linux-gnu
 # profile: hosted
 # build-artifact: library
+# artifact-emit: llvm-ir
 # zmeta-contains: runtimeNeeds = ["c-abi-boundary"]
 # zmeta-contains: linkRuntimeNeeds = ["c-abi-boundary"]
 # zmeta-contains: exports = ["fd_value:abi=C", "point_sum:abi=C", "zeno_add:abi=C"]
 # zmeta-contains: runtime=fnv1a64:
-# purpose: exported C ABI symbols are recorded with explicit runtime/link boundary needs
+# emit-contains: define i32 @add(i32 %a, i32 %b)
+# emit-contains: define i32 @zeno_add(i32 %a, i32 %b)
+# emit-contains: %ret = call i32 @add(i32 %a, i32 %b)
+# object-contains: zeno_add
+# purpose: exported C ABI symbols are recorded and the lowerable I32 export is emitted as a native symbol
 
 [package]
 name = "cAbiRuntime"

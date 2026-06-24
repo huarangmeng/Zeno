@@ -1,15 +1,16 @@
 version = 1
-root = "cAbiRuntime"
+root = "nativeForRangeApp"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "cAbiRuntime"
+name = "nativeForRangeApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:46efc2f36ffc31c3"
-contentHash = "fnv1a64:871c37262ffd8c20"
+manifestHash = "fnv1a64:0e9c3fd7c40eeaee"
+contentHash = "fnv1a64:c4e996207e4fb6a5"
 trust = []
 dependencies = [
+  { key = "core", package = "core" },
 ]
 
 [[package]]

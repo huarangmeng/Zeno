@@ -1,15 +1,16 @@
 version = 1
-root = "cAbiRuntime"
+root = "astSyntaxSurface"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "cAbiRuntime"
+name = "astSyntaxSurface"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:46efc2f36ffc31c3"
-contentHash = "fnv1a64:871c37262ffd8c20"
+manifestHash = "fnv1a64:c4e2d02a5fcebe8f"
+contentHash = "fnv1a64:d9038e35279f10c2"
 trust = []
 dependencies = [
+  { key = "core", package = "core" },
 ]
 
 [[package]]

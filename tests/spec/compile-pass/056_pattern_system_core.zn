@@ -2,7 +2,7 @@
 // stage: mvp
 // milestone: M5
 // profile: freestanding
-// purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-val, and while-val
+// purpose: pattern system supports enum, struct, tuple, literal, range, or, guard, if-pattern, and while-pattern
 
 module tests.pass.patternSystemCore;
 
@@ -58,7 +58,7 @@ fn destructure(point: Point, pair: (U32, U32)) -> U32 {
 }
 
 fn optional(maybe: Maybe<U32>) -> U32 {
-    if val Maybe.Some(value) = maybe {
+    if Maybe.Some(value) = maybe {
         return value;
     } else {
         return 0;
@@ -67,7 +67,7 @@ fn optional(maybe: Maybe<U32>) -> U32 {
 
 fn sumCounter(mut counter: Counter) -> U32 {
     var sum: U32 = 0;
-    while val Maybe.Some(value) = counter.next() {
+    while Maybe.Some(value) = counter.next() {
         sum = sum + value;
     }
     return sum;

@@ -1,0 +1,144 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 34
+# zmeta-contains: decl.enum Result module=main span=src/main.zn:3:1 generic=<T, E>
+# zmeta-contains: decl.variant Ok module=main span=src/main.zn:4:1 payload=(T)
+# zmeta-contains: decl.variant Err module=main span=src/main.zn:5:1 payload=(E)
+# zmeta-contains: decl.fn okValue module=main span=src/main.zn:8:1 params=(value: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn errValue module=main span=src/main.zn:12:1 params=(code: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn step module=main span=src/main.zn:16:1 params=(value: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn fail module=main span=src/main.zn:22:1 params=(value: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn checkOk module=main span=src/main.zn:28:1 params=(value: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn checkErr module=main span=src/main.zn:33:1 params=(value: I32) return=Result<I32, I32>
+# zmeta-contains: decl.fn unwrapOrCode module=main span=src/main.zn:38:1 params=(result: Result<I32, I32>) return=I32
+# zmeta-contains: decl.fn main module=main span=src/main.zn:45:1 params=() return=I32
+# zmeta-contains: stmt.return okValue module=main span=src/main.zn:9:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
+# zmeta-contains: stmt.return errValue module=main span=src/main.zn:13:1 expr=type-static-call:Result.Err expected=Result<I32, I32>
+# zmeta-contains: stmt.val step.first module=main span=src/main.zn:17:1 expr=try:call:okValue
+# zmeta-contains: stmt.val step.second module=main span=src/main.zn:18:1 expr=try:call:okValue
+# zmeta-contains: stmt.return step module=main span=src/main.zn:19:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
+# zmeta-contains: stmt.val fail.first module=main span=src/main.zn:23:1 expr=try:call:okValue
+# zmeta-contains: stmt.val fail.second module=main span=src/main.zn:24:1 expr=try:call:errValue
+# zmeta-contains: stmt.return fail module=main span=src/main.zn:25:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
+# zmeta-contains: stmt.try checkOk module=main span=src/main.zn:29:1 expr=try:call:okValue
+# zmeta-contains: stmt.return checkOk module=main span=src/main.zn:30:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
+# zmeta-contains: stmt.try checkErr module=main span=src/main.zn:34:1 expr=try:call:errValue
+# zmeta-contains: stmt.return checkErr module=main span=src/main.zn:35:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
+# zmeta-contains: stmt.return unwrapOrCode module=main span=src/main.zn:39:1 expr=match expected=I32
+# zmeta-contains: stmt.match-arm unwrapOrCode.Result.Ok(value) module=main span=src/main.zn:40:1 expr=name:value
+# zmeta-contains: stmt.match-arm unwrapOrCode.Result.Err(code) module=main span=src/main.zn:41:1 expr=name:code
+# zmeta-contains: stmt.val main.good module=main span=src/main.zn:46:1 expr=call:step
+# zmeta-contains: stmt.val main.bad module=main span=src/main.zn:47:1 expr=call:fail
+# zmeta-contains: stmt.val main.checked module=main span=src/main.zn:48:1 expr=call:checkOk
+# zmeta-contains: stmt.val main.checkedErr module=main span=src/main.zn:49:1 expr=call:checkErr
+# zmeta-contains: stmt.return main module=main span=src/main.zn:50:1 expr=binary:+ expected=I32
+# zmeta-contains: hir.generic-params Result params=<T, E> span=src/main.zn:3:1
+# zmeta-contains: hir.fn-signature okValue params=(value: I32) return=Result<I32, I32> span=src/main.zn:8:1
+# zmeta-contains: hir.fn-signature errValue params=(code: I32) return=Result<I32, I32> span=src/main.zn:12:1
+# zmeta-contains: hir.fn-signature step params=(value: I32) return=Result<I32, I32> span=src/main.zn:16:1
+# zmeta-contains: hir.fn-signature fail params=(value: I32) return=Result<I32, I32> span=src/main.zn:22:1
+# zmeta-contains: hir.fn-signature checkOk params=(value: I32) return=Result<I32, I32> span=src/main.zn:28:1
+# zmeta-contains: hir.fn-signature checkErr params=(value: I32) return=Result<I32, I32> span=src/main.zn:33:1
+# zmeta-contains: hir.fn-signature unwrapOrCode params=(result: Result<I32, I32>) return=I32 span=src/main.zn:38:1
+# zmeta-contains: hir.local step.first mode=val expr=try:call:okValue type=inferred span=src/main.zn:17:1
+# zmeta-contains: hir.local step.second mode=val expr=try:call:okValue type=inferred span=src/main.zn:18:1
+# zmeta-contains: hir.local fail.first mode=val expr=try:call:okValue type=inferred span=src/main.zn:23:1
+# zmeta-contains: hir.local fail.second mode=val expr=try:call:errValue type=inferred span=src/main.zn:24:1
+# zmeta-contains: hir.try checkOk expr=try:call:okValue span=src/main.zn:29:1
+# zmeta-contains: hir.try checkErr expr=try:call:errValue span=src/main.zn:34:1
+# zmeta-contains: hir.local main.checked mode=val expr=call:checkOk type=inferred span=src/main.zn:48:1
+# zmeta-contains: hir.local main.checkedErr mode=val expr=call:checkErr type=inferred span=src/main.zn:49:1
+# zmeta-contains: mir.generic-input Result params=<T, E>
+# zmeta-contains: mir.fn okValue entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn errValue entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn step entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn fail entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn checkOk entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn checkErr entry=bb0 return=Result<I32, I32>
+# zmeta-contains: mir.fn unwrapOrCode entry=bb0 return=I32
+# zmeta-contains: mir.rvalue step expr=try:call:okValue kind=try
+# zmeta-contains: mir.rvalue fail expr=try:call:errValue kind=try
+# zmeta-contains: mir.rvalue checkOk expr=try:call:okValue kind=try
+# zmeta-contains: mir.rvalue checkErr expr=try:call:errValue kind=try
+# zmeta-contains: mir.try checkOk expr=try:call:okValue ok=continue err=return
+# zmeta-contains: mir.try checkErr expr=try:call:errValue ok=continue err=return
+# zmeta-contains: mir.cleanup-edge step try-error
+# zmeta-contains: mir.cleanup-edge fail try-error
+# zmeta-contains: mir.cleanup-edge checkOk try-error
+# zmeta-contains: mir.cleanup-edge checkErr try-error
+# zmeta-contains: llvm.define-preview @step return=Result<I32, I32>
+# zmeta-contains: llvm.define-preview @fail return=Result<I32, I32>
+# zmeta-contains: llvm.define-preview @checkOk return=Result<I32, I32>
+# zmeta-contains: llvm.define-preview @checkErr return=Result<I32, I32>
+# zmeta-contains: llvm.branch-preview @step kind=try expr=try:call:okValue
+# zmeta-contains: llvm.branch-preview @fail kind=try expr=try:call:errValue
+# zmeta-contains: llvm.branch-preview @checkOk kind=try expr=try:call:okValue
+# zmeta-contains: llvm.branch-preview @checkErr kind=try expr=try:call:errValue
+# emit-contains: %Result_I32_I32 = type { i32, i32 }
+# emit-contains: define %Result_I32_I32 @okValue(i32 %value)
+# emit-contains: insertvalue %Result_I32_I32 undef, i32 0, 0
+# emit-contains: insertvalue %Result_I32_I32 %t0, i32 %value, 1
+# emit-contains: define %Result_I32_I32 @errValue(i32 %code)
+# emit-contains: insertvalue %Result_I32_I32 undef, i32 1, 0
+# emit-contains: insertvalue %Result_I32_I32 %t0, i32 %code, 1
+# emit-contains: define %Result_I32_I32 @step(i32 %value)
+# emit-contains: call %Result_I32_I32 @okValue(i32 %value)
+# emit-contains: %t2 = extractvalue %Result_I32_I32 %t0, 0
+# emit-contains: %t3 = icmp eq i32 %t2, 1
+# emit-contains: ret %Result_I32_I32 %t0
+# emit-contains: try.ok.
+# emit-contains: %t4 = extractvalue %Result_I32_I32 %t0, 1
+# emit-contains: %t6 = call %Result_I32_I32 @okValue(i32 %t5)
+# emit-contains: ret %Result_I32_I32 %t6
+# emit-contains: ret %Result_I32_I32 %t13
+# emit-contains: define %Result_I32_I32 @fail(i32 %value)
+# emit-contains: %t6 = call %Result_I32_I32 @errValue(i32 %t5)
+# emit-contains: ret %Result_I32_I32 %t6
+# emit-contains: define %Result_I32_I32 @checkOk(i32 %value)
+# emit-contains: call %Result_I32_I32 @okValue(i32 %value)
+# emit-contains: br i1 %t3, label %try.err.1, label %try.ok.1
+# emit-contains: ret %Result_I32_I32 %t0
+# emit-contains: define %Result_I32_I32 @checkErr(i32 %value)
+# emit-contains: call %Result_I32_I32 @errValue(i32 %t0)
+# emit-contains: br i1 %t4, label %try.err.2, label %try.ok.2
+# emit-contains: ret %Result_I32_I32 %t1
+# emit-contains: define i32 @unwrapOrCode(%Result_I32_I32 %result)
+# emit-contains: extractvalue %Result_I32_I32 %result, 0
+# emit-contains: define i32 @main()
+# emit-contains: call %Result_I32_I32 @step(i32 3)
+# emit-contains: call %Result_I32_I32 @fail(i32 5)
+# emit-contains: call %Result_I32_I32 @checkOk(i32 4)
+# emit-contains: call %Result_I32_I32 @checkErr(i32 2)
+# emit-contains: call i32 @unwrapOrCode(%Result_I32_I32 %t0)
+# emit-contains: call i32 @unwrapOrCode(%Result_I32_I32 %t1)
+# emit-contains: call i32 @unwrapOrCode(%Result_I32_I32 %t2)
+# emit-contains: call i32 @unwrapOrCode(%Result_I32_I32 %t3)
+# emit-contains: ret i32 %t10
+# object-contains: okValue
+# object-contains: errValue
+# object-contains: step
+# object-contains: fail
+# object-contains: checkOk
+# object-contains: checkErr
+# object-contains: unwrapOrCode
+# object-contains: main
+# purpose: Result<T, E> is concentrated here: Result<I32, I32> constructors, try-binding ok continuation, try-binding err early return, standalone try ok continuation, standalone try err early return, Result match extraction, real LLVM aggregate branches, object code, executable output, and direct run-exit-code validation
+
+[package]
+name = "nativeTryResultApp"
+version = "0.1.0"
+kind = "application"
+entry = "main.main"
+
+[dependencies]
+core = "builtin"
+
+[target]
+triple = "aarch64-apple-darwin"
+profile = "hosted"

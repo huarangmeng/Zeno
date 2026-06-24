@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "artifactLib"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:01088d545fb309bc"
-contentHash = "fnv1a64:3fe7daca003c2b68"
+manifestHash = "fnv1a64:11c4728a79d841fc"
+contentHash = "fnv1a64:65ff255e21a620ec"
 trust = []
 dependencies = [
 ]
