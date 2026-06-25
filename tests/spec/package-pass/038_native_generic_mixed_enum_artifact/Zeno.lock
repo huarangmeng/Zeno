@@ -1,16 +1,15 @@
 version = 1
-root = "astSyntaxSurface"
+root = "nativeGenericMixedEnumApp"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "astSyntaxSurface"
-version = "0.1.0"
+name = "nativeGenericMixedEnumApp"
+version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:b7b437ad4a55502d"
-contentHash = "fnv1a64:12f9a9d92be23b67"
+manifestHash = "fnv1a64:8366a2dc61830be4"
+contentHash = "fnv1a64:b154404eb4d5b8b7"
 trust = []
 dependencies = [
-  { key = "core", package = "core" },
 ]
 
 [[package]]

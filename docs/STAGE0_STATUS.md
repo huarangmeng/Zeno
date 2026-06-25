@@ -276,32 +276,46 @@ semantic phases.
 - Diagnostic emission and spec-runner diagnostic consumption now use the same
   stable ordering by source file, byte span, error code, message, stage, and
   category before JSON/human output or runner failure matching.
-- Build metadata now uses a top-level AST node parser for module declarations,
-  imports, attributes, structs, enums, interfaces, functions, extern
-  declarations, impl headers, trust-block expressions, and covered function
-  body statements including `return`, `val` / `var` local bindings, simple
-  call statements, assignment, local `const`, `break`, `continue`, `if`,
-  `while`, `for` with read/mut/move iteration modes, statement `match` with
-  read/move/mut access modes, match arms with optional guards,
-  or-pattern/range-pattern text, `else`, if-pattern / while-pattern with
-  read/move/mut pattern modes, pattern destructuring local bindings,
-  standalone `try`,
-  top-level `const`, top-level `static`, type aliases, struct fields,
-  enum variant payloads, interface parent lists, generic interface headers and
-  methods, generic interface impl methods, impl consts, destroy blocks,
-  generic / const-generic declaration headers including nested generic
-  constraints such as `fn staticConsumer<T: Consumer<U32>>`, top-level
+- Build metadata now has two front-end fact sources: the legacy
+  `ParsedAstNode` path still feeds AST-derived HIR/MIR/LLVM preview facts, and
+  the first token-cursor syntax spine emits independent `syntax.file`,
+  `syntax.module`, `syntax.import`, `syntax.item`, `syntax.block`,
+  `syntax.field`, `syntax.variant`, `syntax.generic-param`, `syntax.param`,
+  `syntax.type`, `syntax.pattern`, `syntax.arg`, `syntax.stmt`, and
+  `syntax.expr` facts for the covered grammar surface. The
+  legacy path covers module declarations, imports, attributes, structs, enums,
+  interfaces, functions, extern declarations, impl headers, trust-block
+  expressions, and covered function-body statements including `return`, `val` /
+  `var` local bindings, simple call statements, assignment, local `const`,
+  `break`, `continue`, `if`, `while`, `for` with read/mut/move iteration modes,
+  statement `match` with read/move/mut access modes, match arms with optional
+  guards, or-pattern/range-pattern text, `else`, if-pattern / while-pattern
+  with read/move/mut pattern modes, pattern destructuring local bindings,
+  standalone `try`, top-level `const`, top-level `static`, type aliases,
+  struct fields, enum variant payloads, interface parent lists, generic
+  interface headers and methods, generic interface impl methods, impl consts,
+  destroy blocks, generic / const-generic declaration headers including nested
+  generic constraints such as `fn staticConsumer<T: Consumer<U32>>`, top-level
   function/extern/method signatures, trust extern declarations, trust-block
   expressions, C ABI export attributes, struct literal expressions,
   method-call expressions, tuple/unit/char/cast/index/type-static call
   expressions, closure expressions including move-capturing and block closure
   forms, `try` expressions, match expressions including `match move`, and
-  simple binary/comparison-expression facts; the resulting
-  `astNodes` and `astFingerprint` enter `.zmeta`, preview MIR/LLVM emit files,
-  cache-key inputs, and the build fingerprint. Module symbol collection and
-  build declaration summaries now consume the same parsed AST nodes, including
-  top-level `const` / `static`, so nested interface/impl methods do not leak
-  into package declaration fingerprints or public/package API summaries.
+  simple binary/comparison-expression facts. The new syntax spine parses
+  token streams with balanced item/member/function blocks and records
+  file/item/block/field/variant/generic-param/param/type/pattern/argument/
+  statement/expression structure for functions, impl/interface members, local
+  bindings, assignment, if/while pattern conditions using `is`, for loops,
+  standalone and return-position `match`, guarded match arms, block arms,
+  `try`, break/continue, calls, receiver/parameter modes, generic constraints,
+  const-generic parameters, impl target types, enum payload types, local type
+  annotations, and binary/comparison expressions.
+  The resulting `astNodes` and `astFingerprint` enter `.zmeta`, preview
+  MIR/LLVM emit files, cache-key inputs, and the build fingerprint. Module
+  symbol collection and build declaration summaries still consume the legacy
+  parsed AST nodes, including top-level `const` / `static`, so nested
+  interface/impl methods do not leak into package declaration fingerprints or
+  public/package API summaries.
 - Package-pass fixtures can opt into `build-artifact` validation; the runner
   invokes `zeno build` for those directory cases and checks the produced
   native object artifact, host-native executable when the target matches the
@@ -390,7 +404,14 @@ semantic phases.
     the tag plus selected tuple/record payload slots before returning native
     `I32`. Guarded arms, closed `I32` payload range arms, or-pattern arms over
     same-layout payload variants, and unit variants inside payload enums now
-    lower through the same native ordered branch path. Covered payload enum
+    lower through the same native ordered branch path. The payload enum ABI
+    path now also covers the first mixed primitive scalar payload layout:
+    `Packet` can be emitted as `%Packet = type { i32, i8, i16, i64, float, double }`
+    while carrying either a mixed-scalar `%Header = type { i8, i16, i64, float, double }`
+    struct payload or a record payload with `U8`, `U16`, `I64`, `F32`, and
+    `F64` fields; constructors insert typed slots, `match` arms extract or
+    reconstruct typed payloads, and helper calls preserve `i8`, `i16`, `i64`,
+    `float`, and `double` signatures. Covered payload enum
     `if (expr is Pattern)` branches now lower to native tag tests and payload
     binding too, including the `if (state is mut WorkState.Ready(job))` fixture.
     Covered payload enum `while (expr is Pattern)` loops also lower to native loop
@@ -398,10 +419,12 @@ semantic phases.
     body blocks, exit blocks, and loop back-edges over mutable locals, including
     `while (keyUntil(limit, i) is Event.Key(value))` with `acc` / `i` stores.
     The first generic payload enum instantiation path now lowers
-    `Maybe<I32>`, `Maybe<Job>`, and multi-field `Maybe<Task>` as named LLVM
+    `Maybe<I32>`, `Maybe<Job>`, multi-field `Maybe<Task>`, and mixed-scalar
+    `Maybe<Header>` as named LLVM
     aggregates `%Maybe_I32 = type { i32, i32 }`,
     `%Maybe_Job = type { i32, i32 }`, and
-    `%Maybe_Task = type { i32, i32, i32 }`, including
+    `%Maybe_Task = type { i32, i32, i32 }`, plus
+    `%Maybe_Header = type { i32, i8, i16, i64, float, double }`, including
     `Maybe.Some(value)` / `Maybe.None` constructors, struct payload
     reconstruction for `Maybe.Some(Job { ... })` and
     `Maybe.Some(Task { ... })`, and
@@ -410,7 +433,8 @@ semantic phases.
     `Maybe<I32>` producer and `while (maybeUntil(limit, i) is Maybe.Some(value))`
     loop now also lower to real native LLVM with aggregate-returning loop
     scrutinee calls, tag extraction, payload binding, mutable local stores,
-    and a loop back-edge; broader generic payload forms remain preview-backed
+    and a loop back-edge; broader generic payload forms with incompatible
+    per-variant slot layouts remain preview-backed
     until the native monomorphization path is widened;
   - the first native `for` lowering path now covers I32 range iteration:
     `for i in start..end` lowers to a real `for.cond` header with `icmp slt`,
@@ -520,33 +544,23 @@ persistent incremental cache.
 
 The following V01 areas are still preview-backed or placeholder-backed today:
 
-- Full parser/AST construction remains incomplete beyond the top-level AST
-  node parser used by module symbols, declaration summaries, artifact metadata,
-  cache keys, and the covered function-body `return`, `val` / `var`, call
-  statement, assignment, local `const`, `break`, `continue`, `if`, `while`,
-  simple binary-expression, and comparison-expression shapes plus covered
-  top-level `const` / `static`, type aliases, struct fields, enum variant
-  payloads, interface parent lists, generic interface headers and methods,
-  generic interface impl methods, impl consts, destroy blocks,
-  generic / const-generic declaration headers including nested generic
-  constraints, trust extern declarations, trust blocks, C ABI export
-  attributes, `for` with read/mut/move iteration modes,
-  statement `match` with access mode, match-arm with optional guard,
-  or-pattern and range-pattern arm text, `else`, if-pattern / while-pattern
-  pattern modes, pattern destructuring local bindings, standalone `try`,
-  struct-literal expression,
-  method-call expression, tuple/unit/char/cast/index/type-static-call
-  expression, closure-expression including move-capturing and block forms,
-  try-expression, and match-expression artifact facts including `match move`.
-  HIR/MIR/LLVM lowering now
-  has AST-derived phase facts and fingerprints for those nodes, but full
-  syntax-tree construction, scope-aware name binding, CFG-shaped MIR, MIR
-  verification, pattern binding in match arms, monomorphization, and LLVM
-  lowering remain preview-backed beyond the minimal native `I32`
+- Full parser/AST construction is now started but not complete: stage0 has a
+  token-cursor syntax spine for the covered syntax surface, including
+  item/block/field/variant/generic-param/param/type/pattern/argument/statement/
+  expression node facts, emitted as `syntax.*` facts alongside the legacy
+  top-level/body AST node parser used by module symbols, declaration
+  summaries, artifact metadata, cache keys, and AST-derived HIR/MIR/LLVM
+  preview facts. HIR/MIR/LLVM lowering still mostly
+  derives from the legacy `ParsedAstNode` facts rather than the new syntax
+  spine. Full syntax-tree ownership, parse errors/recovery, scope-aware name
+  binding, CFG-shaped MIR, MIR verification, pattern binding in match arms,
+  monomorphization, and LLVM lowering remain preview-backed beyond the minimal
+  native `I32`
   parameter/local/binary-expression/direct-call, if-return, if/else-return,
   var/while-loop, simple `Bool`/`i1` condition-call path, all-`I32` struct
   aggregate path, no-payload enum switch path, first all-`I32` tuple/record
-  payload enum aggregate path, and covered `Result<I32, I32>` try-binding
+  payload enum aggregate path, first mixed primitive scalar struct and payload
+  enum aggregate paths, and covered `Result<I32, I32>` try-binding
   branch/early-return path, plus the covered `Char`, `I8`, `I16`, `I64`,
   `ISize`, `U8`, `U16`, `U32`, `U64`, `USize`, `F32`, and `F64` native scalar
   paths. The
@@ -778,15 +792,15 @@ build/stage0/zeno check tests/spec/compile-fail/195_effect_guards_reject_reachab
 build/stage0/zeno check tests/spec/compile-fail/196_panic_diagnostic_storage_escape.zn --diagnostic-format json
   -> error[E0809]: PanicInfo is a diagnostic access value and cannot be stored; error[E0809]: StackFrames is valid only inside the panic handler path
 build/stage0/zeno test
-  -> zeno test: 144 passed, 0 failed (stage mvp)
+  -> zeno test: 146 passed, 0 failed (stage mvp)
 build/stage0/zeno test --feature diagnostic-order
   -> zeno test: 1 passed, 0 failed
 build/stage0/zeno test --feature build-artifact
-  -> zeno test: 32 passed, 0 failed; artifact fixtures assert top-level AST node facts, covered function-body return/local-binding/pattern-binding/call-statement/assignment/if/else/if-pattern/while/while-pattern/for/match/match-arm/try/local-const/break/continue AST and HIR/MIR/LLVM-preview facts, top-level const/static/type-alias/field/enum-variant/interface/impl/destroy AST and declaration facts, struct-literal/method-call/closure/try/match/tuple/unit/char/cast/index/type-static-call expression facts, simple binary/comparison-expression facts including top-level binary calls, ast/hir/mir/llvm cache inputs, brace-aware top-level declaration collection, declaration stableNodeId/module/visibility/span facts, declaration/runtime/layout/drop/SendSync/interface/ABI/trust/dependency/dependency-package/cost/linked-runtime fingerprints, cacheKeyInputs, emitted MIR/LLVM preview facts, real LLVM IR for the minimal I32 parameter/local/binary-expression/direct-call/if-return/if-else-return/while-loop native path plus simple Bool/i1 functions and Bool-call branch conditions, Char parameter/local/literal/comparison lowering as internal i32 scalars, I8/I16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with signed divide and signed comparisons, U8/U16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with unsigned divide and unsigned comparisons, I64/ISize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with signed divide and signed comparisons, U32 parameter/local/literal/arithmetic/comparison lowering as internal i32 scalars with unsigned divide and unsigned comparisons, U64/USize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with unsigned divide and unsigned comparisons, F32 parameter/local/literal/arithmetic/comparison lowering as internal float scalars, F64 parameter/local/literal/arithmetic/comparison lowering as internal double scalars, simple all-I32 struct aggregate `insertvalue` / `extractvalue` lowering plus mixed primitive scalar struct aggregate lowering as LLVM `{ i8, i16, i64, float, double }`, no-payload and all-I32 payload enum discriminants lowered through ordered LLVM branch chains including guarded, range, or-pattern, unit payload-enum arms, generic `Maybe<I32>` / `Maybe<Job>` / `Maybe<Task>` aggregate constructors, generic payload match expressions, `Maybe<I32>` while-pattern loops, `Result<I32, I32>` try-binding plus standalone-try early-return branches, and I32 range `for` loops with real loop headers/steps/backedges, C ABI export thunks carrying all-I32 `@layout(C)` struct parameters as LLVM aggregates, real native object files, host-native executable output plus runner-checked `run-exit-code`, hosted profile with empty linkRuntimeNeeds, reachable Thread.spawn with linkRuntimeNeeds = ["thread"], reachable allocation/panic/OOM with linkRuntimeNeeds = ["allocator", "oom", "panic"], C ABI exports with linkRuntimeNeeds = ["c-abi-boundary"], C bridge exports recorded as bridge=C, trust report capability metadata, trusted and automatic Send/Sync metadata, interface/impl/static-return metadata, transitive path dependency package fingerprints plus dependency runtime propagation, and layout/drop glue cache metadata
+  -> zeno test: 34 passed, 0 failed; artifact fixtures assert top-level AST node facts plus token-cursor syntax spine facts for file/item/block/field/variant/generic-param/param/type/pattern/argument/statement/expression structure, covered function-body return/local-binding/pattern-binding/call-statement/assignment/if/else/if-pattern/while/while-pattern/for/match/match-arm/try/local-const/break/continue AST and HIR/MIR/LLVM-preview facts, top-level const/static/type-alias/field/enum-variant/interface/impl/destroy AST and declaration facts, struct-literal/method-call/closure/try/match/tuple/unit/char/cast/index/type-static-call expression facts, simple binary/comparison-expression facts including top-level binary calls, ast/hir/mir/llvm cache inputs, brace-aware top-level declaration collection, declaration stableNodeId/module/visibility/span facts, declaration/runtime/layout/drop/SendSync/interface/ABI/trust/dependency/dependency-package/cost/linked-runtime fingerprints, cacheKeyInputs, emitted MIR/LLVM preview facts, real LLVM IR for the minimal I32 parameter/local/binary-expression/direct-call/if-return/if-else-return/while-loop native path plus simple Bool/i1 functions and Bool-call branch conditions, Char parameter/local/literal/comparison lowering as internal i32 scalars, I8/I16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with signed divide and signed comparisons, U8/U16 parameter/local/literal/arithmetic/comparison lowering as internal i8/i16 scalars with unsigned divide and unsigned comparisons, I64/ISize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with signed divide and signed comparisons, U32 parameter/local/literal/arithmetic/comparison lowering as internal i32 scalars with unsigned divide and unsigned comparisons, U64/USize parameter/local/literal/arithmetic/comparison lowering as internal i64 scalars with unsigned divide and unsigned comparisons, F32 parameter/local/literal/arithmetic/comparison lowering as internal float scalars, F64 parameter/local/literal/arithmetic/comparison lowering as internal double scalars, simple all-I32 struct aggregate `insertvalue` / `extractvalue` lowering plus mixed primitive scalar struct aggregate lowering as LLVM `{ i8, i16, i64, float, double }`, no-payload, all-I32 payload, first mixed primitive scalar payload enum discriminants, and generic mixed-scalar `Maybe<Header>` payload instantiations lowered through ordered LLVM branch chains including guarded, range, or-pattern, unit payload-enum arms, mixed scalar payload slot extraction/reconstruction, generic `Maybe<I32>` / `Maybe<Job>` / `Maybe<Task>` aggregate constructors, generic payload match expressions, `Maybe<I32>` while-pattern loops, `Result<I32, I32>` try-binding plus standalone-try early-return branches, and I32 range `for` loops with real loop headers/steps/backedges, C ABI export thunks carrying all-I32 `@layout(C)` struct parameters as LLVM aggregates, real native object files, host-native executable output plus runner-checked `run-exit-code`, hosted profile with empty linkRuntimeNeeds, reachable Thread.spawn with linkRuntimeNeeds = ["thread"], reachable allocation/panic/OOM with linkRuntimeNeeds = ["allocator", "oom", "panic"], C ABI exports with linkRuntimeNeeds = ["c-abi-boundary"], C bridge exports recorded as bridge=C, trust report capability metadata, trusted and automatic Send/Sync metadata, interface/impl/static-return metadata, transitive path dependency package fingerprints plus dependency runtime propagation, and layout/drop glue cache metadata
 build/stage0/zeno test --stage mvp --feature build-artifact
-  -> zeno test: 19 passed, 0 failed (stage mvp)
+  -> zeno test: 21 passed, 0 failed (stage mvp)
 build/stage0/zeno test --stage full-spec --feature build-artifact
-  -> zeno test: 32 passed, 0 failed
+  -> zeno test: 34 passed, 0 failed
 build/stage0/zeno test --feature nope
   -> zeno test: 0 passed, 0 failed (no tests selected)
 build/stage0/zeno build tests/spec/package-pass/004_application_artifact --emit mir
@@ -824,7 +838,7 @@ build/stage0/zeno build tests/spec/package-pass/020_native_application_artifact 
 build/stage0/zeno build tests/spec/package-pass/021_native_bool_condition_artifact --emit llvm-ir
   -> target/aarch64-apple-darwin/hosted/ir/nativeBoolApp.ll contains real LLVM IR for `isPositive(value: I32) -> Bool`, `pick(value: I32) -> I32`, and `main() -> I32`, including `define i1 @isPositive(i32 %value)`, `%t0 = icmp sgt i32 %value, 0`, `ret i1 %t0`, `define i32 @pick(i32 %value)`, `%t0 = call i1 @isPositive(i32 %value)`, `br i1 %t0, label %if.then.1, label %if.cont.1`, and `%t0 = call i32 @pick(i32 3)`; target/.../obj/nativeBoolApp.o is `Mach-O 64-bit object arm64`; target/.../bin/nativeBoolApp is `Mach-O 64-bit executable arm64`; executing it exits with code 7 and the build-artifact runner verifies `run-exit-code: 7`
 build/stage0/zeno build tests/spec/package-pass/022_ast_syntax_surface_artifact --emit mir
-  -> target/.../meta/astSyntaxSurface.zmeta and target/.../mir/astSyntaxSurface.mir record top-level `const LIMIT`, `static Seed`, enum variant payload `Code(U32)`, `struct Point: Copy`, `@layout(Source) struct Buffer<T, const Capacity: USize>`, struct fields, `type ByteBuffer = Buffer<U8, 4>`, `interface Writer: Send, Sync`, interface method signatures, `impl Writer for Buffer<U8, 4>`, impl consts, impl methods, `destroy`, generic `interface Consumer<T>`, `impl Consumer<U32> for Counter`, `fn genericIdentity<T: Copy>`, nested generic constraint `fn staticConsumer<T: Consumer<U32>>`, `trust extern "C" fn hostRead`, `return trust { ... }`, `@export("zeno_surface_add", abi: C) pub fn exportedAdd`, local `const`, `static NativeSeed`, `fn nativeStaticAdd`, `Point { x: 1, y: 2 }`, `val Point { x, y } = point`, `for value in values`, `for move value in counter`, `continue`, `val parsed = try parseDigit(total)`, standalone `try parseDigit(parsed)`, closure expression `(x: U32) => x + LIMIT`, move closure expression `move (x: U32) => x + limit`, block closure expression `(x: U32) -> U32 { ... }`, `return match maybe`, match arms, `if (maybe is Some(value)) { ... } else { ... }`, `if (maybe is move Some(value))`, `return match move maybe`, guarded match arm `Some(value) if value > 10`, or-pattern arm `None | Some(0)`, range-pattern arm `Some(1..=10)`, standalone `match move maybe`, `maybe.unwrapOr(0)`, `while (nextMaybe(total) is Some(value))`, `break total`, unit/tuple/char/cast/index/type-static-call expressions, and statement `match maybe` as AST-derived HIR/MIR/LLVM-preview facts, including `hir.generic-params`, `hir.field`, `hir.type-alias`, `hir.interface-method`, `hir.impl-method`, `hir.fn-signature`, `hir.extern`, `hir.trust`, `hir.destroy`, `hir.local-const`, `hir.static`, `hir.for mode=move/read`, `hir.try`, `hir.match mode=move/read`, `hir.match-arm guard=compare:>/none`, `hir.pattern-local`, `hir.if-pattern mode=move/read`, `hir.else`, `hir.while-pattern mode=read`, `hir.break`, `hir.continue`, `mir.generic-input`, `mir.field`, `mir.interface-slot`, `mir.impl-method`, `mir.fn`, `mir.extern`, `mir.trust`, `mir.return`, `mir.destroy`, `mir.type-alias`, `mir.local-const`, `mir.static`, `mir.loop kind=for mode=move/read`, `mir.try`, `mir.pattern-bind`, `mir.terminator ... kind=continue`, `mir.branch kind=if-pattern`, `mir.branch kind=match-guard`, `mir.branch kind=else`, `mir.loop kind=while-pattern`, `mir.terminator ... kind=break`, `mir.rvalue ... kind=struct-literal`, `mir.rvalue ... kind=method-call`, `mir.rvalue ... kind=closure mode=move/form=block`, `mir.rvalue ... kind=match mode=move`, `mir.match-arm guard=compare:>/none`, `mir.rvalue ... kind=tuple`, `mir.rvalue ... kind=cast`, `mir.operand ... kind=index`, `mir.rvalue ... kind=type-static-call`, `mir.switch mode=move/read`, `llvm.field-preview`, `llvm.interface-method-preview`, `llvm.impl-method-preview`, `llvm.declare`, `llvm.define-preview`, `llvm.ret-preview`, `llvm.lowering-input`, `llvm.destroy-preview`, `llvm.aggregate-preview`, `llvm.pattern-preview`, `llvm.loop-preview mode=move/read`, `llvm.branch-preview kind=try`, `llvm.branch-preview kind=continue`, `llvm.branch-preview kind=if-pattern`, `llvm.branch-preview kind=match-guard`, `llvm.loop-preview kind=while-pattern`, `llvm.branch-preview kind=break`, `llvm.call-preview method=unwrapOr`, `llvm.call-preview @hostRead`, `llvm.global-preview @NativeSeed`, `llvm.cast-preview`, `llvm.index-preview`, `llvm.call-preview static=...`, `llvm.closure-preview mode=move/form=block`, and `llvm.switch-preview mode=move/read`; .zmeta also records `exports = ["zeno_surface_add:abi=C"]` and trust capability metadata for the fixture; target/.../ir/astSyntaxSurface.ll contains real LLVM `declare i32 @hostRead(i32)`, `define i32 @nativeConstAdd(i32 %value)`, `%t0 = add i32 5, 2`, `%t1 = add i32 %value, %t0`, `@NativeSeed = internal global i32 9`, `define i32 @nativeStaticAdd(i32 %value)`, `load i32, ptr @NativeSeed`, `define i32 @trustedHostRead(i32 %value)`, `%t0 = call i32 @hostRead(i32 %value)`, `define i32 @exportedAdd(...)`, and `define i32 @zeno_surface_add(...)`; target/.../obj/astSyntaxSurface.o is a native object whose symbol table contains local data `NativeSeed`, defined `nativeConstAdd` / `nativeStaticAdd` / `trustedHostRead` / `zeno_surface_add`, and unresolved external `hostRead`
+  -> target/.../meta/astSyntaxSurface.zmeta and target/.../mir/astSyntaxSurface.mir record token-cursor `syntax.*` spine facts for file/item/block/field/variant/generic-param/param/type/pattern/argument/statement/expression structure, including `fn sumValues`, its body block, struct fields, enum variants and payload types, const generic parameters, generic interface bounds, receiver/move parameters, local type annotations, call arguments, `for value in values`, `if (maybe is Some(value))`, `while (nextMaybe(total) is Some(value))`, guarded return-position match arms, or-pattern/range-pattern facts, and `return a + b`, plus top-level `const LIMIT`, `static Seed`, enum variant payload `Code(U32)`, `struct Point: Copy`, `@layout(Source) struct Buffer<T, const Capacity: USize>`, struct fields, `type ByteBuffer = Buffer<U8, 4>`, `interface Writer: Send, Sync`, interface method signatures, `impl Writer for Buffer<U8, 4>`, impl consts, impl methods, `destroy`, generic `interface Consumer<T>`, `impl Consumer<U32> for Counter`, `fn genericIdentity<T: Copy>`, nested generic constraint `fn staticConsumer<T: Consumer<U32>>`, `trust extern "C" fn hostRead`, `return trust { ... }`, `@export("zeno_surface_add", abi: C) pub fn exportedAdd`, local `const`, `static NativeSeed`, `fn nativeStaticAdd`, `Point { x: 1, y: 2 }`, `val Point { x, y } = point`, `for value in values`, `for move value in counter`, `continue`, `val parsed = try parseDigit(total)`, standalone `try parseDigit(parsed)`, closure expression `(x: U32) => x + LIMIT`, move closure expression `move (x: U32) => x + limit`, block closure expression `(x: U32) -> U32 { ... }`, `return match maybe`, match arms, `if (maybe is Some(value)) { ... } else { ... }`, `if (maybe is move Some(value))`, `return match move maybe`, guarded match arm `Some(value) if value > 10`, or-pattern arm `None | Some(0)`, range-pattern arm `Some(1..=10)`, standalone `match move maybe`, `maybe.unwrapOr(0)`, `while (nextMaybe(total) is Some(value))`, `break total`, unit/tuple/char/cast/index/type-static-call expressions, and statement `match maybe` as AST-derived HIR/MIR/LLVM-preview facts, including `hir.generic-params`, `hir.field`, `hir.type-alias`, `hir.interface-method`, `hir.impl-method`, `hir.fn-signature`, `hir.extern`, `hir.trust`, `hir.destroy`, `hir.local-const`, `hir.static`, `hir.for mode=move/read`, `hir.try`, `hir.match mode=move/read`, `hir.match-arm guard=compare:>/none`, `hir.pattern-local`, `hir.if-pattern mode=move/read`, `hir.else`, `hir.while-pattern mode=read`, `hir.break`, `hir.continue`, `mir.generic-input`, `mir.field`, `mir.interface-slot`, `mir.impl-method`, `mir.fn`, `mir.extern`, `mir.trust`, `mir.return`, `mir.destroy`, `mir.type-alias`, `mir.local-const`, `mir.static`, `mir.loop kind=for mode=move/read`, `mir.try`, `mir.pattern-bind`, `mir.terminator ... kind=continue`, `mir.branch kind=if-pattern`, `mir.branch kind=match-guard`, `mir.branch kind=else`, `mir.loop kind=while-pattern`, `mir.terminator ... kind=break`, `mir.rvalue ... kind=struct-literal`, `mir.rvalue ... kind=method-call`, `mir.rvalue ... kind=closure mode=move/form=block`, `mir.rvalue ... kind=match mode=move`, `mir.match-arm guard=compare:>/none`, `mir.rvalue ... kind=tuple`, `mir.rvalue ... kind=cast`, `mir.operand ... kind=index`, `mir.rvalue ... kind=type-static-call`, `mir.switch mode=move/read`, `llvm.field-preview`, `llvm.interface-method-preview`, `llvm.impl-method-preview`, `llvm.declare`, `llvm.define-preview`, `llvm.ret-preview`, `llvm.lowering-input`, `llvm.destroy-preview`, `llvm.aggregate-preview`, `llvm.pattern-preview`, `llvm.loop-preview mode=move/read`, `llvm.branch-preview kind=try`, `llvm.branch-preview kind=continue`, `llvm.branch-preview kind=if-pattern`, `llvm.branch-preview kind=match-guard`, `llvm.loop-preview kind=while-pattern`, `llvm.branch-preview kind=break`, `llvm.call-preview method=unwrapOr`, `llvm.call-preview @hostRead`, `llvm.global-preview @NativeSeed`, `llvm.cast-preview`, `llvm.index-preview`, `llvm.call-preview static=...`, `llvm.closure-preview mode=move/form=block`, and `llvm.switch-preview mode=move/read`; .zmeta also records `exports = ["zeno_surface_add:abi=C"]` and trust capability metadata for the fixture; target/.../ir/astSyntaxSurface.ll contains real LLVM `declare i32 @hostRead(i32)`, `define i32 @nativeConstAdd(i32 %value)`, `%t0 = add i32 5, 2`, `%t1 = add i32 %value, %t0`, `@NativeSeed = internal global i32 9`, `define i32 @nativeStaticAdd(i32 %value)`, `load i32, ptr @NativeSeed`, `define i32 @trustedHostRead(i32 %value)`, `%t0 = call i32 @hostRead(i32 %value)`, `define i32 @exportedAdd(...)`, and `define i32 @zeno_surface_add(...)`; target/.../obj/astSyntaxSurface.o is a native object whose symbol table contains local data `NativeSeed`, defined `nativeConstAdd` / `nativeStaticAdd` / `trustedHostRead` / `zeno_surface_add`, and unresolved external `hostRead`
 build/stage0/zeno build tests/spec/package-pass/023_native_if_else_artifact --emit llvm-ir
   -> target/aarch64-apple-darwin/hosted/ir/nativeIfElseApp.ll contains real LLVM IR for `choosePositive(value: I32) -> I32`, including `%t0 = icmp sgt i32 %value, 0`, `br i1 %t0, label %if.then.1, label %if.cont.1`, `if.then.1:`, `ret i32 %value`, `if.cont.1:`, and `ret i32 7`; target/.../obj/nativeIfElseApp.o is a native object, target/.../bin/nativeIfElseApp is a host executable, and the build-artifact runner executes it and verifies `run-exit-code: 7`
 build/stage0/zeno build tests/spec/package-pass/024_native_struct_artifact --emit llvm-ir
@@ -853,8 +867,12 @@ build/stage0/zeno build tests/spec/package-pass/035_native_narrow_int_artifact -
   -> target/aarch64-apple-darwin/hosted/ir/nativeNarrowIntApp.ll contains real LLVM lowering for narrow integer scalars: `I8`/`U8` use LLVM `i8`, `I16`/`U16` use LLVM `i16`, signed functions use `sdiv` and `icmp slt` / `icmp sge`, unsigned functions use `udiv` and `icmp ult` / `icmp uge`, and typed literals materialize as `add i8 0, 8` or `add i16 0, 300`; target/.../obj/nativeNarrowIntApp.o contains `_classifySigned8` / `_classifyUnsigned8` / `_classifySigned16` / `_classifyUnsigned16` / `_isSmallSigned8` / `_isSmallUnsigned8` / `_isLargeSigned16` / `_isLargeUnsigned16` / `_main`, target/.../bin/nativeNarrowIntApp is a host executable, and direct execution verifies `run-exit-code: 79`
 build/stage0/zeno build tests/spec/package-pass/036_native_mixed_struct_artifact --emit llvm-ir
   -> target/aarch64-apple-darwin/hosted/ir/nativeMixedStructApp.ll contains real LLVM aggregate lowering for mixed primitive scalar fields: `%Header = type { i8, i16, i64, float, double }`, `define %Header @makeHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)` inserts each field with its scalar type, `define i32 @consume(%Header %header)` extracts each field and calls typed helpers as `i8`, `i16`, `i64`, `float`, and `double`, target/.../obj/nativeMixedStructApp.o contains `_makeHeader` / `_identity` / `_consume` / `_scoreTag` / `_scoreLength` / `_scoreWeight` / `_scoreRatio` / `_scoreExact` / `_main`, target/.../bin/nativeMixedStructApp is a host executable, and direct execution verifies `run-exit-code: 49`
+build/stage0/zeno build tests/spec/package-pass/037_native_mixed_enum_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeMixedEnumApp.ll contains real LLVM aggregate lowering for mixed primitive scalar enum payloads: `%Header = type { i8, i16, i64, float, double }` and `%Packet = type { i32, i8, i16, i64, float, double }`; `define %Packet @makePacketHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)` builds a `Header`, extracts each typed field, and inserts `i8`, `i16`, `i64`, `float`, and `double` payload slots; `define %Packet @makeReading(...)` inserts the same typed record payload slots directly; `define i32 @inspect(%Packet %packet)` lowers `return match packet` to ordered tag branches, reconstructs `%Header` for `Packet.Header(header)`, and calls `@consumeReading(i8, i16, i64, float, double)` for `Packet.Reading`; `define i32 @unwrapHeader(%Packet %packet)` lowers `if (packet is Packet.Header(header))` to a tag test and typed payload reconstruction; numeric equality remains `==` and emits `icmp eq`, while `is` is only used for pattern matching. target/.../obj/nativeMixedEnumApp.o contains `_makePacketHeader` / `_makeReading` / `_makeEmpty` / `_inspect` / `_unwrapHeader` / `_consumeHeader` / `_consumeReading` / `_main`, target/.../bin/nativeMixedEnumApp is a host executable, and direct execution verifies `run-exit-code: 147`
+build/stage0/zeno build tests/spec/package-pass/038_native_generic_mixed_enum_artifact --emit llvm-ir
+  -> target/aarch64-apple-darwin/hosted/ir/nativeGenericMixedEnumApp.ll contains real LLVM monomorphization and aggregate lowering for `Maybe<Header>`: `%Maybe_Header = type { i32, i8, i16, i64, float, double }`; `define %Maybe_Header @makeSome(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)` calls `@makeHeader`, extracts each mixed scalar field, and inserts typed payload slots; `define %Maybe_Header @makeNone()` inserts the unit-variant tag; `define i32 @inspect(%Maybe_Header %maybe)` lowers `return match maybe` to ordered tag branches and reconstructs `%Header`; `define i32 @unwrap(%Maybe_Header %maybe)` lowers `if (maybe is Maybe.Some(header))` to a tag test and typed payload reconstruction; target/.../obj/nativeGenericMixedEnumApp.o contains `_makeSome` / `_makeNone` / `_inspect` / `_unwrap` / `_consume` / `_main`, target/.../bin/nativeGenericMixedEnumApp is a host executable, and direct execution verifies `run-exit-code: 98`
 build/stage0/zeno test --stage mvp --milestone M2
-  -> zeno test: 78 passed, 0 failed (stage mvp, M2)
+  -> zeno test: 80 passed, 0 failed (stage mvp, M2)
 build/stage0/zeno test --stage mvp --milestone M3
   -> zeno test: 10 passed, 0 failed (stage mvp, M3)
 build/stage0/zeno test --stage mvp --milestone M5
@@ -866,13 +884,13 @@ build/stage0/zeno test --workspace /private/tmp/zeno-metadata-check
 build/stage0/zeno test --workspace /private/tmp/zeno-target-metadata
   -> invalid test target metadata ... wasm32-unknown-unknown
 build/stage0/zeno test --stage full-spec
-  -> zeno test: 426 passed, 0 failed
+  -> zeno test: 428 passed, 0 failed
 build/stage0/zeno test --stage full-spec --target x86_64-unknown-linux-gnu
   -> zeno test: 410 passed, 0 failed
 build/stage0/zeno test --stage full-spec --target aarch64-apple-darwin
-  -> zeno test: 407 passed, 0 failed
-zeno test: 144 passed, 0 failed (stage mvp)
-zeno test: 426 passed, 0 failed
+  -> zeno test: 408 passed, 0 failed
+zeno test: 146 passed, 0 failed (stage mvp)
+zeno test: 428 passed, 0 failed
 ```
 
 At this point, every `tests/spec/compile-fail/*.zn` file is rejected by ordinary

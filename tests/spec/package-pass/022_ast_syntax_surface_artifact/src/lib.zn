@@ -213,3 +213,54 @@ static NativeSeed: I32 = 9;
 fn nativeStaticAdd(value: I32) -> I32 {
     return value + NativeSeed;
 }
+
+fn operatorExpressions(value: U32, flag: Bool) -> U32 {
+    val inverted = !flag;
+    val negative = -1;
+    val both = flag && inverted;
+    val shiftedLeft = value << 1;
+    val shiftedRight = shiftedLeft >> 1;
+    val scaled = value * 2;
+    val divided = scaled / 2;
+    val remainder = divided % 3;
+    val masked = shiftedRight & 3;
+    val combined = masked | 4;
+    val mixed = combined ^ 1;
+    val allowed = (mixed > 0) && inverted || flag;
+    var total: U32 = mixed;
+    total += shiftedRight;
+    return total;
+}
+
+fn mutateValue(mut value: U32) -> U32 {
+    value += 1;
+    return value;
+}
+
+fn accessModes(move counter: Counter, value: U32) -> U32 {
+    var total: U32 = value;
+    total = mutateValue(mut total);
+    mut counter.consume(move total);
+    counter.current = value;
+    return counter.current;
+}
+
+fn rangeExpressions() -> U32 {
+    val window = 1..=10;
+    return 0;
+}
+
+type PairTuple = (U32, U32);
+type Transform = Fn<U32, U32>;
+type MutableU32 = mut U32;
+
+fn controlExpressions(value: U32) -> U32 {
+    val chosen = if (value == 0) { 1 } else { value };
+    val looped = while (value == 0) { break; };
+    val iterated = for i in 0..1 { };
+    val matched = match Some(value) {
+        Some(found) => found,
+        None => 0,
+    };
+    return chosen;
+}

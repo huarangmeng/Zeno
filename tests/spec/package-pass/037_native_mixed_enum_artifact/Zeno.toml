@@ -1,0 +1,80 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 147
+# zmeta-contains: decl.enum Packet module=main span=src/main.zn:11:1
+# zmeta-contains: decl.variant Header module=main span=src/main.zn:12:1 payload=(Header)
+# zmeta-contains: decl.variant Reading module=main span=src/main.zn:13:1 payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 }
+# zmeta-contains: decl.variant Empty module=main span=src/main.zn:14:1
+# zmeta-contains: decl.fn makePacketHeader module=main span=src/main.zn:64:1 params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Packet
+# zmeta-contains: decl.fn makeReading module=main span=src/main.zn:69:1 params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Packet
+# zmeta-contains: decl.fn unwrapHeader module=main span=src/main.zn:77:1 params=(packet: Packet) return=I32
+# zmeta-contains: decl.fn inspect module=main span=src/main.zn:85:1 params=(packet: Packet) return=I32
+# zmeta-contains: stmt.if scoreTag module=main span=src/main.zn:18:1 condition=compare:==
+# zmeta-contains: stmt.if-pattern unwrapHeader.Packet.Header(header) module=main span=src/main.zn:78:1 condition=name:packet pattern=Packet.Header(header)
+# zmeta-contains: hir.enum-variant Header payload=(Header) span=src/main.zn:12:1
+# zmeta-contains: hir.enum-variant Reading payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 } span=src/main.zn:13:1
+# zmeta-contains: hir.fn-signature makePacketHeader params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Packet span=src/main.zn:64:1
+# zmeta-contains: hir.if-pattern unwrapHeader pattern=Packet.Header(header) mode=read scrutinee=name:packet span=src/main.zn:78:1
+# zmeta-contains: hir.match-arm inspect pattern=Packet.Header(header) guard=none expr=call:consumeHeader span=src/main.zn:87:1
+# zmeta-contains: hir.match-arm inspect pattern=Packet.Reading { tag, length, weight, ratio, exact } guard=none expr=call:consumeReading span=src/main.zn:88:1
+# zmeta-contains: mir.enum-variant Header payload=(Header)
+# zmeta-contains: mir.enum-variant Reading payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 }
+# zmeta-contains: mir.branch unwrapHeader kind=if-pattern pattern=Packet.Header(header) mode=read scrutinee=name:packet then=if.then else=if.cont
+# zmeta-contains: mir.match-arm inspect pattern=Packet.Header(header) guard=none body=call:consumeHeader
+# zmeta-contains: mir.match-arm inspect pattern=Packet.Reading { tag, length, weight, ratio, exact } guard=none body=call:consumeReading
+# zmeta-contains: mir.rvalue scoreTag expr=compare:== kind=compare op===
+# zmeta-contains: llvm.variant-preview Header payload=(Header)
+# zmeta-contains: llvm.variant-preview Reading payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 }
+# zmeta-contains: llvm.switch-preview @inspect expr=match
+# zmeta-contains: llvm.branch-preview @unwrapHeader kind=if-pattern pattern=Packet.Header(header) mode=read scrutinee=name:packet
+# emit-contains: %Header = type { i8, i16, i64, float, double }
+# emit-contains: %Packet = type { i32, i8, i16, i64, float, double }
+# emit-contains: define %Packet @makePacketHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)
+# emit-contains: %t3 = insertvalue %Packet %t1, i8 %t2, 1
+# emit-contains: %t5 = insertvalue %Packet %t3, i16 %t4, 2
+# emit-contains: %t7 = insertvalue %Packet %t5, i64 %t6, 3
+# emit-contains: %t9 = insertvalue %Packet %t7, float %t8, 4
+# emit-contains: %t11 = insertvalue %Packet %t9, double %t10, 5
+# emit-contains: define %Packet @makeReading(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)
+# emit-contains: %t1 = insertvalue %Packet %t0, i8 %tag, 1
+# emit-contains: %t2 = insertvalue %Packet %t1, i16 %length, 2
+# emit-contains: %t3 = insertvalue %Packet %t2, i64 %weight, 3
+# emit-contains: %t4 = insertvalue %Packet %t3, float %ratio, 4
+# emit-contains: %t5 = insertvalue %Packet %t4, double %exact, 5
+# emit-contains: define i32 @inspect(%Packet %packet)
+# emit-contains: %t7 = insertvalue %Header undef, i8 %t6, 0
+# emit-contains: %t9 = insertvalue %Header %t7, i16 %t8, 1
+# emit-contains: %t11 = insertvalue %Header %t9, i64 %t10, 2
+# emit-contains: %t13 = insertvalue %Header %t11, float %t12, 3
+# emit-contains: %t15 = insertvalue %Header %t13, double %t14, 4
+# emit-contains: %t16 = call i32 @consumeHeader(%Header %t15)
+# emit-contains: %t26 = call i32 @consumeReading(i8 %t21, i16 %t22, i64 %t23, float %t24, double %t25)
+# emit-contains: define i32 @unwrapHeader(%Packet %packet)
+# emit-contains: %t12 = icmp eq i32 %t10, 0
+# emit-contains: %t13 = call i32 @consumeHeader(%Header %t9)
+# emit-contains: %t0 = icmp eq i8 %value, 7
+# emit-contains: %t0 = icmp uge i16 %value, 300
+# emit-contains: %t0 = icmp sge i64 %value, 4294967296
+# emit-contains: %t0 = fcmp ogt float %value, 1.5
+# emit-contains: %t0 = fcmp olt double %value, 3.0
+# object-contains: _makePacketHeader
+# object-contains: _makeReading
+# object-contains: _makeEmpty
+# object-contains: _inspect
+# object-contains: _unwrapHeader
+# object-contains: _consumeHeader
+# object-contains: _consumeReading
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: mixed primitive scalar enum payload lowering is concentrated here: one enum carries both a mixed-scalar struct payload and a mixed-scalar record payload, constructors insert typed payload slots, if-pattern and return-match bind/reconstruct payloads, helper calls preserve U8/U16/I64/F32/F64 LLVM scalar types, and the path emits real object code plus a host executable with direct run-exit-code validation
+
+[package]
+name = "nativeMixedEnumApp"
+kind = "application"
+entry = "main.main"

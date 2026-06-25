@@ -352,10 +352,10 @@ method_receiver_part = call_args | index_args | "." ident ;
 mut_expr        = "mut" expr ;
 
 if_expr         = "if" if_condition block ("else" (if_expr | block))? ;
-if_condition    = val_condition | expr ;
-val_condition   = "val" pattern_mode? pattern "=" expr ;
+if_condition    = pattern_condition | expr ;
 while_expr      = "while" while_condition block ;
-while_condition = val_condition | expr ;
+while_condition = pattern_condition | expr ;
+pattern_condition = expr "is" pattern_mode? pattern ;
 for_expr        = "for" for_binding "in" expr block ;
 for_binding     = for_binding_mode? pattern ;
 for_binding_mode = pattern_mode ;
@@ -448,7 +448,7 @@ Future block 实参的捕获按逃逸 future 处理：`Copy` 值复制，非 `Co
 
 调用实参上的 `mut` / `move` 表示参数访问模式。`mut receiver.method(...)` 表示调用 `mut self` 方法并取得已有命名接收者的短期唯一可写访问；`move receiver.method(...)` 表示调用 `move self` 方法并消费已有命名接收者。`await mut receiver.method(...)` 表示立即等待一次 async `mut self` 调用；这个调用产生的 future 不能被命名、保存或逃逸。`await task` 等待并消费 `Task<T>` 句柄，不使用 `Task.await()` 方法。`move` 实参只用于从已有命名位置传给 `move` 参数；临时值、字面量、结构体字面量和函数返回值传给 `move` 参数时不需要额外标记。`Thread.spawn(move () { ... })` 这类闭包字面量中的 `move` 属于闭包捕获标记，不是实参标记；把已经命名的闭包任务传入时才写 `Thread.spawn(move task)`。`return move value`、`val owner = move value` 和独立 `move value;` 无效。
 
-`match`、`if (expr is pattern)`、`while (expr is pattern)` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。
+`match`、`if (expr is pattern)`、`while (expr is pattern)` 和 `for` 绑定上的 `mut` / `move` 表示 pattern 访问模式；`for` 的 `in` 右侧只保留 `mut expr` 这种可写访问形式。消耗遍历写成 `for move item in items`，由 `for move` 本身表示消耗右侧拥有者。`is` 只用于可失败 pattern 测试和解构，不表示值相等；整数、浮点、Bool、Char 和可比较 enum 值的相等比较使用 `==` / `!=`。
 
 ## 11. 运算符
 

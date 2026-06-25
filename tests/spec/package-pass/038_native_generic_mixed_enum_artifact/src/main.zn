@@ -1,0 +1,87 @@
+module main;
+
+struct Header {
+    tag: U8,
+    length: U16,
+    weight: I64,
+    ratio: F32,
+    exact: F64,
+}
+
+enum Maybe<T> {
+    Some(T),
+    None,
+}
+
+fn scoreTag(value: U8) -> I32 {
+    if (value == 9) {
+        return 2;
+    }
+    return 0;
+}
+
+fn scoreLength(value: U16) -> I32 {
+    if (value >= 400) {
+        return 7;
+    }
+    return 0;
+}
+
+fn scoreWeight(value: I64) -> I32 {
+    if (value >= 4294967296) {
+        return 13;
+    }
+    return 0;
+}
+
+fn scoreRatio(value: F32) -> I32 {
+    if (value > 2.0) {
+        return 17;
+    }
+    return 0;
+}
+
+fn scoreExact(value: F64) -> I32 {
+    if (value < 4.0) {
+        return 10;
+    }
+    return 0;
+}
+
+fn consume(header: Header) -> I32 {
+    return scoreTag(header.tag) + scoreLength(header.length) + scoreWeight(header.weight) + scoreRatio(header.ratio) + scoreExact(header.exact);
+}
+
+fn makeHeader(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Header {
+    return Header { tag: tag, length: length, weight: weight, ratio: ratio, exact: exact };
+}
+
+fn makeSome(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Maybe<Header> {
+    val header = makeHeader(tag, length, weight, ratio, exact);
+    return Maybe.Some(header);
+}
+
+fn makeNone() -> Maybe<Header> {
+    return Maybe.None;
+}
+
+fn unwrap(maybe: Maybe<Header>) -> I32 {
+    if (maybe is Maybe.Some(header)) {
+        return consume(header);
+    } else {
+        return 0;
+    }
+}
+
+fn inspect(maybe: Maybe<Header>) -> I32 {
+    return match maybe {
+        Maybe.Some(header) => consume(header),
+        Maybe.None => 0,
+    };
+}
+
+fn main() -> I32 {
+    val some = makeSome(9, 400, 4294967296, 2.5, 3.5);
+    val none = makeNone();
+    return unwrap(some) + inspect(some) + unwrap(none) + inspect(none);
+}

@@ -1,0 +1,98 @@
+module main;
+
+struct Header {
+    tag: U8,
+    length: U16,
+    weight: I64,
+    ratio: F32,
+    exact: F64,
+}
+
+enum Packet {
+    Header(Header),
+    Reading { tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 },
+    Empty,
+}
+
+fn scoreTag(value: U8) -> I32 {
+    if (value == 7) {
+        return 3;
+    }
+    return 0;
+}
+
+fn scoreLength(value: U16) -> I32 {
+    if (value >= 300) {
+        return 5;
+    }
+    return 0;
+}
+
+fn scoreWeight(value: I64) -> I32 {
+    if (value >= 4294967296) {
+        return 11;
+    }
+    return 0;
+}
+
+fn scoreRatio(value: F32) -> I32 {
+    if (value > 1.5) {
+        return 13;
+    }
+    return 0;
+}
+
+fn scoreExact(value: F64) -> I32 {
+    if (value < 3.0) {
+        return 17;
+    }
+    return 0;
+}
+
+fn consumeHeader(header: Header) -> I32 {
+    return scoreTag(header.tag) + scoreLength(header.length) + scoreWeight(header.weight) + scoreRatio(header.ratio) + scoreExact(header.exact);
+}
+
+fn consumeReading(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> I32 {
+    return scoreTag(tag) + scoreLength(length) + scoreWeight(weight) + scoreRatio(ratio) + scoreExact(exact);
+}
+
+fn makeHeader(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Header {
+    return Header { tag: tag, length: length, weight: weight, ratio: ratio, exact: exact };
+}
+
+fn makePacketHeader(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Packet {
+    val header = makeHeader(tag, length, weight, ratio, exact);
+    return Packet.Header(header);
+}
+
+fn makeReading(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) -> Packet {
+    return Packet.Reading { tag: tag, length: length, weight: weight, ratio: ratio, exact: exact };
+}
+
+fn makeEmpty() -> Packet {
+    return Packet.Empty;
+}
+
+fn unwrapHeader(packet: Packet) -> I32 {
+    if (packet is Packet.Header(header)) {
+        return consumeHeader(header);
+    } else {
+        return 0;
+    }
+}
+
+fn inspect(packet: Packet) -> I32 {
+    return match packet {
+        Packet.Header(header) => consumeHeader(header),
+        Packet.Reading { tag, length, weight, ratio, exact } => consumeReading(tag, length, weight, ratio, exact),
+        Packet.Empty => 0,
+    };
+}
+
+fn main() -> I32 {
+    val headerPacket = makePacketHeader(7, 300, 4294967296, 2.5, 2.75);
+    val readingPacket = makeReading(7, 300, 4294967296, 2.5, 2.75);
+    val emptyPacket = makeEmpty();
+    return unwrapHeader(headerPacket) + inspect(headerPacket) + inspect(readingPacket) + inspect(emptyPacket);
+}

@@ -4048,13 +4048,153 @@ struct ParsedAstNode {
   int lineNo = 1;
 };
 
+struct SyntaxToken {
+  std::string text;
+  int line = 1;
+  int column = 1;
+};
+
+struct SyntaxSpineNode {
+  std::string kind;
+  std::string owner;
+  std::string name;
+  std::string detail;
+  int lineNo = 1;
+};
+
+std::vector<SyntaxToken> lexSyntaxSpine(const SourceText &source) {
+  std::vector<SyntaxToken> tokens;
+  int line = 1;
+  int column = 1;
+  for (std::size_t i = 0; i < source.text.size();) {
+    const char c = source.text[i];
+    const char next = i + 1 < source.text.size() ? source.text[i + 1] : '\0';
+    if (c == '\n') {
+      ++line;
+      column = 1;
+      ++i;
+      continue;
+    }
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      ++column;
+      ++i;
+      continue;
+    }
+    if (c == '/' && next == '/') {
+      while (i < source.text.size() && source.text[i] != '\n') {
+        ++i;
+        ++column;
+      }
+      continue;
+    }
+    if (c == '/' && next == '*') {
+      i += 2;
+      column += 2;
+      while (i < source.text.size()) {
+        if (source.text[i] == '\n') {
+          ++line;
+          column = 1;
+          ++i;
+          continue;
+        }
+        if (source.text[i] == '*' && i + 1 < source.text.size() && source.text[i + 1] == '/') {
+          i += 2;
+          column += 2;
+          break;
+        }
+        ++i;
+        ++column;
+      }
+      continue;
+    }
+    const int tokenLine = line;
+    const int tokenColumn = column;
+    if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
+      std::string text;
+      while (i < source.text.size()) {
+        const char ch = source.text[i];
+        if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '_') break;
+        text.push_back(ch);
+        ++i;
+        ++column;
+      }
+      tokens.push_back(SyntaxToken{text, tokenLine, tokenColumn});
+      continue;
+    }
+    if (std::isdigit(static_cast<unsigned char>(c))) {
+      std::string text;
+      while (i < source.text.size()) {
+        const char ch = source.text[i];
+        if (ch == '.' && i + 1 < source.text.size() && source.text[i + 1] == '.') break;
+        if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '.' && ch != '_') break;
+        text.push_back(ch);
+        ++i;
+        ++column;
+      }
+      tokens.push_back(SyntaxToken{text, tokenLine, tokenColumn});
+      continue;
+    }
+    if (c == '"' || c == '\'') {
+      const char quote = c;
+      std::string text;
+      text.push_back(c);
+      ++i;
+      ++column;
+      bool escaped = false;
+      while (i < source.text.size()) {
+        const char ch = source.text[i];
+        text.push_back(ch);
+        ++i;
+        ++column;
+        if (ch == '\n') {
+          ++line;
+          column = 1;
+          escaped = false;
+          continue;
+        }
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch == '\\') {
+          escaped = true;
+          continue;
+        }
+        if (ch == quote) break;
+      }
+      tokens.push_back(SyntaxToken{text, tokenLine, tokenColumn});
+      continue;
+    }
+    std::string text;
+    if (i + 2 < source.text.size()) {
+      const std::string three = source.text.substr(i, 3);
+      if (three == "..=") text = three;
+    }
+    if (text.empty() && i + 1 < source.text.size()) {
+      const std::string two = source.text.substr(i, 2);
+      static const std::set<std::string> twoCharTokens{
+          "->", "=>", "==", "!=", "<=", ">=", "..", "&&", "||", "::",
+          "+=", "-=", "*=", "/=", "%=", "<<"};
+      if (twoCharTokens.count(two)) text = two;
+    }
+    if (text.empty()) text = std::string(1, c);
+    tokens.push_back(SyntaxToken{text, tokenLine, tokenColumn});
+    i += text.size();
+    column += static_cast<int>(text.size());
+  }
+  tokens.push_back(SyntaxToken{"<eof>", line, column});
+  return tokens;
+}
+
 std::string expressionAstFact(std::string expr) {
   expr = trim(expr);
   if (!expr.empty() && expr.back() == ';') expr.pop_back();
   expr = trim(expr);
-  auto topLevelBinaryOperator = [](const std::string &text) -> std::optional<char> {
+  auto topLevelOperator = [](const std::string &text,
+                             const std::vector<std::string> &operators) -> std::optional<std::string> {
     int parenDepth = 0;
     int braceDepth = 0;
+    int bracketDepth = 0;
     bool inString = false;
     for (std::size_t offset = text.size(); offset > 0; --offset) {
       const std::size_t i = offset - 1;
@@ -4080,20 +4220,43 @@ std::string expressionAstFact(std::string expr) {
         --braceDepth;
         continue;
       }
-      if (parenDepth != 0 || braceDepth != 0) continue;
-      if (std::string("+-*/").find(c) == std::string::npos) continue;
-      if (i == 0 || i + 1 >= text.size()) continue;
-      const std::string left = trim(std::string_view(text).substr(0, i));
-      const std::string right = trim(std::string_view(text).substr(i + 1));
-      if (left.empty() || right.empty()) continue;
-      const char previous = left.back();
-      if ((c == '+' || c == '-') &&
-          (previous == '+' || previous == '-' || previous == '*' || previous == '/' ||
-           previous == '(' || previous == '{')) {
+      if (c == ']') {
+        ++bracketDepth;
         continue;
       }
-      return c;
+      if (c == '[') {
+        --bracketDepth;
+        continue;
+      }
+      if (parenDepth != 0 || braceDepth != 0 || bracketDepth != 0) continue;
+      for (const auto &op : operators) {
+        if (i + op.size() > text.size() || text.compare(i, op.size(), op) != 0) continue;
+        if ((op == "<" && ((i > 0 && text[i - 1] == '<') ||
+                           (i + 1 < text.size() && text[i + 1] == '<'))) ||
+            (op == ">" && ((i > 0 && text[i - 1] == '>') ||
+                           (i + 1 < text.size() && text[i + 1] == '>')))) {
+          continue;
+        }
+        const std::string left = trim(std::string_view(text).substr(0, i));
+        const std::string right = trim(std::string_view(text).substr(i + op.size()));
+        if (left.empty() || right.empty()) continue;
+        const char previous = left.back();
+        if ((op == "+" || op == "-") &&
+            (previous == '+' || previous == '-' || previous == '*' || previous == '/' ||
+             previous == '%' || previous == '(' || previous == '{' || previous == '[')) {
+          continue;
+        }
+        return op;
+      }
     }
+    return std::nullopt;
+  };
+  auto binaryFact = [&](const std::string &op) -> std::optional<std::string> {
+    if (auto found = topLevelOperator(expr, {op})) return "binary:" + *found;
+    return std::nullopt;
+  };
+  auto compareFact = [&](const std::string &op) -> std::optional<std::string> {
+    if (auto found = topLevelOperator(expr, {op})) return "compare:" + *found;
     return std::nullopt;
   };
   if (expr.empty()) return "unit";
@@ -4101,6 +4264,11 @@ std::string expressionAstFact(std::string expr) {
   if (startsWith(expr, "async ")) return "async-block";
   if (startsWith(expr, "await ")) return "await:" + expressionAstFact(expr.substr(6));
   if (startsWith(expr, "trust")) return "trust-block";
+  if (startsWith(expr, "if ") || startsWith(expr, "if(")) return "if-expr";
+  if (startsWith(expr, "while ") || startsWith(expr, "while(")) return "while-expr";
+  if (startsWith(expr, "for ")) return "for-expr";
+  if (startsWith(expr, "!")) return "prefix:!";
+  if (startsWith(expr, "-")) return "prefix:-";
   if (matchRegex(expr, std::regex(R"(^\s*move\s+\([^)]*\)\s*(?:->\s*[^={]+?)?\s*(?:\{|=>))"))) return "closure:move";
   if (matchRegex(expr, std::regex(R"(^\s*\([^)]*\)\s*->\s*[^={]+?\s*\{)"))) return "closure:block";
   if (startsWith(expr, "move ")) return "move:" + expressionAstFact(expr.substr(5));
@@ -4120,6 +4288,11 @@ std::string expressionAstFact(std::string expr) {
   if (auto tuple = matchRegex(expr, std::regex(R"(^\((.+,.+)\)$)"))) {
     return "tuple";
   }
+  if (startsWith(expr, "(") && expr.back() == ')') {
+    if (auto inner = parenthesizedContentAt(expr, 0)) {
+      if (inner->size() + 2 == expr.size()) return expressionAstFact(*inner);
+    }
+  }
   if (contains(expr, "=>") ||
       matchRegex(expr, std::regex(R"(^\s*(move\s+)?\([^)]*\)\s*(?:->\s*[A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)?\s*\{)"))) {
     return "closure";
@@ -4130,16 +4303,21 @@ std::string expressionAstFact(std::string expr) {
   if (auto typeStatic = matchRegex(expr, std::regex(R"(^([A-Z][A-Za-z0-9_]*(?:<[^>]+>)?)\.([A-Za-z_][A-Za-z0-9_]*)\s*\()"))) {
     return "type-static-call:" + std::string((*typeStatic)[1]) + "." + std::string((*typeStatic)[2]);
   }
-  if (auto comparison = matchRegex(expr, std::regex(R"(^(.+)\s*(>=|<=|==|!=|>|<)\s*(.+)$)"))) {
-    return "compare:" + std::string((*comparison)[2]);
-  }
   if (auto index = matchRegex(expr, std::regex(R"(^(.+)\[.+\]$)"))) {
     return "index:" + trim(std::string((*index)[1]));
   }
-  if (contains(expr, "..=")) return "range:closed";
-  if (contains(expr, "..")) return "range:half-open";
-  if (auto binary = topLevelBinaryOperator(expr)) {
-    return std::string("binary:") + *binary;
+  if (auto found = topLevelOperator(expr, {"..=", ".."})) return *found == "..=" ? "range:closed" : "range:half-open";
+  for (const auto &op : {"||", "&&", "|", "^", "&"}) {
+    if (auto fact = binaryFact(op)) return *fact;
+  }
+  for (const auto &op : {"==", "!="}) {
+    if (auto fact = compareFact(op)) return *fact;
+  }
+  for (const auto &op : {">=", "<=", ">", "<"}) {
+    if (auto fact = compareFact(op)) return *fact;
+  }
+  for (const auto &op : {"<<", ">>", "+", "-", "*", "/", "%"}) {
+    if (auto fact = binaryFact(op)) return *fact;
   }
   if (auto methodCall = matchRegex(expr, std::regex(R"(^(.+)\.([A-Za-z_][A-Za-z0-9_]*)\s*\()"))) {
     return "method-call:" + std::string((*methodCall)[2]);
@@ -4152,42 +4330,1798 @@ std::string expressionAstFact(std::string expr) {
   return "expr:" + expr;
 }
 
+std::string joinSyntaxTokens(const std::vector<SyntaxToken> &tokens,
+                             std::size_t begin,
+                             std::size_t end) {
+  std::string out;
+  auto noSpaceBefore = [](const std::string &token) {
+    return token == ")" || token == "]" || token == "}" || token == "," ||
+           token == ";" || token == "." || token == "::" || token == ">" ||
+           token == "=>" || token == ".." || token == "..=";
+  };
+  auto noSpaceAfter = [](const std::string &token) {
+    return token == "(" || token == "[" || token == "{" || token == "." ||
+           token == "::" || token == "<" || token == "@" || token == ".." ||
+           token == "..=";
+  };
+  auto canBindPrefix = [](const std::string &token) {
+    if (token.empty()) return false;
+    const char last = token.back();
+    return std::isalnum(static_cast<unsigned char>(last)) || last == '_' ||
+           last == ')' || last == ']' || last == '>';
+  };
+  for (std::size_t i = begin; i < end && i < tokens.size(); ++i) {
+    const std::string &text = tokens[i].text;
+    if (text == "<eof>") break;
+    if (!out.empty()) {
+      const std::string &previous = tokens[i - 1].text;
+      const bool prefixBind = (text == "(" || text == "<") && previous != "move" && canBindPrefix(previous);
+      const bool rangeEquals = text == "=" && previous.size() >= 2 &&
+                               previous.substr(previous.size() - 2) == "..";
+      if (!prefixBind && !rangeEquals && !noSpaceBefore(text) && !noSpaceAfter(previous)) out.push_back(' ');
+    }
+    out += text;
+  }
+  return trim(out);
+}
+
+std::string syntaxExpressionFact(const std::vector<SyntaxToken> &tokens,
+                                 std::size_t begin,
+                                 std::size_t end) {
+  return expressionAstFact(joinSyntaxTokens(tokens, begin, end));
+}
+
+std::string syntaxTypeKind(const std::string &typeText) {
+  const std::string text = trim(typeText);
+  if (text.empty()) return "missing";
+  if (startsWith(text, "Fn<")) return "fn";
+  if (startsWith(text, "mut ")) return "access:mut";
+  if (text == "Self") return "self";
+  if (text == "Bool" || text == "I8" || text == "I16" || text == "I32" || text == "I64" ||
+      text == "ISize" || text == "U8" || text == "U16" || text == "U32" || text == "U64" ||
+      text == "USize" || text == "F32" || text == "F64" || text == "Char" ||
+      text == "String" || text == "StringSlice" || text == "Unit" || text == "Never") {
+    return "primitive";
+  }
+  if (startsWith(text, "(") && text != "()") return "tuple";
+  if (contains(text, "<")) return "path-generic";
+  return "path";
+}
+
+std::string syntaxPatternKind(const std::string &patternText) {
+  const std::string text = trim(patternText);
+  if (text.empty()) return "missing";
+  if (text == "_") return "discard";
+  if (contains(text, "|")) return "or";
+  if (contains(text, "..=")) return "range-closed";
+  if (contains(text, "..")) return "range-half-open";
+  if (startsWith(text, "(") && text != "()") return "tuple";
+  if (contains(text, "{")) return "struct";
+  if (contains(text, "(")) return "enum";
+  if (std::regex_match(text, std::regex(R"([0-9]+|true|false|'.*'|".*")"))) return "literal";
+  if (contains(text, ".")) return "path";
+  return "binding";
+}
+
+class SyntaxSpineParser {
+public:
+  explicit SyntaxSpineParser(std::vector<SyntaxToken> tokens, std::string moduleName)
+      : tokens_(std::move(tokens)), moduleName_(std::move(moduleName)) {}
+
+  std::vector<SyntaxSpineNode> parseFile() {
+    nodes_.push_back(SyntaxSpineNode{"file", moduleName_, moduleName_, "kind=file", 1});
+    while (!eof()) parseItem("");
+    return nodes_;
+  }
+
+private:
+  std::vector<SyntaxToken> tokens_;
+  std::string moduleName_;
+  std::vector<SyntaxSpineNode> nodes_;
+  std::vector<std::string> pendingAttributes_;
+  std::string pendingLayout_;
+  std::size_t current_ = 0;
+
+  struct TopLevelOperator {
+    std::size_t begin;
+    std::size_t end;
+    std::string text;
+  };
+
+  bool eof() const {
+    return current_ >= tokens_.size() || tokens_[current_].text == "<eof>";
+  }
+
+  const SyntaxToken &peek(std::size_t offset = 0) const {
+    const std::size_t index = std::min(current_ + offset, tokens_.empty() ? 0 : tokens_.size() - 1);
+    return tokens_[index];
+  }
+
+  bool check(const std::string &text, std::size_t offset = 0) const {
+    return !eof() && peek(offset).text == text;
+  }
+
+  bool match(const std::string &text) {
+    if (!check(text)) return false;
+    ++current_;
+    return true;
+  }
+
+  SyntaxToken advance() {
+    if (eof()) return peek();
+    return tokens_[current_++];
+  }
+
+  void add(const std::string &kind,
+           const std::string &owner,
+           const std::string &name,
+           const std::string &detail,
+           int lineNo) {
+    nodes_.push_back(SyntaxSpineNode{kind, owner, name, detail, lineNo});
+  }
+
+  static bool isItemKeyword(const std::string &text) {
+    return text == "fn" || text == "struct" || text == "enum" || text == "interface" ||
+           text == "impl" || text == "extern" || text == "type" || text == "const" ||
+           text == "static" || text == "trust" || text == "async" || text == "pub" ||
+           text == "private" || text == "destroy" || text == "@";
+  }
+
+  bool isIdentifierLike(const std::string &text) const {
+    if (text.empty()) return false;
+    const unsigned char first = static_cast<unsigned char>(text.front());
+    if (!std::isalpha(first) && text.front() != '_') return false;
+    for (const char ch : text) {
+      const unsigned char c = static_cast<unsigned char>(ch);
+      if (!std::isalnum(c) && ch != '_') return false;
+    }
+    return true;
+  }
+
+  std::string consumeIdentifier() {
+    if (eof()) return "";
+    if (!isIdentifierLike(peek().text)) return "";
+    return advance().text;
+  }
+
+  std::string join(std::size_t begin, std::size_t end) const {
+    return joinSyntaxTokens(tokens_, begin, end);
+  }
+
+  std::string exprFact(std::size_t begin, std::size_t end) const {
+    return syntaxExpressionFact(tokens_, begin, end);
+  }
+
+  void skipAttribute() {
+    if (!check("@")) return;
+    const int line = currentLine();
+    const std::size_t begin = current_;
+    advance();
+    const std::string attributeName = eof() ? "" : advance().text;
+    if (check("(")) {
+      const std::size_t argsOpen = current_;
+      const std::size_t argsClose = findMatchingToken(argsOpen, tokens_.size(), "(", ")");
+      if (argsClose < tokens_.size()) {
+        emitAttributeArgs(attributeName, argsOpen + 1, argsClose, line);
+        current_ = argsClose + 1;
+      } else {
+        skipBalanced("(", ")");
+      }
+    }
+    const std::string text = join(begin, current_);
+    add("attribute", moduleName_, text, "kind=attribute", line);
+    pendingAttributes_.push_back(text);
+    if (contains(text, "@layout(C)")) pendingLayout_ = "C";
+    else if (contains(text, "@layout(Source)")) pendingLayout_ = "Source";
+    else if (contains(text, "@layout(Packed")) pendingLayout_ = "Packed";
+  }
+
+  void emitAttributeArgs(const std::string &attributeName,
+                         std::size_t begin,
+                         std::size_t end,
+                         int lineNo) {
+    auto attributeValue = [&](std::size_t valueBegin, std::size_t valueEnd) {
+      std::string value = join(valueBegin, valueEnd);
+      if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        value = value.substr(1, value.size() - 2);
+      }
+      return value;
+    };
+    std::size_t index = 0;
+    for (const auto &[argBegin, argEnd] : splitTopLevel(begin, end, ",")) {
+      const std::string valueText = attributeValue(argBegin, argEnd);
+      if (valueText.empty()) continue;
+      const std::size_t colon = findTopLevelToken(argBegin, argEnd, ":");
+      std::string detail = "attr=" + attributeName + " index=" + std::to_string(index);
+      if (colon < argEnd) {
+        detail += " kind=named name=" + join(argBegin, colon) + " value=" + attributeValue(colon + 1, argEnd);
+      } else {
+        detail += " kind=positional value=" + valueText;
+      }
+      add("attribute-arg", moduleName_, attributeName + "." + std::to_string(index), detail,
+          argBegin < tokens_.size() ? tokens_[argBegin].line : lineNo);
+      ++index;
+    }
+  }
+
+  void skipBalanced(const std::string &open, const std::string &close) {
+    if (!match(open)) return;
+    int depth = 1;
+    while (!eof() && depth > 0) {
+      if (match(open)) {
+        ++depth;
+      } else if (match(close)) {
+        --depth;
+      } else {
+        advance();
+      }
+    }
+  }
+
+  std::size_t collectUntilTopLevel(const std::set<std::string> &stops, bool consumeStop) {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    while (!eof()) {
+      const std::string &text = peek().text;
+      if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 && stops.count(text)) {
+        const std::size_t end = current_;
+        if (consumeStop) ++current_;
+        return end;
+      }
+      if (text == "(") ++parenDepth;
+      else if (text == ")" && parenDepth > 0) --parenDepth;
+      else if (text == "{") ++braceDepth;
+      else if (text == "}" && braceDepth > 0) --braceDepth;
+      else if (text == "[") ++bracketDepth;
+      else if (text == "]" && bracketDepth > 0) --bracketDepth;
+      advance();
+    }
+    return current_;
+  }
+
+  std::pair<std::size_t, std::size_t> collectParenContents() {
+    if (!match("(")) return {current_, current_};
+    int depth = 1;
+    const std::size_t begin = current_;
+    while (!eof() && depth > 0) {
+      if (check("(")) {
+        ++depth;
+        advance();
+      } else if (check(")")) {
+        --depth;
+        if (depth == 0) {
+          const std::size_t end = current_;
+          advance();
+          return {begin, end};
+        }
+        advance();
+      } else {
+        advance();
+      }
+    }
+    return {begin, current_};
+  }
+
+  int currentLine() const {
+    return eof() ? (tokens_.empty() ? 1 : tokens_.back().line) : peek().line;
+  }
+
+  void parseItem(const std::string &enclosingOwner) {
+    while (check("@")) skipAttribute();
+    std::string visibility;
+    if (check("pub") || check("private")) visibility = advance().text;
+    bool trusted = match("trust");
+    bool async = match("async");
+    if (check("module")) {
+      const int line = advance().line;
+      const std::size_t begin = current_;
+      const std::size_t end = collectUntilTopLevel({";"}, true);
+      add("module", moduleName_, join(begin, end), "kind=module", line);
+      return;
+    }
+    if (check("import")) {
+      const int line = advance().line;
+      const std::size_t begin = current_;
+      const std::size_t end = collectUntilTopLevel({";"}, true);
+      const std::string text = join(begin, end);
+      add("import", moduleName_, text, "kind=import", line);
+      emitImportParts(begin, end, line);
+      return;
+    }
+    if (check("extern")) {
+      parseExtern(trusted);
+      return;
+    }
+    if (check("fn")) {
+      parseFunction(enclosingOwner, visibility, async);
+      return;
+    }
+    if (check("struct") || check("enum") || check("interface")) {
+      parseAggregate(visibility);
+      return;
+    }
+    if (check("impl")) {
+      parseImpl(trusted);
+      return;
+    }
+    if (check("const") || check("static") || check("type")) {
+      parseSimpleItem(advance().text, visibility, enclosingOwner);
+      return;
+    }
+    if (check("destroy")) {
+      parseDestroy(enclosingOwner);
+      return;
+    }
+    if (check(";")) {
+      advance();
+      return;
+    }
+    advance();
+  }
+
+  void parseSimpleItem(const std::string &kind, const std::string &visibility, const std::string &owner) {
+    const int line = tokens_[current_ - 1].line;
+    const std::string name = consumeIdentifier();
+    const std::size_t detailBegin = current_;
+    collectUntilTopLevel({";", "{"}, false);
+    const std::string qualified = owner.empty() || name.empty() ? name : owner + "." + name;
+    std::string detail = "kind=" + kind;
+    if (!visibility.empty()) detail += " visibility=" + visibility;
+    appendPendingAttributes(detail);
+    if (detailBegin < current_) detail += " signature=" + join(detailBegin, current_);
+    add("item", owner.empty() ? moduleName_ : owner, qualified, detail, line);
+    clearPendingAttributes();
+    const std::size_t colon = findTopLevelToken(detailBegin, current_, ":");
+    const std::size_t equals = findTopLevelToken(detailBegin, current_, "=");
+    if ((kind == "const" || kind == "static") && colon < current_) {
+      emitType(qualified.empty() ? owner : qualified, "decl", colon + 1, equals < current_ ? equals : current_, line);
+    } else if (kind == "type" && equals < current_) {
+      emitType(qualified.empty() ? owner : qualified, "alias-target", equals + 1, current_, line);
+    }
+    if (match("{")) parseBlock(qualified.empty() ? owner : qualified, line, true, "body");
+    else match(";");
+  }
+
+  void parseExtern(bool trusted) {
+    const int line = advance().line;
+    std::string abi;
+    if (!eof() && peek().text.size() >= 2 && peek().text.front() == '"') abi = advance().text;
+    if (match("fn")) {
+      const std::string name = consumeIdentifier();
+      const std::size_t signatureBegin = current_;
+      collectUntilTopLevel({";", "{"}, false);
+      std::string detail = "kind=extern";
+      if (!abi.empty()) detail += " abi=" + abi;
+      if (trusted) detail += " trusted=true";
+      appendPendingAttributes(detail);
+      detail += " signature=" + join(signatureBegin, current_);
+      add("item", moduleName_, name, detail, line);
+      clearPendingAttributes();
+      emitSignatureNodes(name, signatureBegin, current_, line);
+      if (match("{")) parseBlock(name, line, true, "body");
+      else match(";");
+      return;
+    }
+    collectUntilTopLevel({";"}, true);
+  }
+
+  void parseFunction(const std::string &enclosingOwner,
+                     const std::string &visibility,
+                     bool async) {
+    const int line = advance().line;
+    const std::string name = consumeIdentifier();
+    const std::string qualified = enclosingOwner.empty() ? name : enclosingOwner + "." + name;
+    const std::size_t signatureBegin = current_;
+    collectUntilTopLevel({";", "{"}, false);
+    std::string detail = "kind=fn";
+    if (!visibility.empty()) detail += " visibility=" + visibility;
+    if (async) detail += " async=true";
+    appendPendingAttributes(detail);
+    detail += " signature=" + join(signatureBegin, current_);
+    add("item", enclosingOwner.empty() ? moduleName_ : enclosingOwner, qualified, detail, line);
+    clearPendingAttributes();
+    emitSignatureNodes(qualified, signatureBegin, current_, line);
+    if (match("{")) parseBlock(qualified, line, true, "body");
+    else match(";");
+  }
+
+  void parseAggregate(const std::string &visibility) {
+    const std::string kind = advance().text;
+    const int line = tokens_[current_ - 1].line;
+    const std::string name = consumeIdentifier();
+    const std::size_t signatureBegin = current_;
+    collectUntilTopLevel({";", "{"}, false);
+    std::string detail = "kind=" + kind;
+    if (!visibility.empty()) detail += " visibility=" + visibility;
+    appendPendingAttributes(detail);
+    if (signatureBegin < current_) detail += " signature=" + join(signatureBegin, current_);
+    add("item", moduleName_, name, detail, line);
+    clearPendingAttributes();
+    emitGenericParams(name, signatureBegin, current_, line);
+    if (match("{")) parseAggregateBlock(name, kind, line, true);
+    else match(";");
+  }
+
+  void parseImpl(bool trusted) {
+    const int line = advance().line;
+    const std::size_t begin = current_;
+    collectUntilTopLevel({";", "{"}, false);
+    const std::string name = join(begin, current_);
+    std::string detail = "kind=impl";
+    if (trusted) detail += " trusted=true";
+    appendPendingAttributes(detail);
+    add("item", moduleName_, name, detail, line);
+    clearPendingAttributes();
+    const std::size_t forToken = findTopLevelToken(begin, current_, "for");
+    if (forToken < current_) {
+      emitType(name, "impl-interface", begin, forToken, line);
+      emitType(name, "impl-for", forToken + 1, current_, line);
+    } else {
+      emitType(name, "impl-target", begin, current_, line);
+    }
+    if (match("{")) parseImplBlock(name, line, true);
+    else match(";");
+  }
+
+  void parseDestroy(const std::string &owner) {
+    const int line = advance().line;
+    std::string detail = "kind=destroy";
+    appendPendingAttributes(detail);
+    add("item", owner.empty() ? moduleName_ : owner, owner, detail, line);
+    clearPendingAttributes();
+    if (match("{")) parseBlock(owner, line, true, "body");
+    else match(";");
+  }
+
+  void appendPendingAttributes(std::string &detail) {
+    if (!pendingAttributes_.empty()) {
+      detail += " attrs=";
+      for (std::size_t i = 0; i < pendingAttributes_.size(); ++i) {
+        if (i != 0) detail += ",";
+        detail += pendingAttributes_[i];
+      }
+    }
+    if (!pendingLayout_.empty()) detail += " layout=" + pendingLayout_;
+  }
+
+  void clearPendingAttributes() {
+    pendingAttributes_.clear();
+    pendingLayout_.clear();
+  }
+
+  void emitImportParts(std::size_t begin, std::size_t end, int lineNo) {
+    if (begin >= end) return;
+    std::size_t itemOpen = end;
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      if (tokens_[i].text == "{") {
+        itemOpen = i;
+        break;
+      }
+    }
+    std::size_t pathEnd = itemOpen;
+    if (itemOpen < end && itemOpen > begin && tokens_[itemOpen - 1].text == ".") pathEnd = itemOpen - 1;
+    const std::string path = join(begin, pathEnd);
+    if (path.empty()) return;
+    add("import-path", moduleName_, path, "path=" + path, lineNo);
+    if (itemOpen >= end) return;
+    const std::size_t itemClose = findMatchingToken(itemOpen, end, "{", "}");
+    if (itemClose >= end) return;
+    for (const auto &[itemBegin, itemEnd] : splitTopLevel(itemOpen + 1, itemClose, ",")) {
+      const std::string item = join(itemBegin, itemEnd);
+      if (item.empty()) continue;
+      add("import-item", moduleName_, path + "." + item, "path=" + path + " item=" + item, tokens_[itemBegin].line);
+    }
+  }
+
+  void parseAggregateBlock(const std::string &owner,
+                           const std::string &aggregateKind,
+                           int lineNo,
+                           bool alreadyConsumedOpen) {
+    if (!alreadyConsumedOpen && !match("{")) return;
+    add("block", owner, owner, "kind=" + aggregateKind + " role=" + aggregateKind, lineNo);
+    while (!eof() && !check("}")) {
+      while (check("@")) skipAttribute();
+      std::string visibility;
+      if (check("pub") || check("private")) visibility = advance().text;
+      bool async = match("async");
+      if (aggregateKind == "interface" && check("fn")) {
+        parseFunction(owner, visibility, async);
+        continue;
+      }
+      const int memberLine = currentLine();
+      const std::size_t memberBegin = current_;
+      const std::size_t memberEnd = collectUntilTopLevel({",", ";", "}"}, false);
+      if (memberBegin < memberEnd) {
+        if (aggregateKind == "struct") {
+          const std::size_t colon = findTopLevelToken(memberBegin, memberEnd, ":");
+          const std::string fieldName = colon < memberEnd ? join(memberBegin, colon) : join(memberBegin, memberEnd);
+          add("field", owner, owner + "." + fieldName, "kind=struct-field", memberLine);
+          if (colon < memberEnd) emitType(owner + "." + fieldName, "field", colon + 1, memberEnd, memberLine);
+        } else if (aggregateKind == "enum") {
+          const std::string variantName = tokens_[memberBegin].text;
+          add("variant", owner, owner + "." + variantName, "kind=enum-variant text=" + join(memberBegin, memberEnd), memberLine);
+          const std::size_t paren = findTopLevelToken(memberBegin, memberEnd, "(");
+          if (paren < memberEnd) {
+            const std::size_t close = findMatchingToken(paren, memberEnd, "(", ")");
+            for (const auto &[payloadBegin, payloadEnd] : splitTopLevel(paren + 1, close, ",")) {
+              emitType(owner + "." + variantName, "variant-payload", payloadBegin, payloadEnd, memberLine);
+            }
+          }
+        }
+      }
+      if (check(",") || check(";")) advance();
+    }
+    match("}");
+  }
+
+  void parseImplBlock(const std::string &owner, int lineNo, bool alreadyConsumedOpen) {
+    if (!alreadyConsumedOpen && !match("{")) return;
+    add("block", owner, owner, "kind=impl role=impl", lineNo);
+    while (!eof() && !check("}")) {
+      while (check("@")) skipAttribute();
+      std::string visibility;
+      if (check("pub") || check("private")) visibility = advance().text;
+      bool trusted = match("trust");
+      bool async = match("async");
+      if (check("fn")) {
+        parseFunction(owner, visibility, async);
+      } else if (check("const") || check("static") || check("type")) {
+        parseSimpleItem(advance().text, visibility, owner);
+      } else if (check("destroy")) {
+        parseDestroy(owner);
+      } else if (check("extern")) {
+        parseExtern(trusted);
+      } else {
+        collectUntilTopLevel({";", "}"}, false);
+        if (check(";")) advance();
+        if (check("}")) break;
+      }
+    }
+    match("}");
+  }
+
+  void parseBlock(const std::string &owner,
+                  int lineNo,
+                  bool alreadyConsumedOpen,
+                  const std::string &role = "body") {
+    if (!alreadyConsumedOpen && !match("{")) return;
+    std::string detail = "kind=body";
+    if (!role.empty()) detail += " role=" + role;
+    add("block", owner, owner, detail, lineNo);
+    while (!eof() && !check("}")) {
+      if (isItemKeyword(peek().text) && (peek().text != "const" && peek().text != "static")) {
+        parseItem(owner);
+      } else {
+        parseStatement(owner);
+      }
+    }
+    match("}");
+  }
+
+  std::size_t findTopLevelToken(std::size_t begin, std::size_t end, const std::string &needle) const {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    int angleDepth = 0;
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      const std::string &text = tokens_[i].text;
+      if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 && angleDepth == 0 && text == needle) return i;
+      if (text == "(") ++parenDepth;
+      else if (text == ")" && parenDepth > 0) --parenDepth;
+      else if (text == "{") ++braceDepth;
+      else if (text == "}" && braceDepth > 0) --braceDepth;
+      else if (text == "[") ++bracketDepth;
+      else if (text == "]" && bracketDepth > 0) --bracketDepth;
+      else if (text == "<") ++angleDepth;
+      else if (text == ">" && angleDepth > 0) --angleDepth;
+    }
+    return end;
+  }
+
+  std::size_t findLastTopLevelToken(std::size_t begin, std::size_t end, const std::string &needle) const {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    int angleDepth = 0;
+    std::size_t found = end;
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      const std::string &text = tokens_[i].text;
+      if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 && angleDepth == 0 && text == needle) found = i;
+      if (text == "(") ++parenDepth;
+      else if (text == ")" && parenDepth > 0) --parenDepth;
+      else if (text == "{") ++braceDepth;
+      else if (text == "}" && braceDepth > 0) --braceDepth;
+      else if (text == "[") ++bracketDepth;
+      else if (text == "]" && bracketDepth > 0) --bracketDepth;
+      else if (text == "<") ++angleDepth;
+      else if (text == ">" && angleDepth > 0) --angleDepth;
+    }
+    return found;
+  }
+
+  std::vector<std::pair<std::size_t, std::size_t>> splitTopLevel(std::size_t begin,
+                                                                 std::size_t end,
+                                                                 const std::string &separator) const {
+    std::vector<std::pair<std::size_t, std::size_t>> ranges;
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    int angleDepth = 0;
+    std::size_t partBegin = begin;
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      const std::string &text = tokens_[i].text;
+      if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 && angleDepth == 0 && text == separator) {
+        if (partBegin < i) ranges.push_back({partBegin, i});
+        partBegin = i + 1;
+        continue;
+      }
+      if (text == "(") ++parenDepth;
+      else if (text == ")" && parenDepth > 0) --parenDepth;
+      else if (text == "{") ++braceDepth;
+      else if (text == "}" && braceDepth > 0) --braceDepth;
+      else if (text == "[") ++bracketDepth;
+      else if (text == "]" && bracketDepth > 0) --bracketDepth;
+      else if (text == "<") ++angleDepth;
+      else if (text == ">" && angleDepth > 0) --angleDepth;
+    }
+    if (partBegin < end) ranges.push_back({partBegin, end});
+    return ranges;
+  }
+
+  std::optional<TopLevelOperator> findLastTopLevelOperator(std::size_t begin,
+                                                           std::size_t end,
+                                                           const std::vector<std::string> &operators) const {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+    int angleDepth = 0;
+    std::optional<TopLevelOperator> found;
+    auto tokenMatches = [&](std::size_t index, const std::string &op) -> bool {
+      if (index >= end || index >= tokens_.size()) return false;
+      if (tokens_[index].text == op) return true;
+      if (op == ">>") return index + 1 < end && tokens_[index].text == ">" && tokens_[index + 1].text == ">";
+      return false;
+    };
+    auto operatorEnd = [&](std::size_t index, const std::string &op) {
+      return op == ">>" && index + 1 < end && tokens_[index].text == ">" && tokens_[index + 1].text == ">" ? index + 2 : index + 1;
+    };
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      const std::string &text = tokens_[i].text;
+      if (parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 && angleDepth == 0) {
+        for (const auto &op : operators) {
+          if (tokenMatches(i, op)) found = TopLevelOperator{i, operatorEnd(i, op), op};
+        }
+      }
+      if (text == "(") ++parenDepth;
+      else if (text == ")" && parenDepth > 0) --parenDepth;
+      else if (text == "{") ++braceDepth;
+      else if (text == "}" && braceDepth > 0) --braceDepth;
+      else if (text == "[") ++bracketDepth;
+      else if (text == "]" && bracketDepth > 0) --bracketDepth;
+      else if (text == "<") ++angleDepth;
+      else if (text == ">" && angleDepth > 0) --angleDepth;
+    }
+    return found;
+  }
+
+  bool isFullyParenthesizedExpression(std::size_t begin, std::size_t end) const {
+    if (begin >= end || tokens_[begin].text != "(") return false;
+    const std::size_t close = findMatchingToken(begin, end, "(", ")");
+    return close + 1 == end;
+  }
+
+  void emitType(const std::string &owner,
+                const std::string &role,
+                std::size_t begin,
+                std::size_t end,
+                int lineNo) {
+    const std::string text = join(begin, end);
+    if (text.empty()) return;
+    add("type", owner, owner, "role=" + role + " kind=" + syntaxTypeKind(text) + " text=" + text, lineNo);
+    emitGenericArgs(owner, role, begin, end, lineNo);
+    emitTypeComponents(owner, role, begin, end, lineNo, text);
+  }
+
+  void emitTypeComponents(const std::string &owner,
+                          const std::string &role,
+                          std::size_t begin,
+                          std::size_t end,
+                          int lineNo,
+                          const std::string &parent) {
+    if (begin >= end) return;
+    if (tokens_[begin].text == "mut" && begin + 1 < end) {
+      const std::string text = join(begin + 1, end);
+      if (!text.empty()) {
+        add("type-component",
+            owner,
+            owner,
+            "role=" + role + " component=access-target index=0 kind=" + syntaxTypeKind(text) +
+                " text=" + text + " parent=" + parent,
+            begin + 1 < tokens_.size() ? tokens_[begin + 1].line : lineNo);
+      }
+      return;
+    }
+
+    if (tokens_[begin].text == "(") {
+      const std::size_t close = findMatchingToken(begin, end, "(", ")");
+      if (close + 1 == end) {
+        std::size_t index = 0;
+        for (const auto &[elementBegin, elementEnd] : splitTopLevel(begin + 1, close, ",")) {
+          const std::string text = join(elementBegin, elementEnd);
+          if (text.empty()) continue;
+          add("type-component",
+              owner,
+              owner,
+              "role=" + role + " component=tuple-element index=" + std::to_string(index) +
+                  " kind=" + syntaxTypeKind(text) + " text=" + text + " parent=" + parent,
+              elementBegin < tokens_.size() ? tokens_[elementBegin].line : lineNo);
+          ++index;
+        }
+      }
+      return;
+    }
+
+    if (tokens_[begin].text == "Fn" && begin + 1 < end && tokens_[begin + 1].text == "<") {
+      const std::size_t close = findMatchingToken(begin + 1, end, "<", ">");
+      if (close >= end) return;
+      const auto args = splitTopLevel(begin + 2, close, ",");
+      for (std::size_t index = 0; index < args.size(); ++index) {
+        const auto &[argBegin, argEnd] = args[index];
+        const std::string text = join(argBegin, argEnd);
+        if (text.empty()) continue;
+        const bool isReturn = index + 1 == args.size();
+        add("type-component",
+            owner,
+            owner,
+            "role=" + role + " component=" + (isReturn ? "fn-return" : "fn-param") +
+                " index=" + std::to_string(index) + " kind=" + syntaxTypeKind(text) +
+                " text=" + text + " parent=" + parent,
+            argBegin < tokens_.size() ? tokens_[argBegin].line : lineNo);
+      }
+    }
+  }
+
+  std::string syntaxGenericArgKind(const std::string &text) const {
+    const std::string trimmed = trim(text);
+    if (trimmed.empty()) return "missing";
+    const std::string expr = expressionAstFact(trimmed);
+    if (startsWith(expr, "int-literal:") || startsWith(expr, "float-literal:") ||
+        startsWith(expr, "bool-literal:") || expr == "char-literal" || expr == "string-literal" ||
+        startsWith(expr, "binary:") || startsWith(expr, "compare:") ||
+        startsWith(expr, "prefix:") || startsWith(expr, "range:") ||
+        startsWith(expr, "call:") || startsWith(expr, "field:")) {
+      return "expr";
+    }
+    return "type";
+  }
+
+  void emitGenericArgs(const std::string &owner,
+                       const std::string &role,
+                       std::size_t begin,
+                       std::size_t end,
+                       int lineNo) {
+    const std::size_t genericOpen = findTopLevelToken(begin, end, "<");
+    if (genericOpen >= end) return;
+    const std::size_t genericClose = findMatchingToken(genericOpen, end, "<", ">");
+    if (genericClose >= end) return;
+    const std::string parent = join(begin, end);
+    std::size_t index = 0;
+    for (const auto &[argBegin, argEnd] : splitTopLevel(genericOpen + 1, genericClose, ",")) {
+      const std::string text = join(argBegin, argEnd);
+      if (text.empty()) continue;
+      add("generic-arg",
+          owner,
+          owner,
+          "role=" + role + " index=" + std::to_string(index) +
+              " kind=" + syntaxGenericArgKind(text) + " text=" + text + " parent=" + parent,
+          argBegin < tokens_.size() ? tokens_[argBegin].line : lineNo);
+      ++index;
+    }
+  }
+
+  void emitPattern(const std::string &owner,
+                   const std::string &role,
+                   std::size_t begin,
+                   std::size_t end,
+                   int lineNo) {
+    const std::string text = join(begin, end);
+    if (text.empty()) return;
+    add("pattern", owner, owner, "role=" + role + " kind=" + syntaxPatternKind(text) + " text=" + text, lineNo);
+    emitPatternComponents(owner, role, begin, end, lineNo, text);
+  }
+
+  void emitPatternComponents(const std::string &owner,
+                             const std::string &role,
+                             std::size_t begin,
+                             std::size_t end,
+                             int lineNo,
+                             const std::string &parent) {
+    if (begin >= end) return;
+    const std::string text = join(begin, end);
+    if (text.empty()) return;
+
+    const auto alternatives = splitTopLevel(begin, end, "|");
+    if (alternatives.size() > 1) {
+      std::size_t index = 0;
+      for (const auto &[altBegin, altEnd] : alternatives) {
+        const std::string altText = join(altBegin, altEnd);
+        if (!altText.empty()) {
+          add("pattern-alt",
+              owner,
+              owner,
+              "role=" + role + " index=" + std::to_string(index) +
+                  " kind=" + syntaxPatternKind(altText) + " text=" + altText + " parent=" + parent,
+              altBegin < tokens_.size() ? tokens_[altBegin].line : lineNo);
+          emitPatternComponents(owner, role, altBegin, altEnd, lineNo, altText);
+        }
+        ++index;
+      }
+      return;
+    }
+
+    const std::size_t brace = findTopLevelToken(begin, end, "{");
+    if (brace < end) {
+      const std::size_t close = findMatchingToken(brace, end, "{", "}");
+      if (close < end) {
+        std::size_t index = 0;
+        for (const auto &[fieldBegin, fieldEnd] : splitTopLevel(brace + 1, close, ",")) {
+          const std::string fieldText = join(fieldBegin, fieldEnd);
+          if (fieldText.empty()) continue;
+          const std::size_t colon = findTopLevelToken(fieldBegin, fieldEnd, ":");
+          const std::string fieldName = colon < fieldEnd ? join(fieldBegin, colon) : fieldText;
+          const std::size_t patternBegin = colon < fieldEnd ? colon + 1 : fieldBegin;
+          const std::string patternText = join(patternBegin, fieldEnd);
+          add("pattern-field",
+              owner,
+              owner,
+              "role=" + role + " index=" + std::to_string(index) + " field=" + fieldName +
+                  " kind=" + syntaxPatternKind(patternText) + " text=" + patternText + " parent=" + parent,
+              fieldBegin < tokens_.size() ? tokens_[fieldBegin].line : lineNo);
+          if (colon < fieldEnd) emitPatternComponents(owner, role, patternBegin, fieldEnd, lineNo, patternText);
+          ++index;
+        }
+      }
+      return;
+    }
+
+    const std::size_t paren = findTopLevelToken(begin, end, "(");
+    if (paren < end) {
+      const std::size_t close = findMatchingToken(paren, end, "(", ")");
+      if (close < end) {
+        std::size_t index = 0;
+        for (const auto &[elementBegin, elementEnd] : splitTopLevel(paren + 1, close, ",")) {
+          const std::string elementText = join(elementBegin, elementEnd);
+          if (elementText.empty()) continue;
+          add("pattern-element",
+              owner,
+              owner,
+              "role=" + role + " index=" + std::to_string(index) +
+                  " kind=" + syntaxPatternKind(elementText) + " text=" + elementText + " parent=" + parent,
+              elementBegin < tokens_.size() ? tokens_[elementBegin].line : lineNo);
+          emitPatternComponents(owner, role, elementBegin, elementEnd, lineNo, elementText);
+          ++index;
+        }
+      }
+      return;
+    }
+
+    std::size_t rangeOp = findTopLevelToken(begin, end, "..=");
+    std::string op = "..=";
+    if (rangeOp >= end) {
+      rangeOp = findTopLevelToken(begin, end, "..");
+      op = "..";
+    }
+    if (rangeOp < end) {
+      const std::string lower = join(begin, rangeOp);
+      const std::string upper = join(rangeOp + 1, end);
+      if (!lower.empty()) {
+        add("pattern-bound", owner, owner,
+            "role=" + role + " side=lower op=" + op + " text=" + lower + " parent=" + parent,
+            begin < tokens_.size() ? tokens_[begin].line : lineNo);
+      }
+      if (!upper.empty()) {
+        add("pattern-bound", owner, owner,
+            "role=" + role + " side=upper op=" + op + " text=" + upper + " parent=" + parent,
+            rangeOp + 1 < tokens_.size() ? tokens_[rangeOp + 1].line : lineNo);
+      }
+    }
+  }
+
+  void emitGenericParams(const std::string &owner,
+                         std::size_t begin,
+                         std::size_t end,
+                         int lineNo) {
+    (void)lineNo;
+    if (begin >= end || begin >= tokens_.size() || tokens_[begin].text != "<") return;
+    const std::size_t close = findMatchingToken(begin, end, "<", ">");
+    if (close >= end) return;
+    for (const auto &[paramBegin, paramEnd] : splitTopLevel(begin + 1, close, ",")) {
+      if (paramBegin >= paramEnd) continue;
+      std::string detail = "kind=type text=" + join(paramBegin, paramEnd);
+      if (tokens_[paramBegin].text == "const") {
+        detail = "kind=const text=" + join(paramBegin, paramEnd);
+        const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
+        if (colon < paramEnd) emitType(owner, "generic-const", colon + 1, paramEnd, tokens_[paramBegin].line);
+      } else {
+        const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
+        if (colon < paramEnd) {
+          detail += " constraint=" + join(colon + 1, paramEnd);
+          emitType(owner, "generic-bound", colon + 1, paramEnd, tokens_[paramBegin].line);
+        }
+      }
+      add("generic-param", owner, owner, detail, tokens_[paramBegin].line);
+    }
+  }
+
+  std::size_t findMatchingToken(std::size_t openIndex,
+                                std::size_t limit,
+                                const std::string &open,
+                                const std::string &close) const {
+    int depth = 0;
+    for (std::size_t i = openIndex; i < limit && i < tokens_.size(); ++i) {
+      if (tokens_[i].text == open) ++depth;
+      else if (tokens_[i].text == close) {
+        --depth;
+        if (depth == 0) return i;
+      }
+    }
+    return limit;
+  }
+
+  void emitSignatureNodes(const std::string &owner,
+                          std::size_t begin,
+                          std::size_t end,
+                          int lineNo) {
+    if (begin >= end) return;
+    if (begin < end && tokens_[begin].text == "<") {
+      const std::size_t genericClose = findMatchingToken(begin, end, "<", ">");
+      if (genericClose < end) emitGenericParams(owner, begin, genericClose + 1, lineNo);
+    }
+    std::size_t paren = end;
+    for (std::size_t i = begin; i < end; ++i) {
+      if (tokens_[i].text == "(") {
+        paren = i;
+        break;
+      }
+    }
+    if (paren < end) {
+      const std::size_t close = findMatchingToken(paren, end, "(", ")");
+      if (close < end) emitParams(owner, paren + 1, close, lineNo);
+      const std::size_t arrow = findTopLevelToken(close + 1, end, "->");
+      if (arrow < end) emitType(owner, "return", arrow + 1, end, lineNo);
+    }
+  }
+
+  void emitParams(const std::string &owner,
+                  std::size_t begin,
+                  std::size_t end,
+                  int lineNo) {
+    (void)lineNo;
+    for (const auto &[paramBegin, paramEnd] : splitTopLevel(begin, end, ",")) {
+      if (paramBegin >= paramEnd) continue;
+      std::size_t nameBegin = paramBegin;
+      std::string mode = "read";
+      if (tokens_[nameBegin].text == "mut" || tokens_[nameBegin].text == "move") mode = tokens_[nameBegin++].text;
+      if (nameBegin < paramEnd && tokens_[nameBegin].text == "self") {
+        add("param", owner, owner, "kind=receiver mode=" + mode + " name=self", tokens_[paramBegin].line);
+        continue;
+      }
+      const std::size_t colon = findTopLevelToken(nameBegin, paramEnd, ":");
+      const std::string name = colon < paramEnd ? join(nameBegin, colon) : join(nameBegin, paramEnd);
+      add("param", owner, owner, "kind=value mode=" + mode + " name=" + name, tokens_[paramBegin].line);
+      if (colon < paramEnd) emitType(owner, "param", colon + 1, paramEnd, tokens_[paramBegin].line);
+    }
+  }
+
+  void emitArguments(const std::string &owner,
+                     std::size_t begin,
+                     std::size_t end,
+                     int lineNo) {
+    for (const auto &[argBeginRaw, argEnd] : splitTopLevel(begin, end, ",")) {
+      if (argBeginRaw >= argEnd) continue;
+      std::size_t argBegin = argBeginRaw;
+      std::string mode = "read";
+      if (tokens_[argBegin].text == "mut" || tokens_[argBegin].text == "move") mode = tokens_[argBegin++].text;
+      add("arg", owner, owner, "mode=" + mode + " expr=" + exprFact(argBegin, argEnd), tokens_[argBeginRaw].line);
+      emitExpression(owner, argBegin, argEnd, lineNo);
+    }
+  }
+
+  bool isClosureParamList(std::size_t paren,
+                          std::size_t close,
+                          std::size_t begin,
+                          std::size_t end) const {
+    if (close >= end) return false;
+    const bool startsClosure = paren == begin ||
+                               (paren == begin + 1 && tokens_[begin].text == "move");
+    if (!startsClosure) return false;
+    if (close + 1 >= end) return false;
+    const std::string &after = tokens_[close + 1].text;
+    return after == "=>" || after == "->" || after == "{";
+  }
+
+  void emitClosureParams(const std::string &owner,
+                         std::size_t begin,
+                         std::size_t end,
+                         int lineNo) {
+    (void)lineNo;
+    for (const auto &[paramBegin, paramEnd] : splitTopLevel(begin, end, ",")) {
+      if (paramBegin >= paramEnd) continue;
+      const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
+      const std::size_t patternEnd = colon < paramEnd ? colon : paramEnd;
+      const std::string pattern = join(paramBegin, patternEnd);
+      std::string detail = "pattern=" + pattern;
+      if (colon < paramEnd) detail += " type=" + join(colon + 1, paramEnd);
+      add("closure-param", owner, owner, detail, tokens_[paramBegin].line);
+      emitPattern(owner, "closure-param", paramBegin, patternEnd, tokens_[paramBegin].line);
+      if (colon < paramEnd) emitType(owner, "closure-param", colon + 1, paramEnd, tokens_[paramBegin].line);
+    }
+  }
+
+  void emitStructLiteralFields(const std::string &owner,
+                               std::size_t begin,
+                               std::size_t end,
+                               int lineNo) {
+    (void)lineNo;
+    for (const auto &[fieldBegin, fieldEnd] : splitTopLevel(begin, end, ",")) {
+      if (fieldBegin >= fieldEnd) continue;
+      const std::size_t colon = findTopLevelToken(fieldBegin, fieldEnd, ":");
+      if (colon >= fieldEnd) continue;
+      const std::string fieldName = join(fieldBegin, colon);
+      if (fieldName.empty()) continue;
+      add("field-init",
+          owner,
+          owner + "." + fieldName,
+          "field=" + fieldName + " expr=" + exprFact(colon + 1, fieldEnd),
+          tokens_[fieldBegin].line);
+      emitExpression(owner, colon + 1, fieldEnd, tokens_[fieldBegin].line);
+    }
+  }
+
+  void emitIndexAccess(const std::string &owner,
+                       std::size_t begin,
+                       std::size_t end,
+                       int lineNo) {
+    const std::size_t bracket = findTopLevelToken(begin, end, "[");
+    if (bracket >= end) return;
+    const std::size_t close = findMatchingToken(bracket, end, "[", "]");
+    if (close >= end) return;
+    const std::string base = join(begin, bracket);
+    if (base.empty()) return;
+    add("index-access",
+        owner,
+        owner,
+        "base=" + base + " index=" + exprFact(bracket + 1, close),
+        lineNo);
+    emitExpression(owner, bracket + 1, close, tokens_[bracket].line);
+  }
+
+  void emitTupleElements(const std::string &owner,
+                         std::size_t begin,
+                         std::size_t end,
+                         int lineNo) {
+    std::size_t elementIndex = 0;
+    for (const auto &[elementBegin, elementEnd] : splitTopLevel(begin, end, ",")) {
+      if (elementBegin >= elementEnd) continue;
+      const std::string index = std::to_string(elementIndex++);
+      add("tuple-element",
+          owner,
+          owner + "." + index,
+          "index=" + index + " expr=" + exprFact(elementBegin, elementEnd),
+          lineNo);
+      emitExpression(owner, elementBegin, elementEnd, tokens_[elementBegin].line);
+    }
+  }
+
+  void emitFieldAccess(const std::string &owner,
+                       std::size_t begin,
+                       std::size_t end,
+                       int lineNo,
+                       const std::string &mode) {
+    const std::size_t dot = findLastTopLevelToken(begin, end, ".");
+    if (dot >= end || dot <= begin || dot + 1 >= end) return;
+    const std::string base = join(begin, dot);
+    const std::string field = join(dot + 1, end);
+    if (base.empty() || field.empty()) return;
+    add("field-access",
+        owner,
+        owner + "." + field,
+        "base=" + base + " field=" + field + " mode=" + mode,
+        lineNo);
+    emitExpression(owner, begin, dot, lineNo);
+  }
+
+  void emitMethodCall(const std::string &owner,
+                      std::size_t begin,
+                      std::size_t end,
+                      int lineNo,
+                      const std::string &fact) {
+    if (!contains(fact, "method-call:")) return;
+    std::size_t receiverBegin = begin;
+    std::string mode = "read";
+    if (tokens_[receiverBegin].text == "mut" || tokens_[receiverBegin].text == "move") {
+      mode = tokens_[receiverBegin].text;
+      ++receiverBegin;
+    }
+    const std::size_t paren = findTopLevelToken(receiverBegin, end, "(");
+    if (paren >= end || paren == receiverBegin) return;
+    const std::size_t dot = findLastTopLevelToken(receiverBegin, paren, ".");
+    if (dot >= paren || dot <= receiverBegin || dot + 1 >= paren) return;
+    const std::string receiver = join(receiverBegin, dot);
+    const std::string method = join(dot + 1, paren);
+    if (receiver.empty() || method.empty()) return;
+    add("method-call",
+        owner,
+        owner + "." + method,
+        "receiver=" + receiver + " method=" + method + " mode=" + mode,
+        lineNo);
+    emitExpression(owner, receiverBegin, dot, lineNo);
+  }
+
+  std::size_t skipExpressionPrefixes(std::size_t begin, std::size_t end) const {
+    while (begin < end &&
+           (tokens_[begin].text == "try" || tokens_[begin].text == "await" ||
+            tokens_[begin].text == "mut" || tokens_[begin].text == "move")) {
+      ++begin;
+    }
+    return begin;
+  }
+
+  void emitDirectCall(const std::string &owner,
+                      std::size_t begin,
+                      std::size_t end,
+                      int lineNo,
+                      const std::string &fact) {
+    if (!contains(fact, "call:") || contains(fact, "method-call:") || contains(fact, "type-static-call:")) return;
+    const std::size_t calleeBegin = skipExpressionPrefixes(begin, end);
+    const std::size_t paren = findTopLevelToken(calleeBegin, end, "(");
+    if (paren >= end || paren == calleeBegin) return;
+    const std::string callee = join(calleeBegin, paren);
+    if (callee.empty() || contains(callee, ".") || contains(callee, " ")) return;
+    add("call",
+        owner,
+        owner + "." + callee,
+        "callee=" + callee,
+        lineNo);
+  }
+
+  void emitTypeStaticCall(const std::string &owner,
+                          std::size_t begin,
+                          std::size_t end,
+                          int lineNo,
+                          const std::string &fact) {
+    if (!contains(fact, "type-static-call:")) return;
+    const std::size_t targetBegin = skipExpressionPrefixes(begin, end);
+    const std::size_t paren = findTopLevelToken(targetBegin, end, "(");
+    if (paren >= end || paren == targetBegin) return;
+    const std::size_t dot = findLastTopLevelToken(targetBegin, paren, ".");
+    if (dot >= paren || dot <= targetBegin || dot + 1 >= paren) return;
+    const std::string targetType = join(targetBegin, dot);
+    const std::string method = join(dot + 1, paren);
+    if (targetType.empty() || method.empty()) return;
+    add("type-static-call",
+        owner,
+        owner + "." + method,
+        "targetType=" + targetType + " method=" + method,
+        lineNo);
+  }
+
+  void emitOperatorExpression(const std::string &owner,
+                              std::size_t begin,
+                              std::size_t end,
+                              int lineNo,
+                              const std::string &fact) {
+    if (startsWith(fact, "binary:")) {
+      const std::string op = fact.substr(7);
+      const auto found = findLastTopLevelOperator(begin, end, {op});
+      if (!found || found->begin <= begin || found->end >= end) return;
+      add("binary-expr",
+          owner,
+          owner,
+          "op=" + op + " left=" + exprFact(begin, found->begin) + " right=" + exprFact(found->end, end),
+          lineNo);
+      emitExpression(owner, begin, found->begin, lineNo);
+      emitExpression(owner, found->end, end, lineNo);
+    } else if (startsWith(fact, "compare:")) {
+      const std::string op = fact.substr(8);
+      const auto found = findLastTopLevelOperator(begin, end, {op});
+      if (!found || found->begin <= begin || found->end >= end) return;
+      add("compare-expr",
+          owner,
+          owner,
+          "op=" + op + " left=" + exprFact(begin, found->begin) + " right=" + exprFact(found->end, end),
+          lineNo);
+      emitExpression(owner, begin, found->begin, lineNo);
+      emitExpression(owner, found->end, end, lineNo);
+    } else if (startsWith(fact, "prefix:")) {
+      const std::string op = fact.substr(7);
+      if (begin + 1 >= end || tokens_[begin].text != op) return;
+      add("prefix-expr",
+          owner,
+          owner,
+          "op=" + op + " operand=" + exprFact(begin + 1, end),
+          lineNo);
+      emitExpression(owner, begin + 1, end, lineNo);
+    } else if (startsWith(fact, "cast:")) {
+      const std::size_t asToken = findTopLevelToken(begin, end, "as");
+      if (asToken <= begin || asToken >= end) return;
+      add("cast-expr",
+          owner,
+          owner,
+          "expr=" + exprFact(begin, asToken) + " targetType=" + join(asToken + 1, end),
+          lineNo);
+      emitExpression(owner, begin, asToken, lineNo);
+      emitType(owner, "cast-target", asToken + 1, end, lineNo);
+    } else if (startsWith(fact, "range:")) {
+      const std::string op = fact == "range:closed" ? "..=" : "..";
+      const auto found = findLastTopLevelOperator(begin, end, {op});
+      if (!found || found->begin <= begin || found->end >= end) return;
+      add("range-expr",
+          owner,
+          owner,
+          "op=" + op + " left=" + exprFact(begin, found->begin) + " right=" + exprFact(found->end, end),
+          lineNo);
+      emitExpression(owner, begin, found->begin, lineNo);
+      emitExpression(owner, found->end, end, lineNo);
+    }
+  }
+
+  void emitPrimaryExpression(const std::string &owner,
+                             std::size_t begin,
+                             std::size_t end,
+                             int lineNo,
+                             const std::string &fact) {
+    if (startsWith(fact, "name:")) {
+      const std::string name = fact.substr(5);
+      add("name-expr", owner, owner + "." + name, "name=" + name, lineNo);
+    } else if (fact == "unit") {
+      add("unit-expr", owner, owner, "expr=unit", lineNo);
+    } else if (startsWith(fact, "int-literal:")) {
+      add("literal-expr", owner, owner, "literalKind=int expr=" + fact, lineNo);
+    } else if (startsWith(fact, "float-literal:")) {
+      add("literal-expr", owner, owner, "literalKind=float expr=" + fact, lineNo);
+    } else if (startsWith(fact, "bool-literal:")) {
+      add("literal-expr", owner, owner, "literalKind=bool expr=" + fact, lineNo);
+    } else if (fact == "char-literal") {
+      add("literal-expr", owner, owner, "literalKind=char expr=char-literal", lineNo);
+    } else if (fact == "string-literal") {
+      add("literal-expr", owner, owner, "literalKind=string expr=string-literal", lineNo);
+    } else if (startsWith(fact, "try:")) {
+      const std::size_t exprBegin = begin < end && tokens_[begin].text == "try" ? begin + 1 : begin;
+      add("try-expr", owner, owner, "expr=" + fact.substr(4), lineNo);
+      if (exprBegin < end) emitExpression(owner, exprBegin, end, lineNo);
+    } else if (startsWith(fact, "mut:") || startsWith(fact, "move:")) {
+      const bool isMove = startsWith(fact, "move:");
+      const std::string mode = isMove ? "move" : "mut";
+      const std::size_t exprBegin = begin < end && tokens_[begin].text == mode ? begin + 1 : begin;
+      add("access-expr", owner, owner, "mode=" + mode + " operand=" + fact.substr(mode.size() + 1), lineNo);
+      if (exprBegin < end) emitExpression(owner, exprBegin, end, lineNo);
+    } else if (fact == "trust-block") {
+      add("trust-expr", owner, owner, "expr=trust-block", lineNo);
+    }
+  }
+
+  void emitControlFlowExpression(const std::string &owner,
+                                 std::size_t begin,
+                                 std::size_t end,
+                                 int lineNo,
+                                 const std::string &fact) {
+    if (fact == "if-expr" || fact == "while-expr") {
+      if (begin + 1 >= end || tokens_[begin + 1].text != "(") return;
+      const std::size_t close = findMatchingToken(begin + 1, end, "(", ")");
+      if (close >= end) return;
+      const std::string kind = fact == "if-expr" ? "if-expr" : "while-expr";
+      const std::size_t conditionBegin = begin + 2;
+      const std::size_t conditionEnd = close;
+      const std::size_t isToken = findTopLevelToken(conditionBegin, conditionEnd, "is");
+      if (isToken < conditionEnd) {
+        std::size_t patternBegin = isToken + 1;
+        std::string mode = "read";
+        if (patternBegin < conditionEnd && (tokens_[patternBegin].text == "move" || tokens_[patternBegin].text == "mut")) {
+          mode = tokens_[patternBegin].text;
+          ++patternBegin;
+        }
+        add(kind,
+            owner,
+            owner,
+            "kind=pattern scrutinee=" + exprFact(conditionBegin, isToken) +
+                " pattern=" + join(patternBegin, conditionEnd) + " mode=" + mode,
+            lineNo);
+        emitPattern(owner, kind + "-condition", patternBegin, conditionEnd, lineNo);
+        emitExpression(owner, conditionBegin, isToken, lineNo);
+      } else {
+        add(kind, owner, owner, "kind=condition condition=" + exprFact(conditionBegin, conditionEnd), lineNo);
+        emitExpression(owner, conditionBegin, conditionEnd, lineNo);
+      }
+      return;
+    }
+
+    if (fact == "for-expr") {
+      std::size_t cursor = begin + 1;
+      std::string mode = "read";
+      if (cursor < end && (tokens_[cursor].text == "move" || tokens_[cursor].text == "mut")) mode = tokens_[cursor++].text;
+      const std::size_t itemBegin = cursor;
+      const std::size_t inToken = findTopLevelToken(itemBegin, end, "in");
+      if (inToken >= end) return;
+      const std::size_t bodyOpen = findTopLevelToken(inToken + 1, end, "{");
+      const std::size_t iterableEnd = bodyOpen < end ? bodyOpen : end;
+      add("for-expr",
+          owner,
+          owner,
+          "item=" + join(itemBegin, inToken) + " iterable=" + exprFact(inToken + 1, iterableEnd) + " mode=" + mode,
+          lineNo);
+      emitPattern(owner, "for-expr-binding", itemBegin, inToken, lineNo);
+      emitExpression(owner, inToken + 1, iterableEnd, lineNo);
+      return;
+    }
+
+    if (fact == "match" || startsWith(fact, "match:")) {
+      std::size_t scrutineeBegin = begin + 1;
+      std::string mode = "read";
+      if (scrutineeBegin < end && (tokens_[scrutineeBegin].text == "move" || tokens_[scrutineeBegin].text == "mut")) {
+        mode = tokens_[scrutineeBegin].text;
+        ++scrutineeBegin;
+      }
+      const std::size_t bodyOpen = findTopLevelToken(scrutineeBegin, end, "{");
+      const std::size_t scrutineeEnd = bodyOpen < end ? bodyOpen : end;
+      add("match-expr", owner, owner, "scrutinee=" + exprFact(scrutineeBegin, scrutineeEnd) + " mode=" + mode, lineNo);
+      emitExpression(owner, scrutineeBegin, scrutineeEnd, lineNo);
+    }
+  }
+
+  void emitExpression(const std::string &owner, std::size_t begin, std::size_t end, int lineNo) {
+    if (begin >= end) return;
+    const std::string fact = exprFact(begin, end);
+    add("expr", owner, owner, "kind=" + fact, lineNo);
+    if (fact != "tuple" && fact != "unit" && isFullyParenthesizedExpression(begin, end)) {
+      emitExpression(owner, begin + 1, end - 1, lineNo);
+      return;
+    }
+    emitPrimaryExpression(owner, begin, end, lineNo, fact);
+    emitControlFlowExpression(owner, begin, end, lineNo, fact);
+    emitOperatorExpression(owner, begin, end, lineNo, fact);
+    emitTypeStaticCall(owner, begin, end, lineNo, fact);
+    emitMethodCall(owner, begin, end, lineNo, fact);
+    emitDirectCall(owner, begin, end, lineNo, fact);
+    if (startsWith(fact, "struct-literal:")) {
+      const std::size_t brace = findTopLevelToken(begin, end, "{");
+      if (brace < end) {
+        const std::size_t close = findMatchingToken(brace, end, "{", "}");
+        if (close < end) emitStructLiteralFields(owner, brace + 1, close, tokens_[brace].line);
+      }
+    }
+    if (startsWith(fact, "index:")) emitIndexAccess(owner, begin, end, lineNo);
+    if (fact == "tuple" && tokens_[begin].text == "(" && end > begin) {
+      const std::size_t close = findMatchingToken(begin, end, "(", ")");
+      if (close < end) emitTupleElements(owner, begin + 1, close, tokens_[begin].line);
+    }
+    if (startsWith(fact, "field:")) emitFieldAccess(owner, begin, end, lineNo, "read");
+    for (std::size_t i = begin; i < end && i < tokens_.size(); ++i) {
+      if (tokens_[i].text != "(") continue;
+      const std::size_t close = findMatchingToken(i, end, "(", ")");
+      if (close >= end) continue;
+      if (isClosureParamList(i, close, begin, end)) {
+        emitClosureParams(owner, i + 1, close, tokens_[i].line);
+      } else if (i > begin && (isIdentifierLike(tokens_[i - 1].text) || tokens_[i - 1].text == ">")) {
+        emitArguments(owner, i + 1, close, tokens_[i].line);
+      }
+      i = close;
+    }
+  }
+
+  void emitStatementRange(const std::string &owner, std::size_t begin, std::size_t end) {
+    while (begin < end && tokens_[begin].text == ";") ++begin;
+    while (end > begin && tokens_[end - 1].text == ";") --end;
+    if (begin >= end) return;
+    const int line = tokens_[begin].line;
+    const std::size_t assignment = findTopLevelToken(begin, end, "=");
+    if (assignment < end) {
+      add("stmt", owner, owner,
+          "kind=assign target=" + join(begin, assignment) + " expr=" + exprFact(assignment + 1, end),
+          line);
+      emitExpression(owner, assignment + 1, end, line);
+      return;
+    }
+    add("stmt", owner, owner, "kind=expr expr=" + exprFact(begin, end), line);
+    emitExpression(owner, begin, end, line);
+  }
+
+  void emitTrustBlockStatements(const std::string &owner, std::size_t begin, std::size_t end) {
+    for (std::size_t i = begin; i + 1 < end && i + 1 < tokens_.size(); ++i) {
+      if (tokens_[i].text != "trust" || tokens_[i + 1].text != "{") continue;
+      const std::size_t close = findMatchingToken(i + 1, end, "{", "}");
+      if (close >= end) continue;
+      for (const auto &[stmtBegin, stmtEnd] : splitTopLevel(i + 2, close, ";")) {
+        emitStatementRange(owner, stmtBegin, stmtEnd);
+      }
+      i = close;
+    }
+  }
+
+  void parseStatement(const std::string &owner) {
+    if (check(";")) {
+      advance();
+      return;
+    }
+    if (check("{")) {
+      const int line = currentLine();
+      match("{");
+      parseBlock(owner, line, true, "block");
+      return;
+    }
+    if (check("return")) {
+      const int line = advance().line;
+      if (check("match")) {
+        parseReturnMatch(owner, line);
+        return;
+      }
+      const std::size_t begin = current_;
+      const std::size_t end = collectUntilTopLevel({";"}, true);
+      const std::string expr = exprFact(begin, end);
+      add("stmt", owner, owner, "kind=return expr=" + expr, line);
+      emitExpression(owner, begin, end, line);
+      if (expr == "trust-block") emitTrustBlockStatements(owner, begin, end);
+      return;
+    }
+    if (check("const")) {
+      advance();
+      parseLocalBinding(owner, "const");
+      return;
+    }
+    if (check("val") || check("var")) {
+      parseLocalBinding(owner, advance().text);
+      return;
+    }
+    if (check("if")) {
+      parseIf(owner);
+      return;
+    }
+    if (check("while")) {
+      parseWhile(owner);
+      return;
+    }
+    if (check("for")) {
+      parseFor(owner);
+      return;
+    }
+    if (check("match")) {
+      parseMatchStatement(owner);
+      return;
+    }
+    if (check("try")) {
+      const int line = advance().line;
+      const std::size_t begin = current_;
+      const std::size_t end = collectUntilTopLevel({";"}, true);
+      const std::string expr = exprFact(begin, end);
+      add("stmt", owner, owner, "kind=try expr=" + expr, line);
+      emitExpression(owner, begin, end, line);
+      return;
+    }
+    if (check("break")) {
+      const int line = advance().line;
+      const std::size_t begin = current_;
+      const std::size_t end = collectUntilTopLevel({";"}, true);
+      std::string detail = "kind=break";
+      if (begin < end) detail += " expr=" + exprFact(begin, end);
+      add("stmt", owner, owner, detail, line);
+      return;
+    }
+    if (check("continue")) {
+      const int line = advance().line;
+      collectUntilTopLevel({";"}, true);
+      add("stmt", owner, owner, "kind=continue", line);
+      return;
+    }
+    parseExpressionOrAssignment(owner);
+  }
+
+  void parseReturnMatch(const std::string &owner, int returnLine) {
+    const std::size_t matchBegin = current_;
+    const int matchLine = advance().line;
+    std::string mode = "read";
+    if (check("move") || check("mut")) mode = advance().text;
+    const std::size_t scrutineeBegin = current_;
+    const std::size_t scrutineeEnd = collectUntilTopLevel({"{"}, false);
+    const std::string returnExpr = mode == "read" ? "match" : "match:" + mode;
+    add("stmt", owner, owner, "kind=return expr=" + returnExpr, returnLine);
+    add("stmt", owner, owner,
+        "kind=match scrutinee=" + exprFact(scrutineeBegin, scrutineeEnd) + " mode=" + mode,
+        matchLine);
+    emitExpression(owner, matchBegin, scrutineeEnd, matchLine);
+    if (match("{")) parseMatchBlock(owner, matchLine, true);
+    match(";");
+  }
+
+  void parseLocalBinding(const std::string &owner, const std::string &mode) {
+    const int line = tokens_[current_ - 1].line;
+    const std::size_t patternBegin = current_;
+    const std::size_t equals = collectUntilTopLevel({"=", ";"}, false);
+    const std::string pattern = join(patternBegin, equals);
+    std::string localName = pattern;
+    const std::size_t colon = findTopLevelToken(patternBegin, equals, ":");
+    if (colon < equals) localName = join(patternBegin, colon);
+    const bool hasEquals = match("=");
+    const std::size_t exprBegin = current_;
+    const std::size_t exprEnd = collectUntilTopLevel({";"}, true);
+    std::string detail = "kind=" + mode;
+    if (!localName.empty()) detail += " name=" + localName;
+    if (pattern != localName) detail += " pattern=" + pattern;
+    if (hasEquals && exprBegin < exprEnd) detail += " expr=" + exprFact(exprBegin, exprEnd);
+    add("stmt", owner, owner, detail, line);
+    emitPattern(owner, mode, patternBegin, colon < equals ? colon : equals, line);
+    if (colon < equals) emitType(owner, "local", colon + 1, equals, line);
+    emitExpression(owner, exprBegin, exprEnd, line);
+    if (hasEquals && exprFact(exprBegin, exprEnd) == "trust-block") emitTrustBlockStatements(owner, exprBegin, exprEnd);
+  }
+
+  void parsePatternCondition(const std::string &owner,
+                             const std::string &statementKind,
+                             std::size_t begin,
+                             std::size_t end,
+                             int line) {
+    const std::size_t isToken = findTopLevelToken(begin, end, "is");
+    if (isToken >= end) {
+      const std::string condition = exprFact(begin, end);
+      add("stmt", owner, owner, "kind=" + statementKind + " condition=" + condition, line);
+      emitExpression(owner, begin, end, line);
+      return;
+    }
+    std::size_t patternBegin = isToken + 1;
+    std::string mode = "read";
+    if (patternBegin < end && (tokens_[patternBegin].text == "move" || tokens_[patternBegin].text == "mut")) {
+      mode = tokens_[patternBegin].text;
+      ++patternBegin;
+    }
+    const std::string scrutinee = exprFact(begin, isToken);
+    const std::string pattern = join(patternBegin, end);
+    add("stmt", owner, owner,
+        "kind=" + statementKind + "-pattern scrutinee=" + scrutinee +
+            " pattern=" + pattern + " mode=" + mode,
+        line);
+    emitPattern(owner, statementKind + "-condition", patternBegin, end, line);
+    emitExpression(owner, begin, isToken, line);
+  }
+
+  void parseIf(const std::string &owner) {
+    const int line = advance().line;
+    auto [conditionBegin, conditionEnd] = collectParenContents();
+    parsePatternCondition(owner, "if", conditionBegin, conditionEnd, line);
+    if (match("{")) parseBlock(owner, line, true, "if-then");
+    if (match("else")) {
+      const int elseLine = tokens_[current_ - 1].line;
+      add("stmt", owner, owner, "kind=else", elseLine);
+      if (check("if")) parseIf(owner);
+      else if (check("{")) {
+        const int blockLine = currentLine();
+        match("{");
+        parseBlock(owner, blockLine, true, "if-else");
+      }
+    }
+  }
+
+  void parseWhile(const std::string &owner) {
+    const int line = advance().line;
+    auto [conditionBegin, conditionEnd] = collectParenContents();
+    parsePatternCondition(owner, "while", conditionBegin, conditionEnd, line);
+    if (match("{")) parseBlock(owner, line, true, "while-body");
+  }
+
+  void parseFor(const std::string &owner) {
+    const int line = advance().line;
+    std::string mode = "read";
+    if (check("move") || check("mut")) mode = advance().text;
+    const std::size_t itemBegin = current_;
+    const std::size_t inToken = collectUntilTopLevel({"in", "{"}, false);
+    const std::string item = join(itemBegin, inToken);
+    emitPattern(owner, "for-binding", itemBegin, inToken, line);
+    if (match("in")) {
+      const std::size_t iterableBegin = current_;
+      const std::size_t iterableEnd = collectUntilTopLevel({"{"}, false);
+      const std::string iterable = exprFact(iterableBegin, iterableEnd);
+      add("stmt", owner, owner,
+          "kind=for item=" + item + " iterable=" + iterable + " mode=" + mode,
+          line);
+      emitExpression(owner, iterableBegin, iterableEnd, line);
+    } else {
+      add("stmt", owner, owner, "kind=for item=" + item + " mode=" + mode, line);
+    }
+    if (match("{")) parseBlock(owner, line, true, "for-body");
+  }
+
+  void parseMatchStatement(const std::string &owner) {
+    const int line = advance().line;
+    std::string mode = "read";
+    if (check("move") || check("mut")) mode = advance().text;
+    const std::size_t scrutineeBegin = current_;
+    const std::size_t scrutineeEnd = collectUntilTopLevel({"{"}, false);
+    const std::string scrutinee = exprFact(scrutineeBegin, scrutineeEnd);
+    add("stmt", owner, owner, "kind=match scrutinee=" + scrutinee + " mode=" + mode, line);
+    emitExpression(owner, scrutineeBegin, scrutineeEnd, line);
+    if (match("{")) parseMatchBlock(owner, line, true);
+  }
+
+  void parseMatchBlock(const std::string &owner, int lineNo, bool alreadyConsumedOpen) {
+    if (!alreadyConsumedOpen && !match("{")) return;
+    add("block", owner, owner, "kind=match role=match", lineNo);
+    while (!eof() && !check("}")) {
+      if (check(",")) {
+        advance();
+        continue;
+      }
+      const int line = currentLine();
+      const std::size_t patternBegin = current_;
+      const std::size_t arrow = collectUntilTopLevel({"=>", "}"}, false);
+      if (!match("=>")) break;
+      const std::size_t guardToken = findTopLevelToken(patternBegin, arrow, "if");
+      const std::string pattern = join(patternBegin, guardToken < arrow ? guardToken : arrow);
+      std::string detail = "kind=match-arm pattern=" + pattern;
+      emitPattern(owner, "match-arm", patternBegin, guardToken < arrow ? guardToken : arrow, line);
+      if (guardToken < arrow) detail += " guard=" + exprFact(guardToken + 1, arrow);
+      if (check("{")) {
+        add("stmt", owner, owner, detail + " expr=block", line);
+        match("{");
+        parseBlock(owner, line, true, "match-arm-body");
+      } else {
+        const std::size_t exprBegin = current_;
+        const std::size_t exprEnd = collectUntilTopLevel({",", ";"}, true);
+        detail += " expr=" + exprFact(exprBegin, exprEnd);
+        add("stmt", owner, owner, detail, line);
+        emitExpression(owner, exprBegin, exprEnd, line);
+      }
+    }
+    match("}");
+  }
+
+  void parseExpressionOrAssignment(const std::string &owner) {
+    const int line = currentLine();
+    const std::size_t begin = current_;
+    const std::size_t end = collectUntilTopLevel({";"}, true);
+    if (begin >= end) return;
+    std::size_t assignment = end;
+    std::string assignmentOp;
+    for (const auto &op : {"=", "+=", "-=", "*=", "/=", "%="}) {
+      const std::size_t found = findTopLevelToken(begin, end, op);
+      if (found < assignment) {
+        assignment = found;
+        assignmentOp = op;
+      }
+    }
+    if (assignment < end) {
+      add("stmt", owner, owner,
+          "kind=assign target=" + join(begin, assignment) + " op=" + assignmentOp +
+              " expr=" + exprFact(assignment + 1, end),
+          line);
+      emitFieldAccess(owner, begin, assignment, line, "write");
+      emitExpression(owner, assignment + 1, end, line);
+      return;
+    }
+    const std::string expr = exprFact(begin, end);
+    add("stmt", owner, owner, "kind=expr expr=" + expr, line);
+    emitExpression(owner, begin, end, line);
+  }
+};
+
+std::string legacySyntaxText(std::string text) {
+  text = trim(text);
+  const std::vector<std::pair<std::string, std::string>> replacements{
+      {"@ ", "@"},
+      {" :", ":"},
+      {"< ", "<"},
+      {" >", ">"},
+      {"( ", "("},
+      {" )", ")"},
+      {"[ ", "["},
+      {" ]", "]"},
+      {"{", "{ "},
+      {"}", " }"}};
+  for (const auto &[from, to] : replacements) {
+    std::size_t pos = 0;
+    while ((pos = text.find(from, pos)) != std::string::npos) {
+      text.replace(pos, from.size(), to);
+      pos += to.size();
+    }
+  }
+  while (contains(text, "  ")) {
+    std::size_t pos = 0;
+    while ((pos = text.find("  ", pos)) != std::string::npos) text.replace(pos, 2, " ");
+  }
+  text = trim(text);
+  return text;
+}
+
+std::optional<std::string> syntaxDetailValue(const std::string &detail, const std::string &key) {
+  const std::string needle = key + "=";
+  const std::size_t pos = detail.find(needle);
+  if (pos == std::string::npos) return std::nullopt;
+  const std::size_t start = pos + needle.size();
+  std::size_t end = detail.size();
+  static const std::vector<std::string> keys{
+      "kind", "owner", "visibility", "async", "trusted", "abi", "attrs", "layout",
+      "signature", "attr", "role", "component", "index", "text", "parent", "constraint", "mode", "name", "pattern", "literalKind",
+      "value", "expr", "target", "op", "scrutinee", "condition", "path", "item", "iterable", "field",
+      "side", "base", "receiver", "callee", "targetType", "left", "right", "operand", "method", "guard"};
+  for (const auto &candidate : keys) {
+    const std::string marker = " " + candidate + "=";
+    const std::size_t next = detail.find(marker, start);
+    if (next != std::string::npos) end = std::min(end, next);
+  }
+  return trim(detail.substr(start, end - start));
+}
+
+std::vector<std::string> syntaxAttributesFromDetail(const std::string &detail) {
+  std::vector<std::string> attrs;
+  const auto value = syntaxDetailValue(detail, "attrs");
+  if (!value) return attrs;
+  for (auto attr : splitArguments(*value)) attrs.push_back(legacySyntaxText(attr));
+  return attrs;
+}
+
+struct SyntaxSignatureParts {
+  std::string generic;
+  std::string params;
+  std::string returnType;
+};
+
+SyntaxSignatureParts parseSyntaxSignatureParts(std::string signature) {
+  SyntaxSignatureParts parts;
+  signature = trim(signature);
+  if (startsWith(signature, "<")) {
+    int depth = 0;
+    for (std::size_t i = 0; i < signature.size(); ++i) {
+      if (signature[i] == '<') ++depth;
+      else if (signature[i] == '>') {
+        --depth;
+        if (depth == 0) {
+          parts.generic = legacySyntaxText(signature.substr(0, i + 1));
+          signature = trim(signature.substr(i + 1));
+          break;
+        }
+      }
+    }
+  }
+  if (startsWith(signature, "(")) {
+    if (auto params = parenthesizedContentAt(signature, 0)) {
+      parts.params = legacySyntaxText(*params);
+      const std::size_t close = signature.find(')');
+      if (close != std::string::npos) {
+        const std::size_t arrow = signature.find("->", close + 1);
+        if (arrow != std::string::npos) parts.returnType = normalizeSignatureType(legacySyntaxText(signature.substr(arrow + 2)));
+      }
+    }
+  }
+  return parts;
+}
+
+std::string syntaxLocalTypeFromPattern(const std::string &pattern) {
+  const std::size_t colon = pattern.find(':');
+  if (colon == std::string::npos) return "";
+  return normalizeSignatureType(legacySyntaxText(pattern.substr(colon + 1)));
+}
+
+std::string syntaxLocalNameFromPattern(const std::string &pattern) {
+  const std::size_t colon = pattern.find(':');
+  if (colon == std::string::npos) return legacySyntaxText(pattern);
+  return legacySyntaxText(pattern.substr(0, colon));
+}
+
+[[maybe_unused]] std::vector<SyntaxSpineNode> parseSyntaxSpine(const fs::path &packageRoot,
+                                                               const std::string &packageName,
+                                                               const fs::path &file) {
+  const SourceText source = loadSource(file);
+  const std::string moduleName = explicitModulePath(source.text).value_or(modulePathForSource(packageRoot, file, packageName));
+  SyntaxSpineParser parser(lexSyntaxSpine(source), moduleName);
+  auto nodes = parser.parseFile();
+  for (auto &node : nodes) {
+    if (node.owner.empty()) node.owner = moduleName;
+  }
+  return nodes;
+}
+
 std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                                             const std::string &packageName,
                                             const std::vector<fs::path> &sourceFiles) {
   std::vector<ParsedAstNode> nodes;
-  const std::regex modulePattern(R"(^\s*module\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*;)");
-  const std::regex importPattern(R"(^\s*import\s+([^;]+)\s*;)");
-  const std::regex attrPattern(R"(^\s*(@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?))");
-  const std::regex constStaticPattern(R"(^\s*(pub\s+|private\s+)?(const|static)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*(?:=\s*(.+?))?\s*;?\s*$)");
-  const std::regex typeAliasPattern(R"(^\s*(pub\s+|private\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*=\s*([^;]+)\s*;?\s*$)");
-  const std::regex declPattern(R"(^\s*(pub\s+|private\s+)?(struct|enum|interface)\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?)");
-  const std::regex fnPattern(R"(^\s*(pub\s+|private\s+)?(async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([^{;]+?))?\s*(?:\{|;|$))");
-  const std::regex externPattern(R"re(^\s*(trust\s+)?extern\s+"([^"]+)"\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)(<[^()]*>)?\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))?)re");
-  const std::regex traitImplPattern(R"(^\s*(trust\s+)?impl(<[^()]*>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?)\s+for\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?))");
-  const std::regex inherentImplPattern(R"(^\s*impl(<[^()]*>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?)\s*\{)");
-  const std::regex enumPattern(R"(^\s*(pub\s+|private\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*))");
-  const std::regex enumVariantPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s*(\([^)]*\)|\{.*\}))?\s*,?\s*$)");
-  const std::regex fieldPattern(R"(^\s*(pub\s+|private\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^,]+)\s*,?\s*$)");
-  const std::regex destroyPattern(R"(^\s*destroy\s*\{)");
-  const std::regex returnPattern(R"(^\s*return\s+(.+)\s*$)");
-  const std::regex localConstPattern(R"(^\s*const\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*=\s*(.+?)\s*;?\s*$)");
-  const std::regex patternBindingPattern(R"(^\s*(val|var)\s+(.+?)\s*=\s*(.+?)\s*;?\s*$)");
-  const std::regex bindingPattern(R"(^\s*(val|var)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^=;]+?))?\s*=\s*(.+?)\s*;?\s*$)");
-  const std::regex assignmentPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*$)");
-  const std::regex breakPattern(R"(^\s*break(?:\s+(.+?))?\s*;?\s*$)");
-  const std::regex continuePattern(R"(^\s*continue\s*;?\s*$)");
-  const std::regex ifPattern(R"(^\s*if\s*\((.+)\)\s*\{\s*$)");
-  const std::regex ifPatternBindingPattern(R"(^\s*if\s*\((.+)\s+is\s+(?:(move|mut)\s+)?([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\([^)]*\))\s*\)\s*\{\s*$)");
-  const std::regex elsePattern(R"(^\s*\}?\s*else\s*\{\s*$)");
-  const std::regex whilePattern(R"(^\s*while\s*\((.+)\)\s*\{\s*$)");
-  const std::regex whilePatternBindingPattern(R"(^\s*while\s*\((.+)\s+is\s+(?:(move|mut)\s+)?([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\s*\([^)]*\))\s*\)\s*\{\s*$)");
-  const std::regex forPattern(R"(^\s*for\s+(move\s+|mut\s+)?(.+?)\s+in\s+(mut\s+)?(.+?)\s*\{\s*$)");
-  const std::regex matchPattern(R"(^\s*match\s+(?:(move|mut)\s+)?(.+?)\s*\{\s*$)");
-  const std::regex matchArmPattern(R"(^\s*(.+?)(?:\s+if\s+(.+?))?\s*=>\s*(.+?)[,;]?\s*$)");
-  const std::regex tryStatementPattern(R"(^\s*try\s+(.+?)\s*;?\s*$)");
-  const std::regex callStatementPattern(R"(^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*;?\s*$)");
-
   auto addNode = [&](const fs::path &file,
                      const std::string &moduleName,
                      const std::string &kind,
@@ -4205,13 +6139,13 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
         file,
         moduleName,
         kind,
-        name,
+        legacySyntaxText(name),
         visibility,
-        std::move(generic),
-        std::move(params),
-        normalizeSignatureType(returnType),
-        std::move(layout),
-        std::move(abi),
+        legacySyntaxText(generic),
+        legacySyntaxText(params),
+        normalizeSignatureType(legacySyntaxText(returnType)),
+        layout.empty() ? "Auto" : layout,
+        legacySyntaxText(abi) == "\"C\"" ? "C" : legacySyntaxText(abi),
         std::move(attributes),
         trusted,
         lineNo});
@@ -4221,426 +6155,539 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
     if (file.extension() != ".zn") continue;
     const SourceText source = loadSource(file);
     const std::string moduleName = explicitModulePath(source.text).value_or(modulePathForSource(packageRoot, file, packageName));
-    int braceDepth = 0;
-    bool inEnum = false;
-    std::string enumVisibility;
-    std::vector<std::string> pendingAttributes;
-    std::string pendingLayout;
-    std::string activeContainerKind;
-    std::string activeContainerName;
-    std::string activeFunction;
-    std::string activeFunctionReturnType;
-    int lineNo = 1;
-    for (const auto &rawLine : splitLines(source.text)) {
-      const std::string line = stripLineComment(rawLine);
-      const std::string trimmed = trim(line);
-      if (braceDepth == 0) {
-        if (auto module = matchRegex(trimmed, modulePattern)) {
-          addNode(file, (*module)[1], "module", (*module)[1], "", lineNo);
-        } else if (auto import = matchRegex(trimmed, importPattern)) {
-          addNode(file, moduleName, "import", trim(std::string((*import)[1])), "", lineNo);
-        } else if (auto attr = matchRegex(trimmed, attrPattern)) {
-          const std::string attribute = (*attr)[1];
-          pendingAttributes.push_back(attribute);
-          if (contains(attribute, "@layout(C)")) pendingLayout = "C";
-          else if (contains(attribute, "@layout(Source)")) pendingLayout = "Source";
-          else if (contains(attribute, "@layout(Packed")) pendingLayout = "Packed";
-          addNode(file, moduleName, "attribute", attribute, "", lineNo);
-        } else if (auto item = matchRegex(trimmed, constStaticPattern)) {
-          const std::string kind = "decl." + std::string((*item)[2]);
-          addNode(file,
-                  moduleName,
-                  kind,
-                  (*item)[3],
-                  (*item)[1],
-                  lineNo,
-                  pendingAttributes,
-                  "",
-                  (*item)[5].matched ? expressionAstFact((*item)[5]) : "",
-                  (*item)[4].matched ? trim(std::string((*item)[4])) : "",
-                  pendingLayout.empty() ? "Auto" : pendingLayout);
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto alias = matchRegex(trimmed, typeAliasPattern)) {
-          addNode(file,
-                  moduleName,
-                  "decl.type",
-                  (*alias)[2],
-                  (*alias)[1],
-                  lineNo,
-                  pendingAttributes,
-                  (*alias)[3],
-                  trim(std::string((*alias)[4])),
-                  "",
-                  pendingLayout.empty() ? "Auto" : pendingLayout);
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto decl = matchRegex(trimmed, declPattern)) {
-          const std::string declKind = "decl." + std::string((*decl)[2]);
-          std::string declParams;
-          std::string declReturn;
-          if (declKind == "decl.interface") {
-            if (auto parents = matchRegex(trimmed, std::regex(R"(^\s*(?:pub\s+|private\s+)?interface\s+[A-Za-z_][A-Za-z0-9_]*(?:<[^()]*>)?\s*:\s*([^{]+)\s*\{)"))) {
-              declParams = trim(std::string((*parents)[1]));
-            }
-          } else if (declKind == "decl.struct" && contains(trimmed, ": Copy")) {
-            declReturn = "Copy";
-          }
-          addNode(file, moduleName, declKind, (*decl)[3], (*decl)[1], lineNo, pendingAttributes, (*decl)[4], declParams, declReturn, pendingLayout.empty() ? "Auto" : pendingLayout);
-          if (contains(trimmed, "{")) {
-            activeContainerKind = declKind;
-            activeContainerName = (*decl)[3];
-          }
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto fn = matchRegex(trimmed, fnPattern)) {
-          addNode(file,
-                  moduleName,
-                  (*fn)[2].matched ? "decl.async-fn" : "decl.fn",
-                  (*fn)[3],
-                  (*fn)[1],
-                  lineNo,
-                  pendingAttributes,
-                  (*fn)[4],
-                  (*fn)[5],
-                  (*fn)[6],
-                  pendingLayout.empty() ? "Auto" : pendingLayout);
-          if (contains(trimmed, "{") && !contains(trimmed, "}")) {
-            activeFunction = (*fn)[3];
-            activeFunctionReturnType = normalizeSignatureType((*fn)[6]);
-          }
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto ext = matchRegex(trimmed, externPattern)) {
-          addNode(file,
-                  moduleName,
-                  "decl.extern",
-                  (*ext)[3],
-                  "",
-                  lineNo,
-                  pendingAttributes,
-                  (*ext)[4],
-                  (*ext)[5],
-                  (*ext)[6],
-                  pendingLayout.empty() ? "Auto" : pendingLayout,
-                  (*ext)[1].matched,
-                  (*ext)[2]);
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto impl = matchRegex(trimmed, traitImplPattern)) {
-          const std::string implName = std::string((*impl)[3]) + " for " + std::string((*impl)[4]);
-          addNode(file,
-                  moduleName,
-                  "decl.impl",
-                  implName,
-                  "",
-                  lineNo,
-                  pendingAttributes,
-                  (*impl)[2],
-                  "",
-                  "",
-                  pendingLayout.empty() ? "Auto" : pendingLayout,
-                  (*impl)[1].matched);
-          if (contains(trimmed, "{")) {
-            activeContainerKind = "decl.impl";
-            activeContainerName = implName;
-          }
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (auto impl = matchRegex(trimmed, inherentImplPattern)) {
-          addNode(file, moduleName, "decl.impl", (*impl)[2], "", lineNo, pendingAttributes, (*impl)[1], "", "", pendingLayout.empty() ? "Auto" : pendingLayout);
-          if (contains(trimmed, "{")) {
-            activeContainerKind = "decl.impl";
-            activeContainerName = (*impl)[2];
-          }
-          pendingAttributes.clear();
-          pendingLayout.clear();
-        } else if (!trimmed.empty() && !startsWith(trimmed, "@")) {
-          pendingAttributes.clear();
-          pendingLayout.clear();
+    SyntaxSpineParser parser(lexSyntaxSpine(source), moduleName);
+    const auto syntaxNodes = parser.parseFile();
+    std::set<std::string> interfaceNames;
+    std::map<std::string, std::string> aggregateVisibility;
+    std::map<std::string, std::map<std::string, std::vector<std::string>>> typeFacts;
+    std::map<std::string, std::string> functionReturnTypes;
+
+    for (const auto &syntax : syntaxNodes) {
+      if (syntax.kind == "item" && syntaxDetailValue(syntax.detail, "kind").value_or("") == "interface") {
+        interfaceNames.insert(legacySyntaxText(syntax.name));
+      }
+      if (syntax.kind == "item") {
+        const std::string itemKind = syntaxDetailValue(syntax.detail, "kind").value_or("");
+        if (itemKind == "struct" || itemKind == "enum" || itemKind == "interface") {
+          const std::string visibility = syntaxDetailValue(syntax.detail, "visibility").value_or("");
+          if (!visibility.empty()) aggregateVisibility[legacySyntaxText(syntax.name)] = visibility + " ";
         }
-        if (auto enumDecl = matchRegex(trimmed, enumPattern)) {
-          inEnum = true;
-          enumVisibility = (*enumDecl)[1];
+      } else if (syntax.kind == "type") {
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        if (!role.empty() && !text.empty()) typeFacts[legacySyntaxText(syntax.owner)][role].push_back(legacySyntaxText(text));
+      }
+    }
+
+    for (const auto &syntax : syntaxNodes) {
+      const std::string module = moduleName.empty() ? "root" : moduleName;
+      if (syntax.kind == "module") {
+        addNode(file, syntax.name, "module", syntax.name, "", syntax.lineNo);
+      } else if (syntax.kind == "import") {
+        addNode(file, module, "import", syntax.name, "", syntax.lineNo);
+      } else if (syntax.kind == "import-path") {
+        const std::string path = syntaxDetailValue(syntax.detail, "path").value_or(syntax.name);
+        addNode(file, module, "import.path", path, "", syntax.lineNo, {}, "", path);
+      } else if (syntax.kind == "import-item") {
+        const std::string path = syntaxDetailValue(syntax.detail, "path").value_or("");
+        const std::string fallback = syntax.name.find_last_of('.') == std::string::npos
+                                         ? syntax.name
+                                         : syntax.name.substr(syntax.name.find_last_of('.') + 1);
+        const std::string item = syntaxDetailValue(syntax.detail, "item").value_or(fallback);
+        addNode(file, module, "import.item", syntax.name, "", syntax.lineNo, {}, path, item);
+      } else if (syntax.kind == "attribute") {
+        addNode(file, module, "attribute", syntax.name, "", syntax.lineNo);
+      } else if (syntax.kind == "attribute-arg") {
+        const std::string attr = syntaxDetailValue(syntax.detail, "attr").value_or("");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string argKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string name = syntaxDetailValue(syntax.detail, "name").value_or("");
+        const std::string value = syntaxDetailValue(syntax.detail, "value").value_or("");
+        addNode(file,
+                module,
+                "attribute.arg",
+                attr + "." + (name.empty() ? index : name),
+                attr,
+                syntax.lineNo,
+                {},
+                argKind,
+                value,
+                name);
+      } else if (syntax.kind == "generic-arg") {
+        const std::string argKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string parent = syntaxDetailValue(syntax.detail, "parent").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "generic-arg." + argKind,
+                owner + "." + role + "." + index,
+                "",
+                syntax.lineNo,
+                {},
+                role,
+                text,
+                parent);
+      } else if (syntax.kind == "pattern-alt" || syntax.kind == "pattern-element" || syntax.kind == "pattern-field") {
+        const std::string componentKind = syntax.kind.substr(8);
+        const std::string patternKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string parent = syntaxDetailValue(syntax.detail, "parent").value_or("");
+        const std::string field = syntaxDetailValue(syntax.detail, "field").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        const std::string name = owner + "." + role + "." + componentKind + "." +
+                                 (field.empty() ? index : field);
+        addNode(file,
+                module,
+                "pattern-" + componentKind + "." + patternKind,
+                name,
+                field,
+                syntax.lineNo,
+                {},
+                role,
+                text,
+                parent);
+      } else if (syntax.kind == "pattern-bound") {
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string side = syntaxDetailValue(syntax.detail, "side").value_or("unknown");
+        const std::string op = syntaxDetailValue(syntax.detail, "op").value_or("..");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string parent = syntaxDetailValue(syntax.detail, "parent").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "pattern-bound." + side,
+                owner + "." + role + ".bound." + side,
+                op,
+                syntax.lineNo,
+                {},
+                role,
+                text,
+                parent);
+      } else if (syntax.kind == "block") {
+        const std::string blockKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or(blockKind);
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "block." + blockKind,
+                owner + "." + role,
+                "",
+                syntax.lineNo,
+                {},
+                blockKind,
+                role);
+      } else if (syntax.kind == "field") {
+        const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
+        const std::string type = typeIt != typeFacts.end() && typeIt->second.count("field") && !typeIt->second.at("field").empty()
+                                     ? typeIt->second.at("field").front()
+                                     : "";
+        addNode(file, module, "decl.field", syntax.name, "", syntax.lineNo, {}, "", "", type);
+      } else if (syntax.kind == "field-init") {
+        addNode(file,
+                module,
+                "expr.field-init",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "expr").value_or(""),
+                syntaxDetailValue(syntax.detail, "field").value_or(""));
+      } else if (syntax.kind == "index-access") {
+        addNode(file,
+                module,
+                "expr.index-access",
+                syntax.owner,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "index").value_or(""),
+                syntaxDetailValue(syntax.detail, "base").value_or(""));
+      } else if (syntax.kind == "tuple-element") {
+        addNode(file,
+                module,
+                "expr.tuple-element",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "expr").value_or(""),
+                syntaxDetailValue(syntax.detail, "index").value_or(""));
+      } else if (syntax.kind == "field-access") {
+        addNode(file,
+                module,
+                "expr.field-access",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "mode").value_or("read"),
+                syntaxDetailValue(syntax.detail, "base").value_or(""),
+                syntaxDetailValue(syntax.detail, "field").value_or(""));
+      } else if (syntax.kind == "method-call") {
+        addNode(file,
+                module,
+                "expr.method-call",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "mode").value_or("read"),
+                syntaxDetailValue(syntax.detail, "receiver").value_or(""),
+                syntaxDetailValue(syntax.detail, "method").value_or(""));
+      } else if (syntax.kind == "call") {
+        addNode(file,
+                module,
+                "expr.call",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "callee").value_or(""));
+      } else if (syntax.kind == "type-static-call") {
+        addNode(file,
+                module,
+                "expr.type-static-call",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "targetType").value_or(""),
+                syntaxDetailValue(syntax.detail, "method").value_or(""));
+      } else if (syntax.kind == "binary-expr" || syntax.kind == "compare-expr" || syntax.kind == "range-expr") {
+        addNode(file,
+                module,
+                syntax.kind == "binary-expr" ? "expr.binary" : (syntax.kind == "compare-expr" ? "expr.compare" : "expr.range"),
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "op").value_or(""),
+                syntaxDetailValue(syntax.detail, "left").value_or(""),
+                syntaxDetailValue(syntax.detail, "right").value_or(""));
+      } else if (syntax.kind == "prefix-expr") {
+        addNode(file,
+                module,
+                "expr.prefix",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "op").value_or(""),
+                syntaxDetailValue(syntax.detail, "operand").value_or(""));
+      } else if (syntax.kind == "cast-expr") {
+        addNode(file,
+                module,
+                "expr.cast",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "targetType").value_or(""),
+                syntaxDetailValue(syntax.detail, "expr").value_or(""));
+      } else if (syntax.kind == "name-expr") {
+        addNode(file,
+                module,
+                "expr.name",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "name").value_or(""));
+      } else if (syntax.kind == "literal-expr") {
+        addNode(file,
+                module,
+                "expr.literal",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "literalKind").value_or("unknown"),
+                syntaxDetailValue(syntax.detail, "expr").value_or(""));
+      } else if (syntax.kind == "unit-expr") {
+        addNode(file, module, "expr.unit", syntax.name, "", syntax.lineNo, {}, "", "unit");
+      } else if (syntax.kind == "try-expr") {
+        addNode(file,
+                module,
+                "expr.try",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "expr").value_or(""));
+      } else if (syntax.kind == "access-expr") {
+        addNode(file,
+                module,
+                "expr.access",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "mode").value_or("read"),
+                syntaxDetailValue(syntax.detail, "operand").value_or(""));
+      } else if (syntax.kind == "trust-expr") {
+        addNode(file, module, "expr.trust-block", syntax.name, "", syntax.lineNo, {}, "", "trust-block");
+      } else if (syntax.kind == "if-expr" || syntax.kind == "while-expr") {
+        const std::string exprKind = syntax.kind == "if-expr" ? "expr.if" : "expr.while";
+        const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("");
+        const std::string conditionKind = syntaxDetailValue(syntax.detail, "kind").value_or("condition");
+        const std::string condition = conditionKind == "pattern"
+                                          ? syntaxDetailValue(syntax.detail, "scrutinee").value_or("")
+                                          : syntaxDetailValue(syntax.detail, "condition").value_or("");
+        const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+        addNode(file,
+                module,
+                exprKind,
+                syntax.owner,
+                conditionKind,
+                syntax.lineNo,
+                {},
+                mode == "read" ? "" : mode,
+                condition,
+                pattern);
+      } else if (syntax.kind == "for-expr") {
+        addNode(file,
+                module,
+                "expr.for",
+                syntax.owner,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "mode").value_or("read"),
+                syntaxDetailValue(syntax.detail, "iterable").value_or(""),
+                syntaxDetailValue(syntax.detail, "item").value_or(""));
+      } else if (syntax.kind == "match-expr") {
+        const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+        addNode(file,
+                module,
+                "expr.match",
+                syntax.owner,
+                "",
+                syntax.lineNo,
+                {},
+                mode == "read" ? "" : mode,
+                syntaxDetailValue(syntax.detail, "scrutinee").value_or(""));
+      } else if (syntax.kind == "pattern") {
+        const std::string patternKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "pattern." + patternKind,
+                owner + "." + text,
+                "",
+                syntax.lineNo,
+                {},
+                role,
+                text);
+      } else if (syntax.kind == "type") {
+        const std::string typeKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "type." + typeKind,
+                owner + "." + role,
+                "",
+                syntax.lineNo,
+                {},
+                role,
+                text);
+      } else if (syntax.kind == "type-component") {
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string component = syntaxDetailValue(syntax.detail, "component").value_or("unknown");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string componentKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string parent = syntaxDetailValue(syntax.detail, "parent").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "type-component." + component,
+                owner + "." + role + "." + component + "." + index,
+                componentKind,
+                syntax.lineNo,
+                {},
+                role,
+                text,
+                "",
+                parent.empty() ? "Auto" : parent);
+      } else if (syntax.kind == "generic-param") {
+        const std::string paramKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
+        const std::string constraint = syntaxDetailValue(syntax.detail, "constraint").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "generic-param." + paramKind,
+                owner + "." + text,
+                "",
+                syntax.lineNo,
+                {},
+                constraint,
+                text);
+      } else if (syntax.kind == "param") {
+        const std::string paramKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
+        const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+        const std::string name = syntaxDetailValue(syntax.detail, "name").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "param." + paramKind,
+                owner + "." + name,
+                "",
+                syntax.lineNo,
+                {},
+                mode,
+                name);
+      } else if (syntax.kind == "variant") {
+        std::string payload;
+        const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
+        if (typeIt != typeFacts.end() && typeIt->second.count("variant-payload")) {
+          payload = "(";
+          const auto &payloadTypes = typeIt->second.at("variant-payload");
+          for (std::size_t i = 0; i < payloadTypes.size(); ++i) {
+            if (i != 0) payload += ", ";
+            payload += payloadTypes[i];
+          }
+          payload += ")";
+        } else if (auto text = syntaxDetailValue(syntax.detail, "text")) {
+          const std::string variantText = legacySyntaxText(*text);
+          const std::string variantName = legacySyntaxText(syntax.name.substr(syntax.name.find_last_of('.') + 1));
+          if (startsWith(variantText, variantName) && variantText.size() > variantName.size()) {
+            payload = trim(variantText.substr(variantName.size()));
+          }
         }
-      } else if (inEnum && trimmed != "}") {
-        if (auto variant = matchRegex(trimmed, enumVariantPattern)) {
-          addNode(file, moduleName, "decl.variant", (*variant)[1], enumVisibility, lineNo, {}, "", (*variant)[2], "");
+        const std::size_t dot = syntax.name.find_last_of('.');
+        const std::string variantName = dot == std::string::npos ? syntax.name : syntax.name.substr(dot + 1);
+        const std::string owner = legacySyntaxText(syntax.owner);
+        addNode(file, module, "decl.variant", variantName, aggregateVisibility.count(owner) ? aggregateVisibility[owner] : "", syntax.lineNo, {}, "", payload, "");
+      } else if (syntax.kind == "item") {
+        const std::string itemKind = syntaxDetailValue(syntax.detail, "kind").value_or("");
+        const std::string visibility = syntaxDetailValue(syntax.detail, "visibility").value_or("");
+        const std::string layout = syntaxDetailValue(syntax.detail, "layout").value_or("Auto");
+        const std::string signature = syntaxDetailValue(syntax.detail, "signature").value_or("");
+        const auto attrs = syntaxAttributesFromDetail(syntax.detail);
+        const bool trusted = syntaxDetailValue(syntax.detail, "trusted").value_or("") == "true";
+        const std::string abi = syntaxDetailValue(syntax.detail, "abi").value_or("");
+        const SyntaxSignatureParts sig = parseSyntaxSignatureParts(signature);
+        const bool topLevel = syntax.owner.empty() || syntax.owner == module;
+
+        if (itemKind == "fn") {
+          const std::string kind = topLevel ? (syntaxDetailValue(syntax.detail, "async").value_or("") == "true" ? "decl.async-fn" : "decl.fn")
+                                            : (interfaceNames.count(legacySyntaxText(syntax.owner)) ? "decl.interface-method" : "decl.impl-method");
+          addNode(file, module, kind, syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, sig.generic, sig.params, sig.returnType, layout, trusted, abi);
+          functionReturnTypes[legacySyntaxText(syntax.name)] = sig.returnType;
+        } else if (itemKind == "extern") {
+          addNode(file, module, "decl.extern", syntax.name, "", syntax.lineNo, attrs, sig.generic, sig.params, sig.returnType, layout, trusted, abi);
+          functionReturnTypes[legacySyntaxText(syntax.name)] = sig.returnType;
+        } else if (itemKind == "struct") {
+          std::string marker;
+          const std::size_t copy = signature.find(": Copy");
+          if (copy != std::string::npos) marker = "Copy";
+          addNode(file, module, "decl.struct", syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, sig.generic, "", marker, layout);
+        } else if (itemKind == "enum") {
+          addNode(file, module, "decl.enum", syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, sig.generic, "", "", layout);
+        } else if (itemKind == "interface") {
+          std::string generic = sig.generic;
+          if (generic.empty() && startsWith(signature, "<")) {
+            const auto parts = parseSyntaxSignatureParts(signature + "()");
+            generic = parts.generic;
+          }
+          std::string parents;
+          const std::size_t colon = signature.find(':');
+          if (colon != std::string::npos) parents = legacySyntaxText(signature.substr(colon + 1));
+          addNode(file, module, "decl.interface", syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, generic, parents, "", layout);
+        } else if (itemKind == "impl") {
+          std::string generic;
+          if (startsWith(signature, "<")) generic = parseSyntaxSignatureParts(signature + "()").generic;
+          addNode(file, module, "decl.impl", syntax.name, "", syntax.lineNo, attrs, generic, "", "", layout, trusted);
+        } else if (itemKind == "const" || itemKind == "static") {
+          const bool member = !topLevel;
+          const std::string kind = member ? "decl.impl-const" : "decl." + itemKind;
+          const std::string nodeName = syntax.name;
+          const std::string expr = syntaxDetailValue(syntax.detail, "signature").value_or("");
+          std::string type;
+          const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
+          if (typeIt != typeFacts.end() && typeIt->second.count("decl") && !typeIt->second.at("decl").empty()) type = typeIt->second.at("decl").front();
+          std::string init;
+          const std::size_t equals = expr.find('=');
+          if (equals != std::string::npos) init = expressionAstFact(legacySyntaxText(expr.substr(equals + 1)));
+          addNode(file, module, kind, nodeName, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, "", init, type, layout);
+        } else if (itemKind == "type") {
+          std::string target;
+          const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
+          if (typeIt != typeFacts.end() && typeIt->second.count("alias-target") && !typeIt->second.at("alias-target").empty()) target = typeIt->second.at("alias-target").front();
+          addNode(file, module, "decl.type", syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, attrs, sig.generic, target, "", layout);
+        } else if (itemKind == "destroy") {
+          addNode(file, module, "decl.destroy", syntax.name, "", syntax.lineNo, attrs);
         }
-      } else if (!activeContainerKind.empty() && activeFunction.empty()) {
-        if (activeContainerKind == "decl.struct") {
-          if (auto field = matchRegex(trimmed, fieldPattern)) {
-            addNode(file,
-                    moduleName,
-                    "decl.field",
-                    activeContainerName + "." + std::string((*field)[2]),
-                    (*field)[1],
-                    lineNo,
-                    {},
-                    "",
-                    "",
-                    trim(std::string((*field)[3])));
+      } else if (syntax.kind == "stmt") {
+        const std::string stmtKind = syntaxDetailValue(syntax.detail, "kind").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner);
+        const std::string expected = functionReturnTypes.count(owner) ? functionReturnTypes[owner] : "";
+        if (stmtKind == "return") {
+          const std::string expr = syntaxDetailValue(syntax.detail, "expr").value_or("");
+          addNode(file, module, "stmt.return", owner, "", syntax.lineNo, {}, "", expr, expected);
+          if (expr == "trust-block") addNode(file, module, "expr.trust", "block", "", syntax.lineNo);
+        } else if (stmtKind == "val" || stmtKind == "var") {
+          const std::string rawName = syntaxDetailValue(syntax.detail, "name").value_or("");
+          const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or(rawName);
+          const std::string expr = syntaxDetailValue(syntax.detail, "expr").value_or("");
+          const std::string type = syntaxLocalTypeFromPattern(pattern);
+          const bool destructuring = contains(rawName, "{") || contains(pattern, "{") || contains(pattern, "(");
+          if (destructuring) {
+            addNode(file, module, "stmt.pattern-" + stmtKind, owner + "." + legacySyntaxText(pattern), "", syntax.lineNo, {}, "", expr, legacySyntaxText(pattern));
+          } else {
+            addNode(file, module, "stmt." + stmtKind, owner + "." + syntaxLocalNameFromPattern(rawName), "", syntax.lineNo, {}, "", expr, type);
           }
-        } else if (activeContainerKind == "decl.interface") {
-          if (auto method = matchRegex(trimmed, fnPattern)) {
-            addNode(file,
-                    moduleName,
-                    "decl.interface-method",
-                    activeContainerName + "." + std::string((*method)[3]),
-                    (*method)[1],
-                    lineNo,
-                    {},
-                    (*method)[4],
-                    (*method)[5],
-                    (*method)[6]);
-          }
-        } else if (activeContainerKind == "decl.impl") {
-          if (auto method = matchRegex(trimmed, fnPattern)) {
-            const std::string methodName = activeContainerName + "." + std::string((*method)[3]);
-            addNode(file,
-                    moduleName,
-                    "decl.impl-method",
-                    methodName,
-                    (*method)[1],
-                    lineNo,
-                    {},
-                    (*method)[4],
-                    (*method)[5],
-                    (*method)[6]);
-            if (contains(trimmed, "{") && !contains(trimmed, "}")) {
-              activeFunction = methodName;
-              activeFunctionReturnType = normalizeSignatureType((*method)[6]);
-            }
-          } else if (matchRegex(trimmed, destroyPattern)) {
-            addNode(file, moduleName, "decl.destroy", activeContainerName, "", lineNo);
-          } else if (auto item = matchRegex(trimmed, constStaticPattern)) {
-            addNode(file,
-                    moduleName,
-                    "decl.impl-const",
-                    activeContainerName + "." + std::string((*item)[3]),
-                    "",
-                    lineNo,
-                    {},
-                    "",
-                    (*item)[5].matched ? expressionAstFact((*item)[5]) : "",
-                    (*item)[4].matched ? trim(std::string((*item)[4])) : "");
-          }
-        }
-      } else if (!activeFunction.empty()) {
-        if (auto ret = matchRegex(trimmed, returnPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.return",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*ret)[1]),
-                  activeFunctionReturnType);
-        } else if (auto localConst = matchRegex(trimmed, localConstPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.const",
-                  activeFunction + "." + std::string((*localConst)[1]),
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*localConst)[3]),
-                  (*localConst)[2].matched ? trim(std::string((*localConst)[2])) : "");
-        } else if (auto binding = matchRegex(trimmed, bindingPattern)) {
-          const std::string bindingMode = (*binding)[1];
-          const std::string bindingName = (*binding)[2];
-          addNode(file,
-                  moduleName,
-                  "stmt." + bindingMode,
-                  activeFunction + "." + bindingName,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*binding)[4]),
-                  (*binding)[3].matched ? trim(std::string((*binding)[3])) : "");
-        } else if (auto patternBinding = matchRegex(trimmed, patternBindingPattern)) {
-          const std::string bindingMode = (*patternBinding)[1];
-          const std::string pattern = trim(std::string((*patternBinding)[2]));
-          if (!std::regex_match(pattern, std::regex(R"([A-Za-z_][A-Za-z0-9_]*(?:\s*:\s*[^=;]+)?)"))) {
-            addNode(file,
-                    moduleName,
-                    "stmt.pattern-" + bindingMode,
-                    activeFunction + "." + pattern,
-                    "",
-                    lineNo,
-                    {},
-                    "",
-                    expressionAstFact((*patternBinding)[3]),
-                    pattern);
-          }
-        } else if (auto arm = matchRegex(trimmed, matchArmPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.match-arm",
-                  activeFunction + "." + trim(std::string((*arm)[1])),
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*arm)[3]),
-                  (*arm)[2].matched ? expressionAstFact((*arm)[2]) : "");
-        } else if (auto assignment = matchRegex(trimmed, assignmentPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.assign",
-                  activeFunction + "." + std::string((*assignment)[1]),
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*assignment)[2]),
-                  "");
-        } else if (auto branch = matchRegex(trimmed, ifPatternBindingPattern)) {
-          const std::string patternMode = (*branch)[2].matched ? trim(std::string((*branch)[2])) : "";
-          const std::string pattern = trim(std::string((*branch)[3]));
-          addNode(file,
-                  moduleName,
-                  "stmt.if-pattern",
-                  activeFunction + "." + pattern,
-                  "",
-                  lineNo,
-                  {},
-                  patternMode,
-                  expressionAstFact((*branch)[1]),
-                  pattern);
-        } else if (auto branch = matchRegex(trimmed, ifPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.if",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*branch)[1]),
-                  "");
-        } else if (matchRegex(trimmed, elsePattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.else",
-                  activeFunction,
-                  "",
-                  lineNo);
-        } else if (auto loop = matchRegex(trimmed, whilePatternBindingPattern)) {
-          const std::string patternMode = (*loop)[2].matched ? trim(std::string((*loop)[2])) : "";
-          const std::string pattern = trim(std::string((*loop)[3]));
-          addNode(file,
-                  moduleName,
-                  "stmt.while-pattern",
-                  activeFunction + "." + pattern,
-                  "",
-                  lineNo,
-                  {},
-                  patternMode,
-                  expressionAstFact((*loop)[1]),
-                  pattern);
-        } else if (auto loop = matchRegex(trimmed, whilePattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.while",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact((*loop)[1]),
-                  "");
-        } else if (auto loop = matchRegex(trimmed, forPattern)) {
-          std::string mode = trim(std::string((*loop)[1]));
-          if (mode.empty()) mode = "read";
-          std::string iterable = trim(std::string((*loop)[4]));
-          if ((*loop)[3].matched) iterable = "mut " + iterable;
-          addNode(file,
-                  moduleName,
-                  "stmt.for",
-                  activeFunction + "." + trim(std::string((*loop)[2])),
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact(iterable),
-                  mode);
-        } else if (auto matchStmt = matchRegex(trimmed, matchPattern)) {
-          const std::string matchMode = (*matchStmt)[1].matched ? trim(std::string((*matchStmt)[1])) : "";
-          addNode(file,
-                  moduleName,
-                  "stmt.match",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  matchMode,
-                  expressionAstFact((*matchStmt)[2]),
-                  "");
-        } else if (auto tryStmt = matchRegex(trimmed, tryStatementPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.try",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact("try " + std::string((*tryStmt)[1])),
-                  "");
-        } else if (auto breakStmt = matchRegex(trimmed, breakPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.break",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  (*breakStmt)[1].matched ? expressionAstFact((*breakStmt)[1]) : "unit",
-                  "");
-        } else if (matchRegex(trimmed, continuePattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.continue",
-                  activeFunction,
-                  "",
-                  lineNo);
-        } else if (matchRegex(trimmed, callStatementPattern)) {
-          addNode(file,
-                  moduleName,
-                  "stmt.expr",
-                  activeFunction,
-                  "",
-                  lineNo,
-                  {},
-                  "",
-                  expressionAstFact(trimmed),
-                  "");
+        } else if (stmtKind == "const") {
+          const std::string rawName = syntaxDetailValue(syntax.detail, "name").value_or("");
+          const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or(rawName);
+          addNode(file, module, "stmt.const", owner + "." + syntaxLocalNameFromPattern(rawName), "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""), syntaxLocalTypeFromPattern(pattern));
+        } else if (stmtKind == "assign") {
+          addNode(file, module, "stmt.assign", owner + "." + syntaxDetailValue(syntax.detail, "target").value_or(""), "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""));
+        } else if (stmtKind == "if" || stmtKind == "while") {
+          addNode(file, module, "stmt." + stmtKind, owner, "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "condition").value_or(""));
+        } else if (stmtKind == "if-pattern" || stmtKind == "while-pattern") {
+          const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+          const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+          const std::string prefix = stmtKind == "if-pattern" ? "stmt.if-pattern" : "stmt.while-pattern";
+          addNode(file, module, prefix, owner + "." + pattern, "", syntax.lineNo, {}, mode == "read" ? "" : mode, syntaxDetailValue(syntax.detail, "scrutinee").value_or(""), pattern);
+        } else if (stmtKind == "else") {
+          addNode(file, module, "stmt.else", owner, "", syntax.lineNo);
+        } else if (stmtKind == "for") {
+          addNode(file, module, "stmt.for", owner + "." + syntaxDetailValue(syntax.detail, "item").value_or(""), "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "iterable").value_or(""), syntaxDetailValue(syntax.detail, "mode").value_or("read"));
+        } else if (stmtKind == "match") {
+          const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+          addNode(file, module, "stmt.match", owner, "", syntax.lineNo, {}, mode == "read" ? "" : mode, syntaxDetailValue(syntax.detail, "scrutinee").value_or(""));
+        } else if (stmtKind == "match-arm") {
+          const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+          addNode(file, module, "stmt.match-arm", owner + "." + pattern, "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""), syntaxDetailValue(syntax.detail, "guard").value_or(""));
+        } else if (stmtKind == "try") {
+          addNode(file, module, "stmt.try", owner, "", syntax.lineNo, {}, "", "try:" + syntaxDetailValue(syntax.detail, "expr").value_or(""));
+        } else if (stmtKind == "break") {
+          std::string expr = syntaxDetailValue(syntax.detail, "expr").value_or("");
+          if (expr.empty()) expr = "unit";
+          addNode(file, module, "stmt.break", owner, "", syntax.lineNo, {}, "", expr);
+        } else if (stmtKind == "continue") {
+          addNode(file, module, "stmt.continue", owner, "", syntax.lineNo);
+        } else if (stmtKind == "expr") {
+          addNode(file, module, "stmt.expr", owner, "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""));
         }
       }
-      if (contains(trimmed, "trust {")) {
-        addNode(file, moduleName, "expr.trust", "block", "", lineNo);
-      }
-      braceDepth += braceDelta(line);
-      if (!activeContainerKind.empty() && !activeFunction.empty() && braceDepth <= 1) {
-        activeFunction.clear();
-        activeFunctionReturnType.clear();
-      }
-      if (braceDepth <= 0) {
-        braceDepth = 0;
-        inEnum = false;
-        enumVisibility.clear();
-        activeContainerKind.clear();
-        activeContainerName.clear();
-        activeFunction.clear();
-        activeFunctionReturnType.clear();
-      }
-      ++lineNo;
     }
   }
   return nodes;
@@ -5886,7 +7933,16 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
         fact += node.attributes[i];
       }
     }
-    if (!node.generic.empty()) {
+    if (!node.generic.empty() && !startsWith(node.kind, "block.") &&
+        !startsWith(node.kind, "import.") &&
+        node.kind != "attribute.arg" &&
+        !startsWith(node.kind, "pattern.") && !startsWith(node.kind, "type.") &&
+        !startsWith(node.kind, "pattern-alt.") && !startsWith(node.kind, "pattern-element.") &&
+        !startsWith(node.kind, "pattern-field.") && !startsWith(node.kind, "pattern-bound.") &&
+        !startsWith(node.kind, "type-component.") &&
+        !startsWith(node.kind, "generic-param.") && !startsWith(node.kind, "generic-arg.") &&
+        node.kind != "expr.if" && node.kind != "expr.while" && node.kind != "expr.for" && node.kind != "expr.match" &&
+        !startsWith(node.kind, "param.")) {
       if (startsWith(node.kind, "stmt.")) fact += " mode=" + node.generic;
       else fact += " generic=" + node.generic;
     }
@@ -5907,6 +7963,66 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
       fact += " parents=" + node.params;
     } else if (node.kind == "decl.struct" && !node.returnType.empty()) {
       fact += " marker=" + node.returnType;
+    } else if (node.kind == "attribute.arg") {
+      if (!node.visibility.empty()) fact += " attr=" + node.visibility;
+      if (!node.generic.empty()) fact += " kind=" + node.generic;
+      if (!node.returnType.empty()) fact += " name=" + node.returnType;
+      if (!node.params.empty()) fact += " value=" + node.params;
+    } else if (node.kind == "import.path") {
+      if (!node.params.empty()) fact += " path=" + node.params;
+    } else if (node.kind == "import.item") {
+      if (!node.generic.empty()) fact += " path=" + node.generic;
+      if (!node.params.empty()) fact += " item=" + node.params;
+    } else if (startsWith(node.kind, "block.")) {
+      if (!node.generic.empty()) fact += " kind=" + node.generic;
+      if (!node.params.empty()) fact += " role=" + node.params;
+    } else if (startsWith(node.kind, "pattern.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.params.empty()) fact += " text=" + node.params;
+    } else if (startsWith(node.kind, "pattern-alt.") || startsWith(node.kind, "pattern-element.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.returnType.empty()) fact += " parent=" + node.returnType;
+    } else if (startsWith(node.kind, "pattern-field.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.visibility.empty()) fact += " field=" + node.visibility;
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.returnType.empty()) fact += " parent=" + node.returnType;
+    } else if (startsWith(node.kind, "pattern-bound.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.visibility.empty()) fact += " op=" + node.visibility;
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.returnType.empty()) fact += " parent=" + node.returnType;
+    } else if (startsWith(node.kind, "type.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.params.empty()) fact += " text=" + node.params;
+    } else if (startsWith(node.kind, "type-component.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.visibility.empty()) fact += " kind=" + node.visibility;
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.layout.empty() && node.layout != "Auto") fact += " parent=" + node.layout;
+    } else if (startsWith(node.kind, "generic-param.")) {
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.generic.empty()) fact += " constraint=" + node.generic;
+    } else if (startsWith(node.kind, "generic-arg.")) {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.params.empty()) fact += " text=" + node.params;
+      if (!node.returnType.empty()) fact += " parent=" + node.returnType;
+    } else if (startsWith(node.kind, "param.")) {
+      if (!node.generic.empty()) fact += " mode=" + node.generic;
+      if (!node.params.empty()) fact += " name=" + node.params;
+    } else if (node.kind == "expr.if" || node.kind == "expr.while") {
+      if (!node.visibility.empty()) fact += " kind=" + node.visibility;
+      if (!node.generic.empty()) fact += " mode=" + node.generic;
+      if (!node.params.empty()) fact += " condition=" + node.params;
+      if (!node.returnType.empty()) fact += " pattern=" + node.returnType;
+    } else if (node.kind == "expr.for") {
+      if (!node.generic.empty()) fact += " mode=" + node.generic;
+      if (!node.returnType.empty()) fact += " item=" + node.returnType;
+      if (!node.params.empty()) fact += " iterable=" + node.params;
+    } else if (node.kind == "expr.match") {
+      if (!node.generic.empty()) fact += " mode=" + node.generic;
+      if (!node.params.empty()) fact += " scrutinee=" + node.params;
     }
     if ((node.kind == "decl.const" || node.kind == "decl.static" ||
          node.kind == "stmt.return" || node.kind == "stmt.val" || node.kind == "stmt.var" ||
@@ -5953,16 +8069,51 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
   return nodes;
 }
 
+std::set<std::string> collectSyntaxSpineAstFacts(const BuildPackage &package,
+                                                 const std::vector<fs::path> &sourceFiles) {
+  std::set<std::string> facts;
+  for (const auto &file : sourceFiles) {
+    if (file.extension() != ".zn") continue;
+    const SourceText source = loadSource(file);
+    const std::string moduleName =
+        explicitModulePath(source.text).value_or(modulePathForSource(package.root, file, package.name));
+    SyntaxSpineParser parser(lexSyntaxSpine(source), moduleName);
+    for (const auto &node : parser.parseFile()) {
+      const std::string module = moduleName.empty() ? "root" : moduleName;
+      const std::string name = node.name.empty() ? (node.owner.empty() ? module : node.owner) : node.name;
+      std::string fact = "syntax." + node.kind + " " + name +
+                         " module=" + module +
+                         " span=" + sourceRelativePathForMetadata(package, file) + ":" +
+                         std::to_string(node.lineNo) + ":1";
+      if (!node.owner.empty() && node.owner != name && node.owner != module) {
+        fact += " owner=" + node.owner;
+      }
+      if (!node.detail.empty()) fact += " " + node.detail;
+      facts.insert(fact);
+    }
+  }
+  return facts;
+}
+
 void collectPipelineFactsFromAst(const BuildPackage &package,
                                  const std::vector<ParsedAstNode> &ast,
                                  BuildSummary &summary) {
   (void)package;
   auto functionNameForNode = [](const ParsedAstNode &node) {
     if (node.kind == "stmt.val" || node.kind == "stmt.var" || node.kind == "stmt.const" || node.kind == "stmt.assign" ||
+        node.kind == "expr.field-init" || node.kind == "expr.index-access" || node.kind == "expr.tuple-element" ||
+        node.kind == "expr.field-access" || node.kind == "expr.method-call" ||
+        node.kind == "expr.call" || node.kind == "expr.type-static-call" ||
+        node.kind == "expr.binary" || node.kind == "expr.compare" || node.kind == "expr.prefix" ||
+        node.kind == "expr.cast" || node.kind == "expr.range" ||
+        startsWith(node.kind, "block.") ||
+        node.kind == "expr.name" || node.kind == "expr.literal" || node.kind == "expr.unit" ||
+        node.kind == "expr.try" || node.kind == "expr.access" || node.kind == "expr.trust-block" ||
+        startsWith(node.kind, "pattern.") ||
         node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var" ||
         node.kind == "stmt.for" || node.kind == "stmt.if-pattern" || node.kind == "stmt.while-pattern" ||
         node.kind == "stmt.match-arm") {
-      const std::size_t dot = node.name.find('.');
+      const std::size_t dot = startsWith(node.kind, "expr.") ? node.name.rfind('.') : node.name.find('.');
       if (dot != std::string::npos) return node.name.substr(0, dot);
     }
     return node.name;
@@ -6066,6 +8217,11 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=match mode=" + mode);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=match mode=" + mode);
       summary.llvmNodes.insert("llvm.switch-preview @" + functionName + " expr=match mode=" + mode);
+    } else if (expr == "if-expr" || expr == "while-expr" || expr == "for-expr") {
+      const std::string controlKind = expr.substr(0, expr.size() - 5);
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=" + controlKind);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=" + controlKind);
+      summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=" + controlKind);
     } else if (expr == "trust-block") {
       summary.mirNodes.insert("mir.operand " + functionName + " expr=trust-block kind=trust");
     } else if (expr == "unit") {
@@ -6084,6 +8240,26 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
         summary.hirNodes.insert("hir.generic-params " + node.name + " params=" + node.generic + " span=" + span);
         summary.mirNodes.insert("mir.generic-input " + node.name + " params=" + node.generic);
       }
+    }
+    if (node.kind == "import.path") {
+      const std::string path = node.params.empty() ? node.name : node.params;
+      summary.hirNodes.insert("hir.import-path " + path + " module=" + module + " span=" + span);
+      summary.mirNodes.insert("mir.import-path " + path + " module=" + module);
+      summary.llvmNodes.insert("llvm.import-preview module=" + module + " path=" + path + " runtime=none");
+    } else if (node.kind == "import.item") {
+      const std::string path = node.generic.empty() ? "unknown" : node.generic;
+      const std::string item = node.params.empty() ? node.name : node.params;
+      summary.hirNodes.insert("hir.import-item " + node.name + " path=" + path + " item=" + item + " span=" + span);
+      summary.mirNodes.insert("mir.import-item " + node.name + " path=" + path + " item=" + item);
+      summary.llvmNodes.insert("llvm.import-preview module=" + module + " path=" + path + " item=" + item + " runtime=none");
+    } else if (node.kind == "attribute.arg") {
+      const std::string attr = node.visibility.empty() ? "unknown" : node.visibility;
+      const std::string argKind = node.generic.empty() ? "unknown" : node.generic;
+      const std::string name = node.returnType.empty() ? "none" : node.returnType;
+      const std::string value = node.params.empty() ? "none" : node.params;
+      summary.hirNodes.insert("hir.attribute-arg " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value + " span=" + span);
+      summary.mirNodes.insert("mir.attribute-arg " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value);
+      summary.llvmNodes.insert("llvm.attribute-preview " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value);
     }
     if (node.kind == "decl.fn" || node.kind == "decl.async-fn") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
@@ -6155,6 +8331,224 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     } else if (node.kind == "expr.trust") {
       summary.hirNodes.insert("hir.trust block span=" + span);
       summary.mirNodes.insert("mir.trust block span=" + span);
+    } else if (node.kind == "expr.field-init") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string fieldName = node.returnType.empty() ? localNameForNode(node) : node.returnType;
+      summary.hirNodes.insert("hir.field-init " + node.name + " field=" + fieldName + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.aggregate-field-init " + functionName + " field=" + fieldName + " value=" + node.params);
+      summary.llvmNodes.insert("llvm.aggregate-field-preview @" + functionName + " field=" + fieldName + " value=" + node.params);
+    } else if (node.kind == "expr.index-access") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string base = node.returnType.empty() ? "unknown" : node.returnType;
+      summary.hirNodes.insert("hir.index-access " + functionName + " base=" + base + " index=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.index-access " + functionName + " base=" + base + " index=" + node.params);
+      summary.llvmNodes.insert("llvm.index-preview @" + functionName + " base=" + base + " index=" + node.params);
+    } else if (node.kind == "expr.tuple-element") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string index = node.returnType.empty() ? localNameForNode(node) : node.returnType;
+      summary.hirNodes.insert("hir.tuple-element " + node.name + " index=" + index + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.aggregate-element-init " + functionName + " index=" + index + " value=" + node.params);
+      summary.llvmNodes.insert("llvm.aggregate-element-preview @" + functionName + " index=" + index + " value=" + node.params);
+    } else if (node.kind == "expr.field-access") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string field = node.returnType.empty() ? localNameForNode(node) : node.returnType;
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.field-access " + node.name + " base=" + node.params + " field=" + field + " mode=" + mode + " span=" + span);
+      emitMirExpressionFacts(functionName, expressionAstFact(node.params), span);
+      summary.mirNodes.insert("mir.field-access " + functionName + " base=" + node.params + " field=" + field + " mode=" + mode);
+      summary.llvmNodes.insert("llvm.field-access-preview @" + functionName + " base=" + node.params + " field=" + field + " mode=" + mode);
+    } else if (node.kind == "expr.method-call") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string method = node.returnType.empty() ? localNameForNode(node) : node.returnType;
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.method-call " + node.name + " receiver=" + node.params + " method=" + method + " mode=" + mode + " span=" + span);
+      emitMirExpressionFacts(functionName, expressionAstFact(node.params), span);
+      summary.mirNodes.insert("mir.method-call " + functionName + " receiver=" + node.params + " method=" + method + " mode=" + mode);
+      summary.llvmNodes.insert("llvm.method-call-preview @" + functionName + " receiver=" + node.params + " method=" + method + " mode=" + mode);
+    } else if (node.kind == "expr.call") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string callee = node.params.empty() ? localNameForNode(node) : node.params;
+      summary.hirNodes.insert("hir.call " + node.name + " callee=" + callee + " span=" + span);
+      summary.mirNodes.insert("mir.call " + functionName + " callee=@" + callee);
+      summary.llvmNodes.insert("llvm.call-detail-preview @" + functionName + " callee=@" + callee);
+    } else if (node.kind == "expr.type-static-call") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string method = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string targetType = node.generic.empty() ? "unknown" : node.generic;
+      summary.hirNodes.insert("hir.type-static-call " + node.name + " target=" + targetType + " method=" + method + " span=" + span);
+      summary.mirNodes.insert("mir.type-static-call " + functionName + " target=" + targetType + " method=" + method);
+      summary.llvmNodes.insert("llvm.type-static-call-preview @" + functionName + " target=" + targetType + " method=" + method);
+    } else if (node.kind == "expr.binary" || node.kind == "expr.compare" || node.kind == "expr.range") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string exprKind = node.kind.substr(5);
+      const std::string op = node.generic.empty() ? "unknown" : node.generic;
+      summary.hirNodes.insert("hir." + exprKind + " " + functionName + " op=" + op + " left=" + node.params + " right=" + node.returnType + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      emitMirExpressionFacts(functionName, node.returnType, span);
+      summary.mirNodes.insert("mir." + exprKind + " " + functionName + " op=" + op + " left=" + node.params + " right=" + node.returnType);
+      summary.llvmNodes.insert("llvm." + exprKind + "-detail-preview @" + functionName + " op=" + op + " left=" + node.params + " right=" + node.returnType);
+    } else if (node.kind == "expr.prefix") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string op = node.generic.empty() ? "unknown" : node.generic;
+      summary.hirNodes.insert("hir.prefix " + functionName + " op=" + op + " operand=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.prefix " + functionName + " op=" + op + " operand=" + node.params);
+      summary.llvmNodes.insert("llvm.prefix-detail-preview @" + functionName + " op=" + op + " operand=" + node.params);
+    } else if (node.kind == "expr.cast") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string targetType = node.generic.empty() ? "unknown" : node.generic;
+      summary.hirNodes.insert("hir.cast " + functionName + " expr=" + node.params + " target=" + targetType + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.cast " + functionName + " expr=" + node.params + " target=" + targetType);
+      summary.llvmNodes.insert("llvm.cast-detail-preview @" + functionName + " expr=" + node.params + " target=" + targetType);
+    } else if (node.kind == "expr.name") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string name = node.params.empty() ? localNameForNode(node) : node.params;
+      summary.hirNodes.insert("hir.name " + functionName + " name=" + name + " span=" + span);
+      summary.mirNodes.insert("mir.name " + functionName + " name=" + name);
+      summary.llvmNodes.insert("llvm.name-detail-preview @" + functionName + " name=" + name);
+    } else if (node.kind == "expr.literal") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string literalKind = node.generic.empty() ? "unknown" : node.generic;
+      summary.hirNodes.insert("hir.literal " + functionName + " kind=" + literalKind + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.literal " + functionName + " kind=" + literalKind + " expr=" + node.params);
+      summary.llvmNodes.insert("llvm.literal-detail-preview @" + functionName + " kind=" + literalKind + " expr=" + node.params);
+    } else if (node.kind == "expr.unit") {
+      const std::string functionName = functionNameForNode(node);
+      summary.hirNodes.insert("hir.unit " + functionName + " span=" + span);
+      summary.mirNodes.insert("mir.unit " + functionName);
+      summary.llvmNodes.insert("llvm.unit-detail-preview @" + functionName);
+    } else if (node.kind == "expr.try") {
+      const std::string functionName = functionNameForNode(node);
+      summary.hirNodes.insert("hir.try-expr " + functionName + " expr=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.try-expr " + functionName + " expr=" + node.params);
+      summary.llvmNodes.insert("llvm.try-detail-preview @" + functionName + " expr=" + node.params);
+    } else if (node.kind == "expr.access") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.access-expr " + functionName + " mode=" + mode + " operand=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.access-expr " + functionName + " mode=" + mode + " operand=" + node.params);
+      summary.llvmNodes.insert("llvm.access-detail-preview @" + functionName + " mode=" + mode + " operand=" + node.params);
+    } else if (node.kind == "expr.trust-block") {
+      const std::string functionName = functionNameForNode(node);
+      summary.hirNodes.insert("hir.trust-expr " + functionName + " span=" + span);
+      summary.mirNodes.insert("mir.trust-expr " + functionName);
+      summary.llvmNodes.insert("llvm.trust-detail-preview @" + functionName);
+    } else if (startsWith(node.kind, "pattern.")) {
+      const std::string functionName = functionNameForNode(node);
+      const std::string patternKind = node.kind.substr(8);
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
+      summary.hirNodes.insert("hir.pattern " + functionName + " role=" + role + " kind=" + patternKind + " text=" + text + " span=" + span);
+      summary.mirNodes.insert("mir.pattern " + functionName + " role=" + role + " kind=" + patternKind + " text=" + text);
+      summary.llvmNodes.insert("llvm.pattern-detail-preview @" + functionName + " role=" + role + " kind=" + patternKind + " text=" + text);
+    } else if (startsWith(node.kind, "pattern-alt.") || startsWith(node.kind, "pattern-element.") ||
+               startsWith(node.kind, "pattern-field.") || startsWith(node.kind, "pattern-bound.")) {
+      const std::string functionName = functionNameForNode(node);
+      std::string component = "unknown";
+      std::string componentKind = "unknown";
+      if (startsWith(node.kind, "pattern-alt.")) {
+        component = "alt";
+        componentKind = node.kind.substr(12);
+      } else if (startsWith(node.kind, "pattern-element.")) {
+        component = "element";
+        componentKind = node.kind.substr(16);
+      } else if (startsWith(node.kind, "pattern-field.")) {
+        component = "field";
+        componentKind = node.kind.substr(14);
+      } else {
+        component = "bound";
+        componentKind = node.kind.substr(14);
+      }
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
+      std::string detail = " role=" + role + " component=" + component + " kind=" + componentKind + " text=" + text;
+      if (!node.visibility.empty()) {
+        if (component == "field") detail += " field=" + node.visibility;
+        else if (component == "bound") detail += " op=" + node.visibility;
+      }
+      if (!node.returnType.empty()) detail += " parent=" + node.returnType;
+      summary.hirNodes.insert("hir.pattern-component " + functionName + detail + " span=" + span);
+      summary.mirNodes.insert("mir.pattern-component " + functionName + detail);
+      summary.llvmNodes.insert("llvm.pattern-component-preview @" + functionName + detail);
+    } else if (startsWith(node.kind, "type.")) {
+      const std::string typeKind = node.kind.substr(5);
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string text = node.params.empty() ? "unknown" : node.params;
+      summary.hirNodes.insert("hir.type-ref " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text + " span=" + span);
+      summary.mirNodes.insert("mir.type-ref " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text);
+      summary.llvmNodes.insert("llvm.type-ref-preview " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text);
+    } else if (startsWith(node.kind, "type-component.")) {
+      const std::string component = node.kind.substr(15);
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string kind = node.visibility.empty() ? "unknown" : node.visibility;
+      const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string parent = node.layout.empty() || node.layout == "Auto" ? "unknown" : node.layout;
+      summary.hirNodes.insert("hir.type-component " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent + " span=" + span);
+      summary.mirNodes.insert("mir.type-component " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent);
+      summary.llvmNodes.insert("llvm.type-component-preview " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent);
+    } else if (startsWith(node.kind, "generic-param.")) {
+      const std::string paramKind = node.kind.substr(14);
+      const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string constraint = node.generic.empty() ? "none" : node.generic;
+      summary.hirNodes.insert("hir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " span=" + span);
+      summary.mirNodes.insert("mir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint);
+      summary.llvmNodes.insert("llvm.generic-param-preview " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint);
+    } else if (startsWith(node.kind, "generic-arg.")) {
+      const std::string argKind = node.kind.substr(12);
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string parent = node.returnType.empty() ? "unknown" : node.returnType;
+      summary.hirNodes.insert("hir.generic-arg " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent + " span=" + span);
+      summary.mirNodes.insert("mir.generic-arg " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent);
+      summary.llvmNodes.insert("llvm.generic-arg-preview " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent);
+    } else if (startsWith(node.kind, "param.")) {
+      const std::string paramKind = node.kind.substr(6);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      const std::string name = node.params.empty() ? localNameForNode(node) : node.params;
+      summary.hirNodes.insert("hir.param " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name + " span=" + span);
+      summary.mirNodes.insert("mir.param " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name);
+      summary.llvmNodes.insert("llvm.param-preview " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name);
+    } else if (startsWith(node.kind, "block.")) {
+      const std::string functionName = functionNameForNode(node);
+      const std::string blockKind = node.generic.empty() ? node.kind.substr(6) : node.generic;
+      const std::string blockRole = node.params.empty() ? blockKind : node.params;
+      summary.hirNodes.insert("hir.block " + node.name + " kind=" + blockKind + " role=" + blockRole + " owner=" + functionName + " span=" + span);
+      summary.mirNodes.insert("mir.block " + functionName + " kind=" + blockKind + " role=" + blockRole + " span=" + span);
+      summary.llvmNodes.insert("llvm.block-preview @" + functionName + " kind=" + blockKind + " role=" + blockRole);
+    } else if (node.kind == "expr.if" || node.kind == "expr.while") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string exprKind = node.kind.substr(5);
+      const std::string conditionKind = node.visibility.empty() ? "condition" : node.visibility;
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      std::string detail = "conditionKind=" + conditionKind + " condition=" + node.params;
+      if (!node.generic.empty()) detail += " mode=" + mode;
+      if (!node.returnType.empty()) detail += " pattern=" + node.returnType;
+      summary.hirNodes.insert("hir." + exprKind + "-expr " + functionName + " " + detail + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + exprKind + " kind=" + exprKind + " " + detail);
+      summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=" + exprKind + " " + detail);
+    } else if (node.kind == "expr.for") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      const std::string item = node.returnType.empty() ? "unknown" : node.returnType;
+      summary.hirNodes.insert("hir.for-expr " + functionName + " item=" + item + " mode=" + mode + " iterable=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=for kind=for item=" + item + " mode=" + mode + " iterable=" + node.params);
+      summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=for item=" + item + " mode=" + mode + " iterable=" + node.params);
+    } else if (node.kind == "expr.match") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      summary.hirNodes.insert("hir.match-expr " + functionName + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitMirExpressionFacts(functionName, node.params, span);
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=match kind=match mode=" + mode + " scrutinee=" + node.params);
+      summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=match mode=" + mode + " scrutinee=" + node.params);
     } else if (node.kind == "stmt.return") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.return " + node.name + " expr=" + node.params + " expected=" + returnType + " span=" + span);
@@ -6333,6 +8727,7 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   std::vector<fs::path> sourceFiles = buildSourceFiles(package);
   const auto ast = parseTopLevelAst(package.root, package.name, sourceFiles);
   summary.astNodes = collectTopLevelAstNodes(package);
+  for (const auto &fact : collectSyntaxSpineAstFacts(package, sourceFiles)) summary.astNodes.insert(fact);
   collectPipelineFactsFromAst(package, ast, summary);
   const auto topLevelDeclarations = collectTopLevelDeclarations(package);
   const std::regex structPattern(R"(^\s*(pub\s+|private\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?)");
@@ -6691,6 +9086,7 @@ struct NativePayloadEnumType {
   std::vector<std::string> variants;
   std::map<std::string, int> discriminants;
   std::map<std::string, NativePayloadEnumVariant> variantPayloads;
+  std::vector<std::string> payloadSlotTypes;
   std::size_t maxPayloadSlots = 0;
 };
 
@@ -6726,11 +9122,6 @@ std::string nativeLlvmTypeName(const std::string &typeName) {
 
 std::string nativeLlvmTypeRef(const std::string &typeName) {
   return "%" + nativeLlvmTypeName(typeName);
-}
-
-bool isNativeI32ScalarType(const std::string &typeName) {
-  const std::string normalized = normalizeSignatureType(typeName);
-  return normalized == "I32" || normalized == "Char";
 }
 
 bool isNativeIntegerScalarType(const std::string &typeName) {
@@ -6807,13 +9198,6 @@ bool isNativeFloatLiteral(const std::string &rawExpr) {
   return std::regex_match(expr, std::regex(R"([0-9]+\.[0-9]+(?:[eE][+-]?[0-9]+)?)"));
 }
 
-std::optional<std::pair<std::string, std::string>> nativeSingleGenericInstance(const std::string &typeName) {
-  if (auto generic = matchRegex(typeName, std::regex(R"(^([A-Z][A-Za-z0-9_]*)<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>$)"))) {
-    return std::make_pair(std::string((*generic)[1]), std::string((*generic)[2]));
-  }
-  return std::nullopt;
-}
-
 std::optional<std::pair<std::string, std::vector<std::string>>> nativeGenericInstance(const std::string &typeName) {
   if (auto generic = matchRegex(typeName, std::regex(R"(^([A-Z][A-Za-z0-9_]*)<\s*(.*?)\s*>$)"))) {
     std::vector<std::string> args;
@@ -6880,11 +9264,42 @@ std::string nativeStructFieldTypeAt(const NativeI32StructType &type, std::size_t
   return type.fieldTypes[index];
 }
 
-bool nativeStructUsesOnlyI32PayloadSlots(const NativeI32StructType &type) {
-  if (type.fieldTypes.size() != type.fields.size()) return false;
-  return std::all_of(type.fieldTypes.begin(), type.fieldTypes.end(), [](const std::string &fieldType) {
-    return isNativeI32ScalarType(fieldType);
-  });
+std::optional<std::vector<std::string>> nativePayloadSlotTypesFor(
+    const std::vector<std::string> &payloadTypes,
+    const std::map<std::string, NativeI32StructType> &structTypes,
+    const std::vector<std::string> &genericParams = {}) {
+  std::vector<std::string> slotTypes;
+  for (const auto &payloadType : payloadTypes) {
+    const bool genericPayload =
+        std::find(genericParams.begin(), genericParams.end(), payloadType) != genericParams.end();
+    if (genericPayload || isNativeScalarType(payloadType)) {
+      slotTypes.push_back(payloadType);
+    } else if (auto structType = structTypes.find(payloadType); structType != structTypes.end()) {
+      if (structType->second.fieldTypes.size() != structType->second.fields.size()) return std::nullopt;
+      slotTypes.insert(slotTypes.end(), structType->second.fieldTypes.begin(), structType->second.fieldTypes.end());
+    } else {
+      return std::nullopt;
+    }
+  }
+  return slotTypes;
+}
+
+bool mergeNativePayloadSlotTypes(NativePayloadEnumType &enumType,
+                                 const std::vector<std::string> &slotTypes) {
+  enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slotTypes.size());
+  for (std::size_t i = 0; i < slotTypes.size(); ++i) {
+    if (i >= enumType.payloadSlotTypes.size()) {
+      enumType.payloadSlotTypes.push_back(slotTypes[i]);
+    } else if (enumType.payloadSlotTypes[i] != slotTypes[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void recordNativePayloadSlotShape(NativePayloadEnumType &enumType,
+                                  const std::vector<std::string> &slotTypes) {
+  enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slotTypes.size());
 }
 
 std::string nativeAccessName(std::string name) {
@@ -7425,12 +9840,13 @@ NativeI32StructExpr lowerNativePayloadEnumConstructor(const std::string &rawExpr
   for (std::size_t i = 0; i < payloadTypes.size(); ++i) {
     const std::string payloadType = payloadTypes[i];
     const std::string arg = trim(args[i]);
-    if (isNativeI32ScalarType(payloadType)) {
+    if (isNativeScalarType(payloadType)) {
       auto lowered = lowerNativeI32Expr(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId, payloadType);
       if (!lowered.ok) return {};
+      if (normalizeSignatureType(lowered.typeName) != normalizeSignatureType(payloadType)) return {};
       temp = "%t" + std::to_string(tempId++);
       code += lowered.code;
-      code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", i32 " + lowered.value + ", " + std::to_string(slot++) + "\n";
+      code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + nativeScalarLlvmType(payloadType) + " " + lowered.value + ", " + std::to_string(slot++) + "\n";
       aggregateValue = temp;
     } else {
       NativeI32StructExpr loweredStruct;
@@ -7440,18 +9856,18 @@ NativeI32StructExpr lowerNativePayloadEnumConstructor(const std::string &rawExpr
       } else {
         loweredStruct = lowerNativeI32StructLiteral(arg, locals, structLocals, structTypes, enumTypes, candidateFunctionParamTypes, candidateCallees, tempId);
       }
-	      auto structType = structTypes.find(payloadType);
-	      if (!loweredStruct.ok || loweredStruct.typeName != payloadType ||
-	          structType == structTypes.end() || !nativeStructUsesOnlyI32PayloadSlots(structType->second)) return {};
-	      code += loweredStruct.code;
-	      for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
-	        const std::string fieldTemp = "%t" + std::to_string(tempId++);
-	        temp = "%t" + std::to_string(tempId++);
-	        code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(payloadType) + " " + loweredStruct.value + ", " + std::to_string(field) + "\n";
-	        code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(slot++) + "\n";
-	        aggregateValue = temp;
-	      }
-	    }
+      auto structType = structTypes.find(payloadType);
+      if (!loweredStruct.ok || loweredStruct.typeName != payloadType ||
+          structType == structTypes.end()) return {};
+      code += loweredStruct.code;
+      for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+        const std::string fieldTemp = "%t" + std::to_string(tempId++);
+        temp = "%t" + std::to_string(tempId++);
+        code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(payloadType) + " " + loweredStruct.value + ", " + std::to_string(field) + "\n";
+        code += "  " + temp + " = insertvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(slot++) + "\n";
+        aggregateValue = temp;
+      }
+    }
   }
   return NativeI32StructExpr{true, code, enumName, aggregateValue};
 }
@@ -7564,17 +9980,17 @@ bool bindNativePayloadEnumArm(const NativePayloadEnumType &enumType,
   if (bindingNames.empty()) return true;
   auto payload = enumType.variantPayloads.find(variantName);
   if (payload == enumType.variantPayloads.end()) return false;
-  const bool allI32Payloads = std::all_of(payload->second.payloadTypes.begin(),
-                                          payload->second.payloadTypes.end(),
-                                          [](const std::string &type) { return isNativeI32ScalarType(type); });
-  if (allI32Payloads && bindingNames.size() == payload->second.payloadTypes.size()) {
+  const bool allNativeScalarPayloads = std::all_of(payload->second.payloadTypes.begin(),
+                                                   payload->second.payloadTypes.end(),
+                                                   [](const std::string &type) { return isNativeScalarType(type); });
+  if (allNativeScalarPayloads && bindingNames.size() == payload->second.payloadTypes.size()) {
     std::size_t slot = 1;
     for (std::size_t i = 0; i < bindingNames.size(); ++i) {
       const std::string payloadType = payload->second.payloadTypes[i];
-      if (!isNativeI32ScalarType(payloadType) || !isSimpleLlvmGlobalName(bindingNames[i])) return false;
+      if (!isNativeScalarType(payloadType) || !isSimpleLlvmGlobalName(bindingNames[i])) return false;
       const std::string temp = "%t" + std::to_string(tempId++);
       code += "  " + temp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(slot++) + "\n";
-      armLocals[bindingNames[i]] = NativeI32Local{false, temp};
+      armLocals[bindingNames[i]] = NativeI32Local{false, temp, payloadType};
     }
     return true;
   }
@@ -7582,22 +9998,22 @@ bool bindNativePayloadEnumArm(const NativePayloadEnumType &enumType,
   const std::string bindingName = bindingNames.front();
   const std::string payloadType = payload->second.payloadTypes.front();
   if (!isSimpleLlvmGlobalName(bindingName)) return false;
-  if (isNativeI32ScalarType(payloadType)) {
+  if (isNativeScalarType(payloadType)) {
     const std::string temp = "%t" + std::to_string(tempId++);
     code += "  " + temp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", 1\n";
-    armLocals[bindingName] = NativeI32Local{false, temp};
+    armLocals[bindingName] = NativeI32Local{false, temp, payloadType};
     return true;
   }
-	  auto structType = structTypes.find(payloadType);
-	  if (structType == structTypes.end() || !nativeStructUsesOnlyI32PayloadSlots(structType->second)) return false;
-	  std::string structValue = "undef";
-	  for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
-	    const std::string fieldTemp = "%t" + std::to_string(tempId++);
-	    const std::string aggregateTemp = "%t" + std::to_string(tempId++);
-	    code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(field + 1) + "\n";
-	    code += "  " + aggregateTemp + " = insertvalue " + nativeLlvmTypeRef(payloadType) + " " + structValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(field) + "\n";
-	    structValue = aggregateTemp;
-	  }
+  auto structType = structTypes.find(payloadType);
+  if (structType == structTypes.end()) return false;
+  std::string structValue = "undef";
+  for (std::size_t field = 0; field < structType->second.fields.size(); ++field) {
+    const std::string fieldTemp = "%t" + std::to_string(tempId++);
+    const std::string aggregateTemp = "%t" + std::to_string(tempId++);
+    code += "  " + fieldTemp + " = extractvalue " + nativeLlvmTypeRef(enumName) + " " + aggregateValue + ", " + std::to_string(field + 1) + "\n";
+    code += "  " + aggregateTemp + " = insertvalue " + nativeLlvmTypeRef(payloadType) + " " + structValue + ", " + nativeScalarLlvmType(nativeStructFieldTypeAt(structType->second, field)) + " " + fieldTemp + ", " + std::to_string(field) + "\n";
+    structValue = aggregateTemp;
+  }
   armStructLocals[bindingName] = NativeI32StructLocal{payloadType, structValue};
   return true;
 }
@@ -8023,9 +10439,7 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
                 for (const auto &rawType : splitArguments((*variant)[3])) {
                   const std::string payloadType = normalizeSignatureType(rawType);
                   const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
-	                  if (!isNativeI32ScalarType(payloadType) &&
-	                      !(nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) &&
-	                      !genericPayload) enumValid = false;
+                  if (!isNativeScalarType(payloadType) && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
                   payload.payloadTypes.push_back(payloadType);
                 }
               } else if ((*variant)[4].matched) {
@@ -8038,21 +10452,21 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
                   }
                   const std::string payloadType = normalizeSignatureType((*parsedField)[2]);
                   const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
-	                  if (!isNativeI32ScalarType(payloadType) &&
-	                      !(nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) &&
-	                      !genericPayload) enumValid = false;
+                  if (!isNativeScalarType(payloadType) && !nativeStructs.count(payloadType) && !genericPayload) enumValid = false;
                   payload.payloadNames.push_back((*parsedField)[1]);
                   payload.payloadTypes.push_back(payloadType);
                 }
               }
-              std::size_t slots = 0;
-              for (const auto &payloadType : payload.payloadTypes) {
-                const bool genericPayload = enumGeneric && std::find(enumGenericParams.begin(), enumGenericParams.end(), payloadType) != enumGenericParams.end();
-                if (isNativeI32ScalarType(payloadType) || genericPayload) slots += 1;
-	                else if (nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) slots += nativeStructs[payloadType].fields.size();
-	                else enumValid = false;
+              auto slotTypes = nativePayloadSlotTypesFor(payload.payloadTypes,
+                                                         nativeStructs,
+                                                         enumGeneric ? enumGenericParams : std::vector<std::string>{});
+              if (!slotTypes) {
+                enumValid = false;
+              } else if (enumGeneric) {
+                recordNativePayloadSlotShape(enumType, *slotTypes);
+              } else if (!mergeNativePayloadSlotTypes(enumType, *slotTypes)) {
+                enumValid = false;
               }
-              enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
               enumType.variantPayloads[variantName] = payload;
             }
           } else {
@@ -8065,16 +10479,19 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
             if (enumGeneric) {
               genericPayloadEnums[enumName] = NativeGenericPayloadEnumTemplate{enumGenericParams, enumType};
             } else {
-	              nativePayloadEnums[enumName] = enumType;
-	              NativeI32StructType aggregateType;
-	              aggregateType.fields.push_back("tag");
-	              aggregateType.fieldTypes.push_back("I32");
-	              std::string llvmType = "\n" + nativeLlvmTypeRef(enumName) + " = type { i32";
-	              for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
-	                llvmType += ", i32";
-	                aggregateType.fields.push_back("payload" + std::to_string(slot));
-	                aggregateType.fieldTypes.push_back("I32");
-	              }
+              nativePayloadEnums[enumName] = enumType;
+              NativeI32StructType aggregateType;
+              aggregateType.fields.push_back("tag");
+              aggregateType.fieldTypes.push_back("I32");
+              std::string llvmType = "\n" + nativeLlvmTypeRef(enumName) + " = type { i32";
+              for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+                const std::string slotType = slot < enumType.payloadSlotTypes.size()
+                                                 ? enumType.payloadSlotTypes[slot]
+                                                 : "I32";
+                llvmType += ", " + nativeScalarLlvmType(slotType);
+                aggregateType.fields.push_back("payload" + std::to_string(slot));
+                aggregateType.fieldTypes.push_back(slotType);
+              }
               llvmType += " }\n";
               nativeStructs[enumName] = aggregateType;
               out[nativeLlvmTypeRef(enumName)] = llvmType;
@@ -8102,8 +10519,7 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
     if (genericTemplate == genericPayloadEnums.end()) return;
     if (genericTemplate->second.typeParams.size() != instance->second.size()) return;
     for (const auto &arg : instance->second) {
-	      if (!isNativeI32ScalarType(arg) &&
-	          !(nativeStructs.count(arg) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[arg]))) return;
+      if (!isNativeScalarType(arg) && !nativeStructs.count(arg)) return;
     }
     genericPayloadInstances.insert(normalized);
   };
@@ -8140,26 +10556,24 @@ std::map<std::string, std::string> nativeI32FunctionIrDefinitions(const BuildPac
           payload.payloadTypes.push_back(payloadType);
         }
       }
-      std::size_t slots = 0;
-      for (const auto &payloadType : payload.payloadTypes) {
-        if (isNativeI32ScalarType(payloadType)) slots += 1;
-	        else if (nativeStructs.count(payloadType) && nativeStructUsesOnlyI32PayloadSlots(nativeStructs[payloadType])) slots += nativeStructs[payloadType].fields.size();
-        else validInstance = false;
-      }
-      enumType.maxPayloadSlots = std::max(enumType.maxPayloadSlots, slots);
+      auto slotTypes = nativePayloadSlotTypesFor(payload.payloadTypes, nativeStructs);
+      if (!slotTypes || !mergeNativePayloadSlotTypes(enumType, *slotTypes)) validInstance = false;
       enumType.variantPayloads[variantName] = payload;
     }
     if (!validInstance || enumType.variants.empty()) continue;
-	    nativePayloadEnums[instanceTypeName] = enumType;
-	    NativeI32StructType aggregateType;
-	    aggregateType.fields.push_back("tag");
-	    aggregateType.fieldTypes.push_back("I32");
-	    std::string llvmType = "\n" + nativeLlvmTypeRef(instanceTypeName) + " = type { i32";
-	    for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
-	      llvmType += ", i32";
-	      aggregateType.fields.push_back("payload" + std::to_string(slot));
-	      aggregateType.fieldTypes.push_back("I32");
-	    }
+    nativePayloadEnums[instanceTypeName] = enumType;
+    NativeI32StructType aggregateType;
+    aggregateType.fields.push_back("tag");
+    aggregateType.fieldTypes.push_back("I32");
+    std::string llvmType = "\n" + nativeLlvmTypeRef(instanceTypeName) + " = type { i32";
+    for (std::size_t slot = 0; slot < enumType.maxPayloadSlots; ++slot) {
+      const std::string slotType = slot < enumType.payloadSlotTypes.size()
+                                       ? enumType.payloadSlotTypes[slot]
+                                       : "I32";
+      llvmType += ", " + nativeScalarLlvmType(slotType);
+      aggregateType.fields.push_back("payload" + std::to_string(slot));
+      aggregateType.fieldTypes.push_back(slotType);
+    }
     llvmType += " }\n";
     nativeStructs[instanceTypeName] = aggregateType;
     out[nativeLlvmTypeRef(instanceTypeName)] = llvmType;
