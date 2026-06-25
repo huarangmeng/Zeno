@@ -8,7 +8,7 @@ static Seed: U32 = 1;
 
 enum ParseError {
     Empty,
-    Code(U32),
+    Code(U32), Located { line: U32, column: U32 },
 }
 
 struct Point: Copy {
@@ -149,6 +149,8 @@ impl Counter {
     destroy {}
 }
 
+trust impl Send for Counter {}
+
 impl Iterator<U32> for Counter {
     fn next(mut self) -> Option<U32> {
         return None;
@@ -263,4 +265,37 @@ fn controlExpressions(value: U32) -> U32 {
         None => 0,
     };
     return chosen;
+}
+
+async fn asyncSyntax(move counter: Counter) -> Result<U32, ParseError> {
+    val future = async move {
+        return Ok(counter.current);
+    };
+    return try await future;
+}
+
+fn blockExpression(value: U32) -> U32 {
+    val scoped = {
+        const inner: U32 = value;
+        inner
+    };
+    return scoped;
+}
+
+struct Future<T> {
+}
+
+fn consumeFuture(task: Future<U32>) {
+    observe(0);
+}
+
+fn futureBlockArgument(value: U32) {
+    consumeFuture({
+        return value;
+    });
+}
+
+fn parenExpression(value: U32) -> U32 {
+    val grouped = (value + 1);
+    return grouped;
 }

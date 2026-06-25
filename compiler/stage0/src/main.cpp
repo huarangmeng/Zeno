@@ -570,15 +570,6 @@ std::vector<Diagnostic> lexicalAndSyntaxDiagnostics(const SourceText &source) {
         add("E0004", "unsafe blocks are not part of Zeno user syntax", line, startColumn);
       } else if (ident == "defer") {
         add("E0004", "defer is not a Zeno keyword; use a RAII guard with destroy", line, startColumn);
-      } else if (ident == "await" || ident == "async") {
-        Diagnostic diag = makeDiagnostic(source, "E9001", "async lowering is not implemented in stage0", line, startColumn);
-        diag.staged = true;
-        diag.feature = "async";
-        diag.category = "staged";
-        diag.stageName = "lowering";
-        diag.notes.push_back("async syntax is reserved for the full language");
-        diag.help.push_back("use synchronous code in stage0 MVP");
-        diagnostics.push_back(diag);
       }
       continue;
     }
@@ -4261,6 +4252,7 @@ std::string expressionAstFact(std::string expr) {
   };
   if (expr.empty()) return "unit";
   if (expr == "()") return "unit";
+  if (startsWith(expr, "{") && expr.back() == '}') return "block";
   if (startsWith(expr, "async ")) return "async-block";
   if (startsWith(expr, "await ")) return "await:" + expressionAstFact(expr.substr(6));
   if (startsWith(expr, "trust")) return "trust-block";
@@ -4618,6 +4610,7 @@ private:
       const std::size_t begin = current_;
       const std::size_t end = collectUntilTopLevel({";"}, true);
       add("module", moduleName_, join(begin, end), "kind=module", line);
+      emitPathSegments(moduleName_, "module", begin, end, line);
       return;
     }
     if (check("import")) {
@@ -4739,6 +4732,7 @@ private:
     add("item", moduleName_, name, detail, line);
     clearPendingAttributes();
     emitGenericParams(name, signatureBegin, current_, line);
+    if (kind == "interface") emitInterfaceParents(name, signatureBegin, current_, line);
     if (match("{")) parseAggregateBlock(name, kind, line, true);
     else match(";");
   }
@@ -4804,6 +4798,7 @@ private:
     const std::string path = join(begin, pathEnd);
     if (path.empty()) return;
     add("import-path", moduleName_, path, "path=" + path, lineNo);
+    emitPathSegments(moduleName_, "import", begin, pathEnd, lineNo);
     if (itemOpen >= end) return;
     const std::size_t itemClose = findMatchingToken(itemOpen, end, "{", "}");
     if (itemClose >= end) return;
@@ -4836,7 +4831,9 @@ private:
         if (aggregateKind == "struct") {
           const std::size_t colon = findTopLevelToken(memberBegin, memberEnd, ":");
           const std::string fieldName = colon < memberEnd ? join(memberBegin, colon) : join(memberBegin, memberEnd);
-          add("field", owner, owner + "." + fieldName, "kind=struct-field", memberLine);
+          std::string detail = "kind=struct-field";
+          if (!visibility.empty()) detail += " visibility=" + visibility;
+          add("field", owner, owner + "." + fieldName, detail, memberLine);
           if (colon < memberEnd) emitType(owner + "." + fieldName, "field", colon + 1, memberEnd, memberLine);
         } else if (aggregateKind == "enum") {
           const std::string variantName = tokens_[memberBegin].text;
@@ -4844,8 +4841,42 @@ private:
           const std::size_t paren = findTopLevelToken(memberBegin, memberEnd, "(");
           if (paren < memberEnd) {
             const std::size_t close = findMatchingToken(paren, memberEnd, "(", ")");
+            std::size_t payloadIndex = 0;
             for (const auto &[payloadBegin, payloadEnd] : splitTopLevel(paren + 1, close, ",")) {
+              const std::string payloadType = join(payloadBegin, payloadEnd);
+              if (!payloadType.empty()) {
+                add("variant-payload",
+                    owner,
+                    owner + "." + variantName + "." + std::to_string(payloadIndex),
+                    "index=" + std::to_string(payloadIndex) + " variant=" + variantName + " type=" + payloadType,
+                    payloadBegin < tokens_.size() ? tokens_[payloadBegin].line : memberLine);
+              }
               emitType(owner + "." + variantName, "variant-payload", payloadBegin, payloadEnd, memberLine);
+              ++payloadIndex;
+            }
+          }
+          const std::size_t brace = findTopLevelToken(memberBegin, memberEnd, "{");
+          if (brace < memberEnd) {
+            const std::size_t close = findMatchingToken(brace, memberEnd, "{", "}");
+            if (close < memberEnd) {
+              for (const auto &[fieldBeginRaw, fieldEnd] : splitTopLevel(brace + 1, close, ",")) {
+                if (fieldBeginRaw >= fieldEnd) continue;
+                std::size_t fieldBegin = fieldBeginRaw;
+                std::string fieldVisibility;
+                if (tokens_[fieldBegin].text == "pub" || tokens_[fieldBegin].text == "private") {
+                  fieldVisibility = tokens_[fieldBegin++].text;
+                }
+                const std::size_t colon = findTopLevelToken(fieldBegin, fieldEnd, ":");
+                if (colon >= fieldEnd) continue;
+                const std::string fieldName = join(fieldBegin, colon);
+                if (fieldName.empty()) continue;
+                std::string detail = "kind=variant-field variant=" + variantName + " field=" + fieldName;
+                if (!fieldVisibility.empty()) detail += " visibility=" + fieldVisibility;
+                add("variant-field", owner, owner + "." + variantName + "." + fieldName, detail,
+                    fieldBegin < tokens_.size() ? tokens_[fieldBegin].line : memberLine);
+                emitType(owner + "." + variantName + "." + fieldName, "variant-field", colon + 1, fieldEnd,
+                         fieldBegin < tokens_.size() ? tokens_[fieldBegin].line : memberLine);
+              }
             }
           }
         }
@@ -5019,8 +5050,56 @@ private:
     const std::string text = join(begin, end);
     if (text.empty()) return;
     add("type", owner, owner, "role=" + role + " kind=" + syntaxTypeKind(text) + " text=" + text, lineNo);
+    const std::string typeKind = syntaxTypeKind(text);
+    if (typeKind == "path" || typeKind == "path-generic" || typeKind == "self") {
+      emitPathSegments(owner, role, begin, end, lineNo);
+    }
     emitGenericArgs(owner, role, begin, end, lineNo);
     emitTypeComponents(owner, role, begin, end, lineNo, text);
+  }
+
+  void emitPathSegments(const std::string &owner,
+                        const std::string &role,
+                        std::size_t begin,
+                        std::size_t end,
+                        int lineNo) {
+    const std::string path = join(begin, end);
+    if (path.empty()) return;
+    std::size_t pathEnd = findTopLevelToken(begin, end, "<");
+    if (pathEnd >= end) pathEnd = end;
+    std::size_t index = 0;
+    for (const auto &[segmentBegin, segmentEnd] : splitTopLevel(begin, pathEnd, ".")) {
+      const std::string segment = join(segmentBegin, segmentEnd);
+      if (segment.empty()) continue;
+      add("path-segment",
+          owner,
+          owner,
+          "role=" + role + " index=" + std::to_string(index) +
+              " segment=" + segment + " path=" + path,
+          segmentBegin < tokens_.size() ? tokens_[segmentBegin].line : lineNo);
+      ++index;
+    }
+  }
+
+  void emitInterfaceParents(const std::string &owner,
+                            std::size_t begin,
+                            std::size_t end,
+                            int lineNo) {
+    const std::size_t colon = findTopLevelToken(begin, end, ":");
+    if (colon >= end) return;
+    std::size_t parentIndex = 0;
+    for (const auto &[parentBegin, parentEnd] : splitTopLevel(colon + 1, end, ",")) {
+      const std::string parent = join(parentBegin, parentEnd);
+      if (parent.empty()) continue;
+      add("interface-parent",
+          owner,
+          owner + "." + parent,
+          "index=" + std::to_string(parentIndex) + " parent=" + parent,
+          parentBegin < tokens_.size() ? tokens_[parentBegin].line : lineNo);
+      emitType(owner, "interface-parent", parentBegin, parentEnd,
+               parentBegin < tokens_.size() ? tokens_[parentBegin].line : lineNo);
+      ++parentIndex;
+    }
   }
 
   void emitTypeComponents(const std::string &owner,
@@ -5238,17 +5317,24 @@ private:
     if (close >= end) return;
     for (const auto &[paramBegin, paramEnd] : splitTopLevel(begin + 1, close, ",")) {
       if (paramBegin >= paramEnd) continue;
+      const bool constParam = tokens_[paramBegin].text == "const";
+      const std::size_t nameIndex = constParam ? paramBegin + 1 : paramBegin;
+      const std::string paramName = nameIndex < paramEnd ? tokens_[nameIndex].text : "";
+      const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
       std::string detail = "kind=type text=" + join(paramBegin, paramEnd);
       if (tokens_[paramBegin].text == "const") {
         detail = "kind=const text=" + join(paramBegin, paramEnd);
-        const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
-        if (colon < paramEnd) emitType(owner, "generic-const", colon + 1, paramEnd, tokens_[paramBegin].line);
+        if (!paramName.empty()) detail += " name=" + paramName;
+        if (colon < paramEnd) {
+          detail += " type=" + join(colon + 1, paramEnd);
+          emitType(owner, "generic-const", colon + 1, paramEnd, tokens_[paramBegin].line);
+        }
       } else {
-        const std::size_t colon = findTopLevelToken(paramBegin, paramEnd, ":");
         if (colon < paramEnd) {
           detail += " constraint=" + join(colon + 1, paramEnd);
           emitType(owner, "generic-bound", colon + 1, paramEnd, tokens_[paramBegin].line);
         }
+        if (!paramName.empty()) detail += " name=" + paramName;
       }
       add("generic-param", owner, owner, detail, tokens_[paramBegin].line);
     }
@@ -5318,13 +5404,26 @@ private:
                      std::size_t begin,
                      std::size_t end,
                      int lineNo) {
+    std::size_t index = 0;
     for (const auto &[argBeginRaw, argEnd] : splitTopLevel(begin, end, ",")) {
       if (argBeginRaw >= argEnd) continue;
       std::size_t argBegin = argBeginRaw;
       std::string mode = "read";
       if (tokens_[argBegin].text == "mut" || tokens_[argBegin].text == "move") mode = tokens_[argBegin++].text;
-      add("arg", owner, owner, "mode=" + mode + " expr=" + exprFact(argBegin, argEnd), tokens_[argBeginRaw].line);
+      add("arg",
+          owner,
+          owner,
+          "mode=" + mode + " expr=" + exprFact(argBegin, argEnd) + " index=" + std::to_string(index),
+          tokens_[argBeginRaw].line);
+      if (exprFact(argBegin, argEnd) == "block" && argBegin < argEnd && tokens_[argBegin].text == "{") {
+        add("block-arg",
+            owner,
+            owner,
+            "mode=" + mode + " expr=block index=" + std::to_string(index) + " futureCandidate=true",
+            tokens_[argBeginRaw].line);
+      }
       emitExpression(owner, argBegin, argEnd, lineNo);
+      ++index;
     }
   }
 
@@ -5357,6 +5456,67 @@ private:
       emitPattern(owner, "closure-param", paramBegin, patternEnd, tokens_[paramBegin].line);
       if (colon < paramEnd) emitType(owner, "closure-param", colon + 1, paramEnd, tokens_[paramBegin].line);
     }
+  }
+
+  void emitClosureExpression(const std::string &owner,
+                             std::size_t begin,
+                             std::size_t end,
+                             int lineNo,
+                             const std::string &fact) {
+    if (fact != "closure" && !startsWith(fact, "closure:")) return;
+    std::size_t cursor = begin;
+    std::string capture = "read";
+    if (cursor < end && tokens_[cursor].text == "move") {
+      capture = "move";
+      ++cursor;
+    }
+    if (cursor >= end || tokens_[cursor].text != "(") return;
+    const std::size_t close = findMatchingToken(cursor, end, "(", ")");
+    if (close >= end) return;
+
+    std::size_t after = close + 1;
+    std::string form = "expr";
+    std::string body = "unit";
+    std::string returnType;
+    std::size_t bodyBegin = end;
+    std::size_t bodyEnd = end;
+
+    if (after < end && tokens_[after].text == "->") {
+      const std::size_t fatArrow = findTopLevelToken(after + 1, end, "=>");
+      const std::size_t bodyOpen = findTopLevelToken(after + 1, end, "{");
+      const bool expressionBody = fatArrow < end && (bodyOpen >= end || fatArrow < bodyOpen);
+      const std::size_t typeEnd = expressionBody ? fatArrow : bodyOpen;
+      if (after + 1 < typeEnd) {
+        returnType = join(after + 1, typeEnd);
+        emitType(owner, "closure-return", after + 1, typeEnd, lineNo);
+      }
+      if (expressionBody) {
+        form = "expr";
+        bodyBegin = fatArrow + 1;
+      } else {
+        form = "block";
+        body = "block";
+      }
+    } else if (after < end && tokens_[after].text == "=>") {
+      form = "expr";
+      bodyBegin = after + 1;
+    } else {
+      const std::size_t bodyOpen = after < end && tokens_[after].text == "{" ? after : findTopLevelToken(after, end, "{");
+      if (bodyOpen < end) {
+        form = "block";
+        body = "block";
+      }
+    }
+
+    if (form == "expr" && bodyBegin < end) {
+      bodyEnd = end;
+      body = exprFact(bodyBegin, bodyEnd);
+    }
+
+    std::string detail = "capture=" + capture + " form=" + form + " body=" + body;
+    if (!returnType.empty()) detail += " returnType=" + returnType;
+    add("closure-expr", owner, owner, detail, lineNo);
+    if (form == "expr" && bodyBegin < bodyEnd) emitExpression(owner, bodyBegin, bodyEnd, lineNo);
   }
 
   void emitStructLiteralFields(const std::string &owner,
@@ -5577,6 +5737,12 @@ private:
       add("name-expr", owner, owner + "." + name, "name=" + name, lineNo);
     } else if (fact == "unit") {
       add("unit-expr", owner, owner, "expr=unit", lineNo);
+    } else if (fact == "block") {
+      add("block-expr", owner, owner, "expr=block", lineNo);
+      if (begin < end && tokens_[begin].text == "{") {
+        const std::size_t close = findMatchingToken(begin, end, "{", "}");
+        if (close < end) emitBlockStatements(owner, begin + 1, close);
+      }
     } else if (startsWith(fact, "int-literal:")) {
       add("literal-expr", owner, owner, "literalKind=int expr=" + fact, lineNo);
     } else if (startsWith(fact, "float-literal:")) {
@@ -5596,6 +5762,18 @@ private:
       const std::string mode = isMove ? "move" : "mut";
       const std::size_t exprBegin = begin < end && tokens_[begin].text == mode ? begin + 1 : begin;
       add("access-expr", owner, owner, "mode=" + mode + " operand=" + fact.substr(mode.size() + 1), lineNo);
+      if (exprBegin < end) emitExpression(owner, exprBegin, end, lineNo);
+    } else if (fact == "async-block") {
+      const bool moveCapture = begin + 1 < end && tokens_[begin].text == "async" && tokens_[begin + 1].text == "move";
+      add("async-expr", owner, owner, std::string("capture=") + (moveCapture ? "move" : "read") + " body=block", lineNo);
+      const std::size_t blockBegin = findTopLevelToken(begin, end, "{");
+      if (blockBegin < end) {
+        const std::size_t blockClose = findMatchingToken(blockBegin, end, "{", "}");
+        if (blockClose < end) emitBlockStatements(owner, blockBegin + 1, blockClose);
+      }
+    } else if (startsWith(fact, "await:")) {
+      const std::size_t exprBegin = begin < end && tokens_[begin].text == "await" ? begin + 1 : begin;
+      add("await-expr", owner, owner, "expr=" + fact.substr(6), lineNo);
       if (exprBegin < end) emitExpression(owner, exprBegin, end, lineNo);
     } else if (fact == "trust-block") {
       add("trust-expr", owner, owner, "expr=trust-block", lineNo);
@@ -5634,6 +5812,18 @@ private:
         add(kind, owner, owner, "kind=condition condition=" + exprFact(conditionBegin, conditionEnd), lineNo);
         emitExpression(owner, conditionBegin, conditionEnd, lineNo);
       }
+      const std::size_t thenOpen = close + 1 < end && tokens_[close + 1].text == "{" ? close + 1 : findTopLevelToken(close + 1, end, "{");
+      if (thenOpen < end) {
+        const std::size_t thenClose = emitControlBodyExpression(owner, kind == "if-expr" ? "if" : "while",
+                                                                kind == "if-expr" ? "then" : "body",
+                                                                thenOpen, end, lineNo);
+        if (kind == "if-expr" && thenClose < end && thenClose + 1 < end && tokens_[thenClose + 1].text == "else") {
+          const std::size_t elseOpen = thenClose + 2 < end && tokens_[thenClose + 2].text == "{"
+                                           ? thenClose + 2
+                                           : findTopLevelToken(thenClose + 2, end, "{");
+          if (elseOpen < end) emitControlBodyExpression(owner, "if", "else", elseOpen, end, tokens_[thenClose + 1].line);
+        }
+      }
       return;
     }
 
@@ -5653,6 +5843,7 @@ private:
           lineNo);
       emitPattern(owner, "for-expr-binding", itemBegin, inToken, lineNo);
       emitExpression(owner, inToken + 1, iterableEnd, lineNo);
+      if (bodyOpen < end) emitControlBodyExpression(owner, "for", "body", bodyOpen, end, lineNo);
       return;
     }
 
@@ -5667,6 +5858,65 @@ private:
       const std::size_t scrutineeEnd = bodyOpen < end ? bodyOpen : end;
       add("match-expr", owner, owner, "scrutinee=" + exprFact(scrutineeBegin, scrutineeEnd) + " mode=" + mode, lineNo);
       emitExpression(owner, scrutineeBegin, scrutineeEnd, lineNo);
+      if (bodyOpen < end) emitMatchExpressionArms(owner, bodyOpen, end, lineNo);
+    }
+  }
+
+  std::size_t emitControlBodyExpression(const std::string &owner,
+                                        const std::string &control,
+                                        const std::string &role,
+                                        std::size_t bodyOpen,
+                                        std::size_t end,
+                                        int lineNo) {
+    const std::size_t bodyClose = findMatchingToken(bodyOpen, end, "{", "}");
+    if (bodyClose >= end) return end;
+    const std::size_t bodyBegin = bodyOpen + 1;
+    std::string body = "unit";
+    const std::size_t semicolon = findTopLevelToken(bodyBegin, bodyClose, ";");
+    if (bodyBegin < bodyClose) {
+      body = semicolon < bodyClose ? "block" : exprFact(bodyBegin, bodyClose);
+    }
+    add("control-body-expr",
+        owner,
+        owner,
+        "kind=" + control + " role=" + role + " expr=" + body,
+        bodyOpen < tokens_.size() ? tokens_[bodyOpen].line : lineNo);
+    if (body == "block") {
+      for (const auto &[stmtBegin, stmtEnd] : splitTopLevel(bodyBegin, bodyClose, ";")) {
+        emitStatementRange(owner, stmtBegin, stmtEnd);
+      }
+    } else if (body != "unit") {
+      emitExpression(owner, bodyBegin, bodyClose, bodyOpen < tokens_.size() ? tokens_[bodyOpen].line : lineNo);
+    }
+    return bodyClose;
+  }
+
+  void emitMatchExpressionArms(const std::string &owner,
+                               std::size_t bodyOpen,
+                               std::size_t end,
+                               int lineNo) {
+    const std::size_t bodyClose = findMatchingToken(bodyOpen, end, "{", "}");
+    if (bodyClose >= end) return;
+    std::size_t index = 0;
+    for (const auto &[armBegin, armEnd] : splitTopLevel(bodyOpen + 1, bodyClose, ",")) {
+      if (armBegin >= armEnd) continue;
+      const std::size_t arrow = findTopLevelToken(armBegin, armEnd, "=>");
+      if (arrow >= armEnd) continue;
+      const std::size_t guardToken = findTopLevelToken(armBegin, arrow, "if");
+      const std::size_t patternEnd = guardToken < arrow ? guardToken : arrow;
+      const std::string pattern = join(armBegin, patternEnd);
+      const std::size_t exprBegin = arrow + 1;
+      const std::string expr = exprFact(exprBegin, armEnd);
+      std::string detail = "index=" + std::to_string(index) + " pattern=" + pattern +
+                           " guard=" + (guardToken < arrow ? exprFact(guardToken + 1, arrow) : "none") +
+                           " expr=" + expr;
+      add("match-arm-expr", owner, owner, detail,
+          armBegin < tokens_.size() ? tokens_[armBegin].line : lineNo);
+      emitPattern(owner, "match-expr-arm", armBegin, patternEnd,
+                  armBegin < tokens_.size() ? tokens_[armBegin].line : lineNo);
+      if (guardToken < arrow) emitExpression(owner, guardToken + 1, arrow, tokens_[guardToken].line);
+      emitExpression(owner, exprBegin, armEnd, exprBegin < tokens_.size() ? tokens_[exprBegin].line : lineNo);
+      ++index;
     }
   }
 
@@ -5675,12 +5925,14 @@ private:
     const std::string fact = exprFact(begin, end);
     add("expr", owner, owner, "kind=" + fact, lineNo);
     if (fact != "tuple" && fact != "unit" && isFullyParenthesizedExpression(begin, end)) {
+      add("paren-expr", owner, owner, "expr=" + fact, lineNo);
       emitExpression(owner, begin + 1, end - 1, lineNo);
       return;
     }
     emitPrimaryExpression(owner, begin, end, lineNo, fact);
     emitControlFlowExpression(owner, begin, end, lineNo, fact);
     emitOperatorExpression(owner, begin, end, lineNo, fact);
+    emitClosureExpression(owner, begin, end, lineNo, fact);
     emitTypeStaticCall(owner, begin, end, lineNo, fact);
     emitMethodCall(owner, begin, end, lineNo, fact);
     emitDirectCall(owner, begin, end, lineNo, fact);
@@ -5715,6 +5967,41 @@ private:
     while (end > begin && tokens_[end - 1].text == ";") --end;
     if (begin >= end) return;
     const int line = tokens_[begin].line;
+    if (tokens_[begin].text == "return") {
+      const std::size_t exprBegin = begin + 1;
+      add("stmt", owner, owner, "kind=return expr=" + (exprBegin < end ? exprFact(exprBegin, end) : "unit"), line);
+      if (exprBegin < end) emitExpression(owner, exprBegin, end, line);
+      return;
+    }
+    if (tokens_[begin].text == "break") {
+      std::string detail = "kind=break";
+      if (begin + 1 < end) detail += " expr=" + exprFact(begin + 1, end);
+      add("stmt", owner, owner, detail, line);
+      if (begin + 1 < end) emitExpression(owner, begin + 1, end, line);
+      return;
+    }
+    if (tokens_[begin].text == "continue") {
+      add("stmt", owner, owner, "kind=continue", line);
+      return;
+    }
+    if (tokens_[begin].text == "val" || tokens_[begin].text == "var" || tokens_[begin].text == "const") {
+      const std::string mode = tokens_[begin].text;
+      const std::size_t patternBegin = begin + 1;
+      const std::size_t equals = findTopLevelToken(patternBegin, end, "=");
+      const std::size_t patternEnd = equals < end ? equals : end;
+      const std::size_t colon = findTopLevelToken(patternBegin, patternEnd, ":");
+      const std::string pattern = join(patternBegin, patternEnd);
+      const std::string localName = colon < patternEnd ? join(patternBegin, colon) : pattern;
+      std::string detail = "kind=" + mode;
+      if (!localName.empty()) detail += " name=" + localName;
+      if (pattern != localName) detail += " pattern=" + pattern;
+      if (equals < end && equals + 1 < end) detail += " expr=" + exprFact(equals + 1, end);
+      add("stmt", owner, owner, detail, line);
+      emitPattern(owner, mode, patternBegin, colon < patternEnd ? colon : patternEnd, line);
+      if (colon < patternEnd) emitType(owner, "local", colon + 1, patternEnd, line);
+      if (equals < end && equals + 1 < end) emitExpression(owner, equals + 1, end, line);
+      return;
+    }
     const std::size_t assignment = findTopLevelToken(begin, end, "=");
     if (assignment < end) {
       add("stmt", owner, owner,
@@ -5732,10 +6019,14 @@ private:
       if (tokens_[i].text != "trust" || tokens_[i + 1].text != "{") continue;
       const std::size_t close = findMatchingToken(i + 1, end, "{", "}");
       if (close >= end) continue;
-      for (const auto &[stmtBegin, stmtEnd] : splitTopLevel(i + 2, close, ";")) {
-        emitStatementRange(owner, stmtBegin, stmtEnd);
-      }
+      emitBlockStatements(owner, i + 2, close);
       i = close;
+    }
+  }
+
+  void emitBlockStatements(const std::string &owner, std::size_t begin, std::size_t end) {
+    for (const auto &[stmtBegin, stmtEnd] : splitTopLevel(begin, end, ";")) {
+      emitStatementRange(owner, stmtBegin, stmtEnd);
     }
   }
 
@@ -6039,8 +6330,9 @@ std::optional<std::string> syntaxDetailValue(const std::string &detail, const st
   static const std::vector<std::string> keys{
       "kind", "owner", "visibility", "async", "trusted", "abi", "attrs", "layout",
       "signature", "attr", "role", "component", "index", "text", "parent", "constraint", "mode", "name", "pattern", "literalKind",
-      "value", "expr", "target", "op", "scrutinee", "condition", "path", "item", "iterable", "field",
-      "side", "base", "receiver", "callee", "targetType", "left", "right", "operand", "method", "guard"};
+      "type", "value", "expr", "target", "op", "scrutinee", "condition", "path", "item", "iterable", "field",
+      "variant", "segment", "side", "base", "receiver", "callee", "targetType", "left", "right", "operand", "method", "guard",
+      "capture", "form", "body", "returnType", "futureCandidate"};
   for (const auto &candidate : keys) {
     const std::string marker = " " + candidate + "=";
     const std::size_t next = detail.find(marker, start);
@@ -6103,6 +6395,18 @@ std::string syntaxLocalNameFromPattern(const std::string &pattern) {
   const std::size_t colon = pattern.find(':');
   if (colon == std::string::npos) return legacySyntaxText(pattern);
   return legacySyntaxText(pattern.substr(0, colon));
+}
+
+std::string syntaxNameFragment(std::string text) {
+  text = legacySyntaxText(std::move(text));
+  std::string out;
+  for (const char ch : text) {
+    const unsigned char c = static_cast<unsigned char>(ch);
+    if (std::isalnum(c) || ch == '_') out.push_back(ch);
+    else if (!out.empty() && out.back() != '_') out.push_back('_');
+  }
+  while (!out.empty() && out.back() == '_') out.pop_back();
+  return out.empty() ? "path" : out;
 }
 
 [[maybe_unused]] std::vector<SyntaxSpineNode> parseSyntaxSpine(const fs::path &packageRoot,
@@ -6213,6 +6517,62 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 argKind,
                 value,
                 name);
+      } else if (syntax.kind == "arg") {
+        const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+        const std::string expr = syntaxDetailValue(syntax.detail, "expr").value_or("");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "arg",
+                owner + ".arg." + std::to_string(syntax.lineNo) + "." + index,
+                index,
+                syntax.lineNo,
+                {},
+                mode,
+                expr);
+      } else if (syntax.kind == "block-arg") {
+        const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "arg.block",
+                owner + ".arg." + std::to_string(syntax.lineNo) + "." + index,
+                index,
+                syntax.lineNo,
+                {},
+                mode,
+                "block",
+                syntaxDetailValue(syntax.detail, "futureCandidate").value_or("false"));
+      } else if (syntax.kind == "path-segment") {
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string segment = syntaxDetailValue(syntax.detail, "segment").value_or("");
+        const std::string path = syntaxDetailValue(syntax.detail, "path").value_or("");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "path.segment",
+                owner + "." + role + "." + syntaxNameFragment(path) + "." + index,
+                index,
+                syntax.lineNo,
+                {},
+                role,
+                segment,
+                path);
+      } else if (syntax.kind == "interface-parent") {
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string parent = syntaxDetailValue(syntax.detail, "parent").value_or("");
+        addNode(file,
+                module,
+                "interface.parent",
+                syntax.name,
+                index,
+                syntax.lineNo,
+                {},
+                "",
+                parent);
       } else if (syntax.kind == "generic-arg") {
         const std::string argKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
@@ -6286,7 +6646,39 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
         const std::string type = typeIt != typeFacts.end() && typeIt->second.count("field") && !typeIt->second.at("field").empty()
                                      ? typeIt->second.at("field").front()
                                      : "";
-        addNode(file, module, "decl.field", syntax.name, "", syntax.lineNo, {}, "", "", type);
+        const std::string visibility = syntaxDetailValue(syntax.detail, "visibility").value_or("");
+        addNode(file, module, "decl.field", syntax.name, visibility.empty() ? "" : visibility + " ", syntax.lineNo, {}, "", "", type);
+      } else if (syntax.kind == "variant-field") {
+        const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
+        const std::string type = typeIt != typeFacts.end() && typeIt->second.count("variant-field") && !typeIt->second.at("variant-field").empty()
+                                     ? typeIt->second.at("variant-field").front()
+                                     : "";
+        const std::string visibility = syntaxDetailValue(syntax.detail, "visibility").value_or("");
+        const std::string variant = syntaxDetailValue(syntax.detail, "variant").value_or("");
+        const std::string field = syntaxDetailValue(syntax.detail, "field").value_or("");
+        addNode(file,
+                module,
+                "decl.variant-field",
+                syntax.name,
+                visibility.empty() ? "" : visibility + " ",
+                syntax.lineNo,
+                {},
+                variant,
+                field,
+                type);
+      } else if (syntax.kind == "variant-payload") {
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string variant = syntaxDetailValue(syntax.detail, "variant").value_or("");
+        const std::string type = syntaxDetailValue(syntax.detail, "type").value_or("");
+        addNode(file,
+                module,
+                "decl.variant-payload",
+                syntax.name,
+                index,
+                syntax.lineNo,
+                {},
+                variant,
+                type);
       } else if (syntax.kind == "field-init") {
         addNode(file,
                 module,
@@ -6415,10 +6807,42 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 syntaxDetailValue(syntax.detail, "expr").value_or(""));
       } else if (syntax.kind == "unit-expr") {
         addNode(file, module, "expr.unit", syntax.name, "", syntax.lineNo, {}, "", "unit");
+      } else if (syntax.kind == "paren-expr") {
+        addNode(file,
+                module,
+                "expr.paren",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "expr").value_or("unit"));
+      } else if (syntax.kind == "block-expr") {
+        addNode(file, module, "expr.block", syntax.name, "", syntax.lineNo, {}, "", "block");
       } else if (syntax.kind == "try-expr") {
         addNode(file,
                 module,
                 "expr.try",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                syntaxDetailValue(syntax.detail, "expr").value_or(""));
+      } else if (syntax.kind == "async-expr") {
+        addNode(file,
+                module,
+                "expr.async-block",
+                syntax.name,
+                "",
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "capture").value_or("read"),
+                syntaxDetailValue(syntax.detail, "body").value_or("block"));
+      } else if (syntax.kind == "await-expr") {
+        addNode(file,
+                module,
+                "expr.await",
                 syntax.name,
                 "",
                 syntax.lineNo,
@@ -6437,6 +6861,18 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 syntaxDetailValue(syntax.detail, "operand").value_or(""));
       } else if (syntax.kind == "trust-expr") {
         addNode(file, module, "expr.trust-block", syntax.name, "", syntax.lineNo, {}, "", "trust-block");
+      } else if (syntax.kind == "closure-expr") {
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "expr.closure",
+                owner,
+                syntaxDetailValue(syntax.detail, "form").value_or("expr"),
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "capture").value_or("read"),
+                syntaxDetailValue(syntax.detail, "body").value_or("unit"),
+                syntaxDetailValue(syntax.detail, "returnType").value_or(""));
       } else if (syntax.kind == "if-expr" || syntax.kind == "while-expr") {
         const std::string exprKind = syntax.kind == "if-expr" ? "expr.if" : "expr.while";
         const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("");
@@ -6466,6 +6902,19 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 syntaxDetailValue(syntax.detail, "mode").value_or("read"),
                 syntaxDetailValue(syntax.detail, "iterable").value_or(""),
                 syntaxDetailValue(syntax.detail, "item").value_or(""));
+      } else if (syntax.kind == "control-body-expr") {
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        const std::string control = syntaxDetailValue(syntax.detail, "kind").value_or("control");
+        const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("body");
+        addNode(file,
+                module,
+                "expr.control-body",
+                owner + ".control-body." + role + "." + std::to_string(syntax.lineNo),
+                control,
+                syntax.lineNo,
+                {},
+                role,
+                syntaxDetailValue(syntax.detail, "expr").value_or("unit"));
       } else if (syntax.kind == "match-expr") {
         const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
         addNode(file,
@@ -6477,6 +6926,20 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 {},
                 mode == "read" ? "" : mode,
                 syntaxDetailValue(syntax.detail, "scrutinee").value_or(""));
+      } else if (syntax.kind == "match-arm-expr") {
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+        addNode(file,
+                module,
+                "expr.match-arm",
+                owner + ".match-arm." + std::to_string(syntax.lineNo) + "." + index,
+                index,
+                syntax.lineNo,
+                {},
+                syntaxDetailValue(syntax.detail, "guard").value_or("none"),
+                syntaxDetailValue(syntax.detail, "expr").value_or("unit"),
+                pattern);
       } else if (syntax.kind == "pattern") {
         const std::string patternKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
@@ -6528,16 +6991,19 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
         const std::string paramKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string text = syntaxDetailValue(syntax.detail, "text").value_or("");
         const std::string constraint = syntaxDetailValue(syntax.detail, "constraint").value_or("");
+        const std::string paramName = syntaxDetailValue(syntax.detail, "name").value_or("");
+        const std::string paramType = syntaxDetailValue(syntax.detail, "type").value_or("");
         const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
         addNode(file,
                 module,
                 "generic-param." + paramKind,
                 owner + "." + text,
-                "",
+                paramType,
                 syntax.lineNo,
                 {},
                 constraint,
-                text);
+                text,
+                paramName);
       } else if (syntax.kind == "param") {
         const std::string paramKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
@@ -6658,7 +7124,16 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
           const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or(rawName);
           addNode(file, module, "stmt.const", owner + "." + syntaxLocalNameFromPattern(rawName), "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""), syntaxLocalTypeFromPattern(pattern));
         } else if (stmtKind == "assign") {
-          addNode(file, module, "stmt.assign", owner + "." + syntaxDetailValue(syntax.detail, "target").value_or(""), "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "expr").value_or(""));
+          const std::string op = syntaxDetailValue(syntax.detail, "op").value_or("=");
+          addNode(file,
+                  module,
+                  "stmt.assign",
+                  owner + "." + syntaxDetailValue(syntax.detail, "target").value_or(""),
+                  op,
+                  syntax.lineNo,
+                  {},
+                  "",
+                  syntaxDetailValue(syntax.detail, "expr").value_or(""));
         } else if (stmtKind == "if" || stmtKind == "while") {
           addNode(file, module, "stmt." + stmtKind, owner, "", syntax.lineNo, {}, "", syntaxDetailValue(syntax.detail, "condition").value_or(""));
         } else if (stmtKind == "if-pattern" || stmtKind == "while-pattern") {
@@ -7936,12 +8411,18 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
     if (!node.generic.empty() && !startsWith(node.kind, "block.") &&
         !startsWith(node.kind, "import.") &&
         node.kind != "attribute.arg" &&
+        node.kind != "arg" &&
+        node.kind != "arg.block" &&
+        node.kind != "decl.variant-field" &&
+        node.kind != "decl.variant-payload" &&
         !startsWith(node.kind, "pattern.") && !startsWith(node.kind, "type.") &&
         !startsWith(node.kind, "pattern-alt.") && !startsWith(node.kind, "pattern-element.") &&
         !startsWith(node.kind, "pattern-field.") && !startsWith(node.kind, "pattern-bound.") &&
+        node.kind != "path.segment" &&
         !startsWith(node.kind, "type-component.") &&
         !startsWith(node.kind, "generic-param.") && !startsWith(node.kind, "generic-arg.") &&
         node.kind != "expr.if" && node.kind != "expr.while" && node.kind != "expr.for" && node.kind != "expr.match" &&
+        node.kind != "expr.closure" && node.kind != "expr.match-arm" && node.kind != "expr.control-body" &&
         !startsWith(node.kind, "param.")) {
       if (startsWith(node.kind, "stmt.")) fact += " mode=" + node.generic;
       else fact += " generic=" + node.generic;
@@ -7955,6 +8436,16 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
       if (!node.returnType.empty()) fact += " return=" + node.returnType;
     } else if (node.kind == "decl.field" && !node.returnType.empty()) {
       fact += " type=" + node.returnType;
+      if (!node.visibility.empty()) fact += " visibility=" + declarationVisibility(node.visibility);
+    } else if (node.kind == "decl.variant-field") {
+      if (!node.generic.empty()) fact += " variant=" + node.generic;
+      if (!node.params.empty()) fact += " field=" + node.params;
+      if (!node.returnType.empty()) fact += " type=" + node.returnType;
+      if (!node.visibility.empty()) fact += " visibility=" + declarationVisibility(node.visibility);
+    } else if (node.kind == "decl.variant-payload") {
+      if (!node.generic.empty()) fact += " variant=" + node.generic;
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.params.empty()) fact += " type=" + node.params;
     } else if (node.kind == "decl.variant" && !node.params.empty()) {
       fact += " payload=" + node.params;
     } else if (node.kind == "decl.type" && !node.params.empty()) {
@@ -8004,6 +8495,8 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
     } else if (startsWith(node.kind, "generic-param.")) {
       if (!node.params.empty()) fact += " text=" + node.params;
       if (!node.generic.empty()) fact += " constraint=" + node.generic;
+      if (!node.returnType.empty()) fact += " name=" + node.returnType;
+      if (!node.visibility.empty()) fact += " type=" + node.visibility;
     } else if (startsWith(node.kind, "generic-arg.")) {
       if (!node.generic.empty()) fact += " role=" + node.generic;
       if (!node.params.empty()) fact += " text=" + node.params;
@@ -8011,6 +8504,24 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
     } else if (startsWith(node.kind, "param.")) {
       if (!node.generic.empty()) fact += " mode=" + node.generic;
       if (!node.params.empty()) fact += " name=" + node.params;
+    } else if (node.kind == "path.segment") {
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.params.empty()) fact += " segment=" + node.params;
+      if (!node.returnType.empty()) fact += " path=" + node.returnType;
+    } else if (node.kind == "interface.parent") {
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.params.empty()) fact += " parent=" + node.params;
+    } else if (node.kind == "arg" || node.kind == "arg.block") {
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.generic.empty()) fact += " mode=" + node.generic;
+      if (!node.params.empty()) fact += " expr=" + node.params;
+      if (node.kind == "arg.block" && !node.returnType.empty()) fact += " futureCandidate=" + node.returnType;
+    } else if (node.kind == "expr.closure") {
+      if (!node.generic.empty()) fact += " capture=" + node.generic;
+      if (!node.visibility.empty()) fact += " form=" + node.visibility;
+      if (!node.params.empty()) fact += " body=" + node.params;
+      if (!node.returnType.empty()) fact += " returnType=" + node.returnType;
     } else if (node.kind == "expr.if" || node.kind == "expr.while") {
       if (!node.visibility.empty()) fact += " kind=" + node.visibility;
       if (!node.generic.empty()) fact += " mode=" + node.generic;
@@ -8020,9 +8531,18 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
       if (!node.generic.empty()) fact += " mode=" + node.generic;
       if (!node.returnType.empty()) fact += " item=" + node.returnType;
       if (!node.params.empty()) fact += " iterable=" + node.params;
+    } else if (node.kind == "expr.control-body") {
+      if (!node.visibility.empty()) fact += " control=" + node.visibility;
+      if (!node.generic.empty()) fact += " role=" + node.generic;
+      if (!node.params.empty()) fact += " expr=" + node.params;
     } else if (node.kind == "expr.match") {
       if (!node.generic.empty()) fact += " mode=" + node.generic;
       if (!node.params.empty()) fact += " scrutinee=" + node.params;
+    } else if (node.kind == "expr.match-arm") {
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.returnType.empty()) fact += " pattern=" + node.returnType;
+      if (!node.generic.empty()) fact += " guard=" + node.generic;
+      if (!node.params.empty()) fact += " expr=" + node.params;
     }
     if ((node.kind == "decl.const" || node.kind == "decl.static" ||
          node.kind == "stmt.return" || node.kind == "stmt.val" || node.kind == "stmt.var" ||
@@ -8041,6 +8561,9 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
         fact += " iterable=" + node.params;
       } else {
         fact += " expr=" + node.params;
+      }
+      if (node.kind == "stmt.assign" && !node.visibility.empty()) {
+        fact += " op=" + node.visibility;
       }
       if (node.kind == "stmt.return") {
         if (!node.returnType.empty()) fact += " expected=" + node.returnType;
@@ -8100,15 +8623,27 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
                                  BuildSummary &summary) {
   (void)package;
   auto functionNameForNode = [](const ParsedAstNode &node) {
+    if (node.kind == "expr.control-body") {
+      const std::size_t marker = node.name.find(".control-body.");
+      if (marker != std::string::npos) return node.name.substr(0, marker);
+    }
+    if (node.kind == "expr.match-arm") {
+      const std::size_t marker = node.name.find(".match-arm.");
+      if (marker != std::string::npos) return node.name.substr(0, marker);
+    }
     if (node.kind == "stmt.val" || node.kind == "stmt.var" || node.kind == "stmt.const" || node.kind == "stmt.assign" ||
         node.kind == "expr.field-init" || node.kind == "expr.index-access" || node.kind == "expr.tuple-element" ||
         node.kind == "expr.field-access" || node.kind == "expr.method-call" ||
         node.kind == "expr.call" || node.kind == "expr.type-static-call" ||
         node.kind == "expr.binary" || node.kind == "expr.compare" || node.kind == "expr.prefix" ||
-        node.kind == "expr.cast" || node.kind == "expr.range" ||
+        node.kind == "expr.cast" || node.kind == "expr.range" || node.kind == "expr.closure" ||
+        node.kind == "expr.match-arm" || node.kind == "expr.control-body" ||
         startsWith(node.kind, "block.") ||
         node.kind == "expr.name" || node.kind == "expr.literal" || node.kind == "expr.unit" ||
-        node.kind == "expr.try" || node.kind == "expr.access" || node.kind == "expr.trust-block" ||
+        node.kind == "expr.paren" || node.kind == "expr.block" ||
+        node.kind == "expr.try" || node.kind == "expr.async-block" || node.kind == "expr.await" ||
+        node.kind == "expr.access" || node.kind == "expr.trust-block" ||
+        node.kind == "arg" || node.kind == "arg.block" ||
         startsWith(node.kind, "pattern.") ||
         node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var" ||
         node.kind == "stmt.for" || node.kind == "stmt.if-pattern" || node.kind == "stmt.while-pattern" ||
@@ -8226,6 +8761,10 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.mirNodes.insert("mir.operand " + functionName + " expr=trust-block kind=trust");
     } else if (expr == "unit") {
       summary.mirNodes.insert("mir.operand " + functionName + " expr=unit kind=const");
+    } else if (expr == "block") {
+      summary.mirNodes.insert("mir.operand " + functionName + " expr=block kind=block");
+      summary.mirNodes.insert("mir.rvalue " + functionName + " expr=block kind=block");
+      summary.llvmNodes.insert("llvm.block-expr-preview @" + functionName);
     } else if (!expr.empty()) {
       summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=opaque");
     }
@@ -8236,7 +8775,7 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     const std::string span = sourceRelativePathForMetadata(package, node.file) + ":" + std::to_string(node.lineNo) + ":1";
     if (startsWith(node.kind, "decl.")) {
       summary.hirNodes.insert("hir." + node.kind.substr(5) + " " + node.name + " module=" + module + " span=" + span);
-      if (!node.generic.empty()) {
+      if (!node.generic.empty() && node.kind != "decl.variant-field" && node.kind != "decl.variant-payload") {
         summary.hirNodes.insert("hir.generic-params " + node.name + " params=" + node.generic + " span=" + span);
         summary.mirNodes.insert("mir.generic-input " + node.name + " params=" + node.generic);
       }
@@ -8260,6 +8799,39 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.attribute-arg " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value + " span=" + span);
       summary.mirNodes.insert("mir.attribute-arg " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value);
       summary.llvmNodes.insert("llvm.attribute-preview " + node.name + " attr=" + attr + " kind=" + argKind + " name=" + name + " value=" + value);
+    } else if (node.kind == "arg" || node.kind == "arg.block") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string mode = node.generic.empty() ? "read" : node.generic;
+      const std::string expr = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.arg " + node.name + " index=" + index + " mode=" + mode + " expr=" + expr + " owner=" + functionName + " span=" + span);
+      emitMirExpressionFacts(functionName, expr, span);
+      summary.mirNodes.insert("mir.arg " + functionName + " index=" + index + " mode=" + mode + " operand=" + expr);
+      summary.llvmNodes.insert("llvm.arg-preview @" + functionName + " index=" + index + " mode=" + mode + " operand=" + expr);
+      if (node.kind == "arg.block") {
+        const std::string futureCandidate = node.returnType.empty() ? "false" : node.returnType;
+        summary.hirNodes.insert("hir.block-arg " + functionName + " index=" + index + " mode=" + mode + " futureCandidate=" + futureCandidate + " span=" + span);
+        summary.mirNodes.insert("mir.block-arg " + functionName + " index=" + index + " mode=" + mode + " futureCandidate=" + futureCandidate);
+        if (futureCandidate == "true") {
+          summary.mirNodes.insert("mir.future-block-arg " + functionName + " index=" + index + " capture=auto staged=true");
+          summary.llvmNodes.insert("llvm.future-block-arg-preview @" + functionName + " index=" + index + " staged=true");
+        }
+        summary.llvmNodes.insert("llvm.block-arg-preview @" + functionName + " index=" + index + " mode=" + mode + " futureCandidate=" + futureCandidate);
+      }
+    } else if (node.kind == "path.segment") {
+      const std::string role = node.generic.empty() ? "unknown" : node.generic;
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string segment = node.params.empty() ? "unknown" : node.params;
+      const std::string path = node.returnType.empty() ? "unknown" : node.returnType;
+      summary.hirNodes.insert("hir.path-segment " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path + " span=" + span);
+      summary.mirNodes.insert("mir.path-segment " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path);
+      summary.llvmNodes.insert("llvm.path-segment-preview " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path);
+    } else if (node.kind == "interface.parent") {
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string parent = node.params.empty() ? "unknown" : node.params;
+      summary.hirNodes.insert("hir.interface-parent " + node.name + " index=" + index + " parent=" + parent + " span=" + span);
+      summary.mirNodes.insert("mir.interface-parent " + node.name + " index=" + index + " parent=" + parent);
+      summary.llvmNodes.insert("llvm.interface-parent-preview " + node.name + " index=" + index + " parent=" + parent);
     }
     if (node.kind == "decl.fn" || node.kind == "decl.async-fn") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
@@ -8284,16 +8856,37 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
         summary.hirNodes.insert("hir.interface-parents " + node.name + " parents=" + node.params);
         summary.mirNodes.insert("mir.interface-parents " + node.name + " parents=" + node.params);
       }
+    } else if (node.kind == "decl.impl") {
+      const std::string trust = node.trusted ? " trusted=true" : "";
+      summary.hirNodes.insert("hir.impl-detail " + node.name + " module=" + module + " span=" + span + trust);
+      summary.mirNodes.insert("mir.impl " + node.name + trust);
+      summary.llvmNodes.insert("llvm.impl-preview " + node.name + trust);
     } else if (node.kind == "decl.field") {
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
-      summary.hirNodes.insert("hir.field " + node.name + " type=" + type + " span=" + span);
-      summary.mirNodes.insert("mir.field " + node.name + " type=" + type);
-      summary.llvmNodes.insert("llvm.field-preview " + node.name + " type=" + type);
+      const std::string visibility = node.visibility.empty() ? "package" : declarationVisibility(node.visibility);
+      summary.hirNodes.insert("hir.field " + node.name + " type=" + type + " span=" + span + " visibility=" + visibility);
+      summary.mirNodes.insert("mir.field " + node.name + " type=" + type + " visibility=" + visibility);
+      summary.llvmNodes.insert("llvm.field-preview " + node.name + " type=" + type + " visibility=" + visibility);
     } else if (node.kind == "decl.variant") {
       const std::string payload = node.params.empty() ? "unit" : node.params;
       summary.hirNodes.insert("hir.enum-variant " + node.name + " payload=" + payload + " span=" + span);
       summary.mirNodes.insert("mir.enum-variant " + node.name + " payload=" + payload);
       summary.llvmNodes.insert("llvm.variant-preview " + node.name + " payload=" + payload);
+    } else if (node.kind == "decl.variant-field") {
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      const std::string variant = node.generic.empty() ? "unknown" : node.generic;
+      const std::string field = node.params.empty() ? "unknown" : node.params;
+      const std::string visibility = node.visibility.empty() ? "package" : declarationVisibility(node.visibility);
+      summary.hirNodes.insert("hir.variant-field " + node.name + " variant=" + variant + " field=" + field + " type=" + type + " visibility=" + visibility + " span=" + span);
+      summary.mirNodes.insert("mir.variant-field " + node.name + " variant=" + variant + " field=" + field + " type=" + type + " visibility=" + visibility);
+      summary.llvmNodes.insert("llvm.variant-field-preview " + node.name + " variant=" + variant + " field=" + field + " type=" + type + " visibility=" + visibility);
+    } else if (node.kind == "decl.variant-payload") {
+      const std::string variant = node.generic.empty() ? "unknown" : node.generic;
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string type = node.params.empty() ? "inferred" : node.params;
+      summary.hirNodes.insert("hir.variant-payload " + node.name + " variant=" + variant + " index=" + index + " type=" + type + " span=" + span);
+      summary.mirNodes.insert("mir.variant-payload " + node.name + " variant=" + variant + " index=" + index + " type=" + type);
+      summary.llvmNodes.insert("llvm.variant-payload-preview " + node.name + " variant=" + variant + " index=" + index + " type=" + type);
     } else if (node.kind == "decl.interface-method") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.interface-method " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
@@ -8422,12 +9015,40 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.unit " + functionName + " span=" + span);
       summary.mirNodes.insert("mir.unit " + functionName);
       summary.llvmNodes.insert("llvm.unit-detail-preview @" + functionName);
+    } else if (node.kind == "expr.paren") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string expr = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.paren-expr " + functionName + " expr=" + expr + " span=" + span);
+      emitMirExpressionFacts(functionName, expr, span);
+      summary.mirNodes.insert("mir.paren-expr " + functionName + " expr=" + expr);
+      summary.llvmNodes.insert("llvm.paren-expr-preview @" + functionName + " expr=" + expr);
+    } else if (node.kind == "expr.block") {
+      const std::string functionName = functionNameForNode(node);
+      summary.hirNodes.insert("hir.block-expr " + functionName + " span=" + span);
+      emitMirExpressionFacts(functionName, "block", span);
+      summary.mirNodes.insert("mir.block-expr " + functionName + " span=" + span);
+      summary.llvmNodes.insert("llvm.block-expr-detail-preview @" + functionName);
     } else if (node.kind == "expr.try") {
       const std::string functionName = functionNameForNode(node);
       summary.hirNodes.insert("hir.try-expr " + functionName + " expr=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.try-expr " + functionName + " expr=" + node.params);
       summary.llvmNodes.insert("llvm.try-detail-preview @" + functionName + " expr=" + node.params);
+    } else if (node.kind == "expr.async-block") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string capture = node.generic.empty() ? "read" : node.generic;
+      const std::string body = node.params.empty() ? "block" : node.params;
+      summary.hirNodes.insert("hir.async-expr " + functionName + " capture=" + capture + " body=" + body + " span=" + span);
+      emitMirExpressionFacts(functionName, "async-block", span);
+      summary.mirNodes.insert("mir.async-expr " + functionName + " capture=" + capture + " body=" + body + " staged=true");
+      summary.llvmNodes.insert("llvm.async-detail-preview @" + functionName + " capture=" + capture + " body=" + body + " staged=true");
+    } else if (node.kind == "expr.await") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string expr = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.await-expr " + functionName + " expr=" + expr + " span=" + span);
+      emitMirExpressionFacts(functionName, "await:" + expr, span);
+      summary.mirNodes.insert("mir.await-expr " + functionName + " expr=" + expr + " staged=true");
+      summary.llvmNodes.insert("llvm.await-detail-preview @" + functionName + " expr=" + expr + " staged=true");
     } else if (node.kind == "expr.access") {
       const std::string functionName = functionNameForNode(node);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
@@ -8440,6 +9061,16 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.trust-expr " + functionName + " span=" + span);
       summary.mirNodes.insert("mir.trust-expr " + functionName);
       summary.llvmNodes.insert("llvm.trust-detail-preview @" + functionName);
+    } else if (node.kind == "expr.closure") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string capture = node.generic.empty() ? "read" : node.generic;
+      const std::string form = node.visibility.empty() ? "expr" : node.visibility;
+      const std::string body = node.params.empty() ? (form == "block" ? "block" : "unit") : node.params;
+      const std::string returnType = node.returnType.empty() ? "inferred" : node.returnType;
+      summary.hirNodes.insert("hir.closure-expr " + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType + " span=" + span);
+      if (body != "block") emitMirExpressionFacts(functionName, body, span);
+      summary.mirNodes.insert("mir.closure " + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType + " mayEscape=false");
+      summary.llvmNodes.insert("llvm.closure-detail-preview @" + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType);
     } else if (startsWith(node.kind, "pattern.")) {
       const std::string functionName = functionNameForNode(node);
       const std::string patternKind = node.kind.substr(8);
@@ -8497,9 +9128,11 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string paramKind = node.kind.substr(14);
       const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
       const std::string constraint = node.generic.empty() ? "none" : node.generic;
-      summary.hirNodes.insert("hir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " span=" + span);
-      summary.mirNodes.insert("mir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint);
-      summary.llvmNodes.insert("llvm.generic-param-preview " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint);
+      const std::string paramName = node.returnType.empty() ? "unknown" : node.returnType;
+      const std::string paramType = node.visibility.empty() ? "none" : node.visibility;
+      summary.hirNodes.insert("hir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " span=" + span + " name=" + paramName + " type=" + paramType);
+      summary.mirNodes.insert("mir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " name=" + paramName + " type=" + paramType);
+      summary.llvmNodes.insert("llvm.generic-param-preview " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " name=" + paramName + " type=" + paramType);
     } else if (startsWith(node.kind, "generic-arg.")) {
       const std::string argKind = node.kind.substr(12);
       const std::string role = node.generic.empty() ? "unknown" : node.generic;
@@ -8542,6 +9175,15 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=for kind=for item=" + item + " mode=" + mode + " iterable=" + node.params);
       summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=for item=" + item + " mode=" + mode + " iterable=" + node.params);
+    } else if (node.kind == "expr.control-body") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string control = node.visibility.empty() ? "control" : node.visibility;
+      const std::string role = node.generic.empty() ? "body" : node.generic;
+      const std::string body = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.control-body-expr " + functionName + " control=" + control + " role=" + role + " expr=" + body + " span=" + span);
+      if (body != "unit" && body != "block") emitMirExpressionFacts(functionName, body, span);
+      summary.mirNodes.insert("mir.control-body " + functionName + " control=" + control + " role=" + role + " body=" + body);
+      summary.llvmNodes.insert("llvm.control-body-preview @" + functionName + " control=" + control + " role=" + role + " body=" + body);
     } else if (node.kind == "expr.match") {
       const std::string functionName = functionNameForNode(node);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
@@ -8549,6 +9191,17 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=match kind=match mode=" + mode + " scrutinee=" + node.params);
       summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=match mode=" + mode + " scrutinee=" + node.params);
+    } else if (node.kind == "expr.match-arm") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string pattern = node.returnType.empty() ? "unknown" : node.returnType;
+      const std::string guard = node.generic.empty() ? "none" : node.generic;
+      const std::string body = node.params.empty() ? "unit" : node.params;
+      summary.hirNodes.insert("hir.match-expr-arm " + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " expr=" + body + " span=" + span);
+      if (guard != "none") emitMirExpressionFacts(functionName, guard, span);
+      emitMirExpressionFacts(functionName, body, span);
+      summary.mirNodes.insert("mir.match-expr-arm " + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " body=" + body);
+      summary.llvmNodes.insert("llvm.match-arm-preview @" + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " body=" + body);
     } else if (node.kind == "stmt.return") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.return " + node.name + " expr=" + node.params + " expected=" + returnType + " span=" + span);
@@ -8582,11 +9235,12 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     } else if (node.kind == "stmt.assign") {
       const std::string functionName = functionNameForNode(node);
       const std::string localName = localNameForNode(node);
-      summary.hirNodes.insert("hir.assign " + node.name + " expr=" + node.params + " span=" + span);
+      const std::string assignOp = node.visibility.empty() ? "=" : node.visibility;
+      summary.hirNodes.insert("hir.assign " + node.name + " expr=" + node.params + " span=" + span + " op=" + assignOp);
       emitMirExpressionFacts(functionName, node.params, span);
-      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params);
-      summary.mirNodes.insert("mir.store-preview " + functionName + " place=%" + localName + " value=" + node.params);
-      summary.llvmNodes.insert("llvm.store-preview @" + functionName + " %" + localName + " value=" + node.params);
+      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params + " op=" + assignOp);
+      summary.mirNodes.insert("mir.store-preview " + functionName + " place=%" + localName + " value=" + node.params + " op=" + assignOp);
+      summary.llvmNodes.insert("llvm.store-preview @" + functionName + " %" + localName + " value=" + node.params + " op=" + assignOp);
       emitCallPreview(node.params, functionName);
     } else if (node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var") {
       const std::string functionName = functionNameForNode(node);
