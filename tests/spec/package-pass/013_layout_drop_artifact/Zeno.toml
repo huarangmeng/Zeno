@@ -6,8 +6,15 @@
 # zmeta-contains: layoutFingerprint = "fnv1a64:
 # zmeta-contains: dropFingerprint = "fnv1a64:
 # zmeta-contains: CPoint:C:fingerprint=
-# zmeta-contains: Packet:Packed:fingerprint=
+# zmeta-contains: Packet:Packed(1):fingerprint=
 # zmeta-contains: Resource:Auto:fingerprint=
+# zmeta-contains: hir.ctfe-layout-query CPoint layout=C fields=2 key=fnv1a64:
+# zmeta-contains: hir.ctfe-layout-field Packet.tag owner=Packet index=0 type=I32 layout=Packed(1) span=src/lib.zn:9:1
+# zmeta-contains: mir.layout-query Packet layout=Packed(1) fields=2 key=fnv1a64:
+# zmeta-contains: mir.verifier-layout-query Resource result=accepted layout=Auto fields=1 key=fnv1a64:
+# zmeta-contains: mir.layout-field-query Packet.tag owner=Packet index=0 type=I32 offset=field-index:0 size=4 align=1 layout=Packed(1)
+# zmeta-contains: llvm.layout-constant-preview %Packet layout=Packed(1) fields=2 key=fnv1a64:
+# zmeta-contains: llvm.layout-field-preview %Packet.tag index=0 offset=field-index:0 size=4 align=1 layout=Packed(1)
 # zmeta-contains: dropGlue = ["Resource:destroy"]
 # zmeta-contains: layouts=fnv1a64:
 # zmeta-contains: drop=fnv1a64:

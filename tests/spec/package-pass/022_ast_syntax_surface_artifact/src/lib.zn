@@ -299,3 +299,165 @@ fn parenExpression(value: U32) -> U32 {
     val grouped = (value + 1);
     return grouped;
 }
+
+struct MoveBox {
+    value: U32,
+}
+
+impl MoveBox {
+    fn intoValue(move self) -> U32 {
+        return self.value;
+    }
+}
+
+fn moveReceiverCall(move holder: MoveBox) -> U32 {
+    return move holder.intoValue();
+}
+
+@layout(C)
+pub struct CPacket {
+    pub tag: U8,
+    pub length: U16,
+}
+
+@layout(Packed(2))
+struct PackedHeader {
+    tag: U8,
+    length: U16,
+}
+
+@export("zeno_surface_maybe", bridge: C)
+pub fn exportedMaybe(value: I32) -> Option<I32> {
+    return Some(value);
+}
+
+fn integerLiteralForms() -> U32 {
+    const HexValue: U32 = 0xff;
+    val binary = 0b1010;
+    val separated = 1_000_000;
+    return HexValue + binary + separated;
+}
+
+private struct FileSecret {
+    value: U32,
+}
+
+private fn hiddenValue(secret: FileSecret) -> U32 {
+    return secret.value;
+}
+
+private struct LocalLayout {
+    size: USize,
+    align: USize,
+}
+
+@noPanic
+fn guaranteedValue(value: I32) -> I32 {
+    return value;
+}
+
+@noAlloc
+fn stackOnly(value: U32) -> U32 {
+    val next = value + 1;
+    return next;
+}
+
+fn failFast(message: StringSlice) -> Never {
+    panic(message);
+}
+
+fn allocationTrap() -> Never {
+    oom(LocalLayout { size: 1, align: 1 });
+}
+
+fn selectOverload(value: I32) -> I32 {
+    return value;
+}
+
+fn selectOverload(value: U32) -> U32 {
+    return value;
+}
+
+fn overloadDispatch() -> U32 {
+    const signed: I32 = 1;
+    const unsigned: U32 = 2;
+    val left = selectOverload(signed);
+    val right = selectOverload(unsigned);
+    return right;
+}
+
+struct WriterSlot {
+    writer: Box<Writer>,
+}
+
+fn moveWriterSlot(move slot: WriterSlot) -> Box<Writer> {
+    return slot.writer;
+}
+
+interface Measured {
+    fn measure(self) -> U32;
+}
+
+impl Measured for Counter {
+    fn measure(self) -> U32 {
+        return self.current;
+    }
+}
+
+fn makeMeasured() -> Measured {
+    return Counter { current: 1, end: 2 };
+}
+
+fn readMeasured() -> U32 {
+    val measured = makeMeasured();
+    return measured.measure();
+}
+
+fn raiiScopeDrop() -> U32 {
+    val counter = Counter { current: 3, end: 4 };
+    return counter.current;
+}
+
+fn returnResource() -> Counter {
+    val counter = Counter { current: 5, end: 6 };
+    return counter;
+}
+
+fn tryCleanupResource() -> Result<U32, ParseError> {
+    val counter = Counter { current: 7, end: 8 };
+    val parsed = try parseDigit(counter.current);
+    return Ok(parsed);
+}
+
+fn enumPayloadModes(readMaybe: Option<U32>, mut writeMaybe: Option<U32>, move ownedMaybe: Option<U32>) -> U32 {
+    if (readMaybe is Some(readValue)) {
+        observe(readValue);
+    }
+    if (writeMaybe is mut Some(writeValue)) {
+        observe(writeValue);
+    }
+    if (ownedMaybe is move Some(movedValue)) {
+        return movedValue;
+    }
+    return 0;
+}
+
+fn staticConsumerDispatch() -> U32 {
+    var counter = Counter { current: 1, end: 2 };
+    return staticConsumer(mut counter, 7);
+}
+
+fn callBoxWriter(mut writer: Box<Writer>, bytes: ArraySlice<U8>) -> Result<USize, ParseError> {
+    return writer.write(bytes);
+}
+
+fn closureCapabilityModes() -> U32 {
+    var total: U32 = 0;
+    val readOnly = (x: U32) => x + total;
+    val mutating = () -> U32 { total = total + 1; return total; };
+    val consuming = move () -> U32 { return total; };
+    return total;
+}
+
+type MutableTransform = MutFn<Unit>;
+type OwningTransform = OnceFn<U32>;

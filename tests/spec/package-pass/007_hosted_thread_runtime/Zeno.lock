@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "hostedThread"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:7a9559d0004cfb6e"
-contentHash = "fnv1a64:6a8d2fa1a62039a0"
+manifestHash = "fnv1a64:dcb05e2a105a0d0b"
+contentHash = "fnv1a64:7732fe2f79e9dc21"
 trust = []
 dependencies = [
   { key = "std", package = "std" },

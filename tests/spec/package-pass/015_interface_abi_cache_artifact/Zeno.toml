@@ -17,8 +17,12 @@
 # zmeta-contains: cost=fnv1a64:
 # zmeta-contains: interfaces = ["ThreadWriter", "Writer"]
 # zmeta-contains: impls = ["ThreadWriter for Service", "Writer for Service"]
+# zmeta-contains: hir.send-sync-candidate Service auto=true reason=plain-data span=src/lib.zn:9:1
+# zmeta-contains: hir.send-sync Service capability=Send source=auto span=src/lib.zn:9:1
+# zmeta-contains: mir.verifier-send-sync Service capability=Send result=accepted reason=auto-plain-data span=src/lib.zn:9:1
+# zmeta-contains: llvm.send-sync-preview Service capability=Send source=auto
 # zmeta-contains: genericSignatures = ["fn identity<T>"]
-# zmeta-contains: staticInterfaceReturns = ["identity->T", "makeWriter->Writer"]
+# zmeta-contains: staticInterfaceReturns = ["makeWriter->Writer"]
 # zmeta-contains: exports = ["zeno_service_id:abi=C"]
 # zmeta-contains: trustCapabilities = ["ffi", "manifest:dependencyTrust=false", "manifest:ffi=true", "manifest:hardware=false", "manifest:inlineAsm=false", "manifest:interrupts=false", "manifest:rawMemory=false", "trust-block"]
 # zmeta-contains: costInputs = ["box-interface", "closure-dispatch", "slice-provenance"]

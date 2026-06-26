@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "layoutDrop"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:826b3d4296500ca3"
-contentHash = "fnv1a64:a28ed31317fe259d"
+manifestHash = "fnv1a64:8c8ce1d5031e58c4"
+contentHash = "fnv1a64:099e00aed9ffce38"
 trust = []
 dependencies = [
 ]

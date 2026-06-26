@@ -789,6 +789,50 @@ std::string baseTypeName(std::string type) {
   return trim(type);
 }
 
+struct CtfeStaticSafety {
+  bool accepted = true;
+  std::string reason = "ctfe-materialized";
+  std::string message;
+};
+
+CtfeStaticSafety classifyStaticInitializerSafety(const std::string &line,
+                                                 const std::string &staticType,
+                                                 const std::set<std::string> &externFunctions) {
+  if (contains(line, "trust {")) {
+    return CtfeStaticSafety{false, "dynamic-init",
+                            "static initializer must be CTFE; implicit dynamic static initialization is not v1"};
+  }
+  if (contains(line, ".withCapacity(") || contains(line, "String.from(")) {
+    return CtfeStaticSafety{false, "runtime-allocation",
+                            "static initializer must be CTFE-materialized data; runtime allocation and global destruction must be explicit"};
+  }
+  if (contains(line, "File.open(") || contains(line, "readFileSync(") || contains(line, "writeFileSync(")) {
+    return CtfeStaticSafety{false, "runtime-io",
+                            "static initializer cannot perform runtime I/O; I/O must be explicit runtime code"};
+  }
+  if (contains(line, "Thread.spawn")) {
+    return CtfeStaticSafety{false, "thread-start",
+                            "static initializer cannot start threads; thread creation must be explicit runtime code"};
+  }
+  if (contains(line, "runtime.spawn") || contains(line, "TaskGroup<")) {
+    return CtfeStaticSafety{false, "task-runtime",
+                            "static initializer cannot create task runtime work; task creation must be explicit runtime code"};
+  }
+  const std::string staticBase = baseTypeName(staticType);
+  if (staticBase == "String" || staticBase == "Vector" || staticBase == "Map" ||
+      staticBase == "Set" || staticBase == "Box") {
+    return CtfeStaticSafety{false, "global-destructor",
+                            "static initializer cannot require exit-time global destruction; use explicit runtime-owned state"};
+  }
+  for (const auto &externName : externFunctions) {
+    if (contains(line, externName + "(")) {
+      return CtfeStaticSafety{false, "extern-call",
+                              "static initializer must be CTFE; extern calls cannot execute at compile time"};
+    }
+  }
+  return CtfeStaticSafety{};
+}
+
 bool containsNestedType(const std::string &type, const std::string &name) {
   const std::regex pattern("(^|[^A-Za-z0-9_])" + name + "([^A-Za-z0-9_]|$)");
   return std::regex_search(type, pattern);
@@ -819,6 +863,15 @@ std::string firstCallArgument(const std::string &line) {
   if (startsWith(arg, "move ")) arg = trim(arg.substr(5));
   if (startsWith(arg, "mut ")) arg = trim(arg.substr(4));
   return arg;
+}
+
+bool isIntegerLiteralText(const std::string &expr) {
+  static const std::regex decimalPattern(R"([0-9](?:_?[0-9])*)");
+  static const std::regex hexPattern(R"(0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*)");
+  static const std::regex binaryPattern(R"(0[bB][01](?:_?[01])*)");
+  return std::regex_match(expr, decimalPattern) ||
+         std::regex_match(expr, hexPattern) ||
+         std::regex_match(expr, binaryPattern);
 }
 
 struct ExportAttribute {
@@ -1308,7 +1361,7 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
       if (std::regex_match(expr, std::regex(R"((?:[0-9]+\.[0-9]+|[0-9]+[eE][+-]?[0-9]+|[0-9]+\.[0-9]+[eE][+-]?[0-9]+))"))) {
         return "FloatLiteral";
       }
-      if (std::regex_match(expr, std::regex(R"([0-9]+)"))) return "IntLiteral";
+      if (isIntegerLiteralText(expr)) return "IntLiteral";
       if (std::regex_match(expr, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)")) && variableTypes.count(expr)) {
         if (normalizeSignatureType(variableTypes[expr]) == "Unknown") return std::nullopt;
         return normalizeSignatureType(variableTypes[expr]);
@@ -2119,31 +2172,13 @@ std::vector<Diagnostic> sourceSemanticDiagnostics(const SourceText &source) {
     }
     const bool staticInitializer = startsWith(trimmed, "static ");
     if (staticInitializer) {
-      if (contains(trimmed, "trust {")) {
-        add("E0801", "static initializer must be CTFE; implicit dynamic static initialization is not v1");
-      } else if (contains(trimmed, ".withCapacity(") || contains(trimmed, "String.from(")) {
-        add("E0801", "static initializer must be CTFE-materialized data; runtime allocation and global destruction must be explicit");
-      } else if (contains(trimmed, "File.open(") || contains(trimmed, "readFileSync(") || contains(trimmed, "writeFileSync(")) {
-        add("E0801", "static initializer cannot perform runtime I/O; I/O must be explicit runtime code");
-      } else if (contains(trimmed, "Thread.spawn")) {
-        add("E0801", "static initializer cannot start threads; thread creation must be explicit runtime code");
-      } else if (contains(trimmed, "runtime.spawn") || contains(trimmed, "TaskGroup<")) {
-        add("E0801", "static initializer cannot create task runtime work; task creation must be explicit runtime code");
-      } else {
-        if (auto staticDecl = matchRegex(trimmed, staticDeclPattern)) {
-          const std::string staticType = normalizeSignatureType((*staticDecl)[1]);
-          const std::string staticBase = baseTypeName(staticType);
-          if (staticBase == "String" || staticBase == "Vector" || staticBase == "Map" ||
-              staticBase == "Set" || staticBase == "Box") {
-            add("E0801", "static initializer cannot require exit-time global destruction; use explicit runtime-owned state");
-          }
-        }
-        for (const auto &externName : trustExternFunctions) {
-          if (contains(trimmed, externName + "(")) {
-            add("E0801", "static initializer must be CTFE; extern calls cannot execute at compile time");
-            break;
-          }
-        }
+      std::string staticType;
+      if (auto staticDecl = matchRegex(trimmed, staticDeclPattern)) {
+        staticType = normalizeSignatureType((*staticDecl)[1]);
+      }
+      const auto safety = classifyStaticInitializerSafety(trimmed, staticType, trustExternFunctions);
+      if (!safety.accepted) {
+        add("E0801", safety.message);
       }
     }
     if (startsWith(trimmed, "static ") && contains(trimmed, ": StringSlice")) {
@@ -4273,7 +4308,7 @@ std::string expressionAstFact(std::string expr) {
   if (expr.size() >= 2 && expr.front() == '"' && expr.back() == '"') return "string-literal";
   if (expr.size() >= 3 && expr.front() == '\'' && expr.back() == '\'') return "char-literal";
   if (std::regex_match(expr, std::regex(R"([0-9]+\.[0-9]+)"))) return "float-literal:" + expr;
-  if (std::regex_match(expr, std::regex(R"([0-9]+)"))) return "int-literal:" + expr;
+  if (isIntegerLiteralText(expr)) return "int-literal:" + expr;
   if (auto cast = matchRegex(expr, std::regex(R"(^(.+)\s+as\s+(.+)$)"))) {
     return "cast:" + trim(std::string((*cast)[2]));
   }
@@ -4366,7 +4401,7 @@ std::string syntaxExpressionFact(const std::vector<SyntaxToken> &tokens,
 std::string syntaxTypeKind(const std::string &typeText) {
   const std::string text = trim(typeText);
   if (text.empty()) return "missing";
-  if (startsWith(text, "Fn<")) return "fn";
+  if (startsWith(text, "Fn<") || startsWith(text, "MutFn<") || startsWith(text, "OnceFn<")) return "fn";
   if (startsWith(text, "mut ")) return "access:mut";
   if (text == "Self") return "self";
   if (text == "Bool" || text == "I8" || text == "I16" || text == "I32" || text == "I64" ||
@@ -4393,6 +4428,75 @@ std::string syntaxPatternKind(const std::string &patternText) {
   if (std::regex_match(text, std::regex(R"([0-9]+|true|false|'.*'|".*")"))) return "literal";
   if (contains(text, ".")) return "path";
   return "binding";
+}
+
+std::string stripPatternAccessMode(std::string pattern) {
+  pattern = trim(pattern);
+  if (startsWith(pattern, "move ")) return trim(pattern.substr(5));
+  if (startsWith(pattern, "mut ")) return trim(pattern.substr(4));
+  return pattern;
+}
+
+std::vector<std::string> splitTopLevelAlternatives(const std::string &text) {
+  std::vector<std::string> out;
+  std::string current;
+  int depth = 0;
+  bool inString = false;
+  bool inChar = false;
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    const char c = text[i];
+    const bool escaped = i > 0 && text[i - 1] == '\\';
+    if (!inChar && c == '"' && !escaped) inString = !inString;
+    if (!inString && c == '\'' && !escaped) inChar = !inChar;
+    if (!inString && !inChar) {
+      if (c == '(' || c == '<' || c == '{' || c == '[') ++depth;
+      else if (c == ')' || c == '>' || c == '}' || c == ']') --depth;
+      else if (c == '|' && depth == 0) {
+        if (!trim(current).empty()) out.push_back(trim(current));
+        current.clear();
+        continue;
+      }
+    }
+    current.push_back(c);
+  }
+  if (!trim(current).empty()) out.push_back(trim(current));
+  return out;
+}
+
+std::size_t findTopLevelChar(const std::string &text, char target) {
+  int depth = 0;
+  bool inString = false;
+  bool inChar = false;
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    const char c = text[i];
+    const bool escaped = i > 0 && text[i - 1] == '\\';
+    if (!inChar && c == '"' && !escaped) inString = !inString;
+    if (!inString && c == '\'' && !escaped) inChar = !inChar;
+    if (inString || inChar) continue;
+    if (c == target && depth == 0) return i;
+    if (c == '(' || c == '<' || c == '{' || c == '[') ++depth;
+    else if (c == ')' || c == '>' || c == '}' || c == ']') --depth;
+  }
+  return std::string::npos;
+}
+
+std::vector<std::string> enumPayloadBindings(const std::string &patternText) {
+  std::vector<std::string> bindings;
+  for (const auto &rawAlt : splitTopLevelAlternatives(patternText)) {
+    const std::string alt = stripPatternAccessMode(rawAlt);
+    const std::size_t open = findTopLevelChar(alt, '(');
+    if (open == std::string::npos) continue;
+    const auto content = parenthesizedContentAt(alt, open);
+    if (!content) continue;
+    for (const auto &rawElement : splitArguments(*content)) {
+      const std::string element = stripPatternAccessMode(rawElement);
+      if (syntaxPatternKind(element) != "binding") continue;
+      if (std::regex_match(element, std::regex(R"([A-Za-z_][A-Za-z0-9_]*)"))) {
+        bindings.push_back(element);
+      }
+    }
+  }
+  return bindings;
 }
 
 class SyntaxSpineParser {
@@ -4503,9 +4607,13 @@ private:
     const std::string text = join(begin, current_);
     add("attribute", moduleName_, text, "kind=attribute", line);
     pendingAttributes_.push_back(text);
-    if (contains(text, "@layout(C)")) pendingLayout_ = "C";
-    else if (contains(text, "@layout(Source)")) pendingLayout_ = "Source";
-    else if (contains(text, "@layout(Packed")) pendingLayout_ = "Packed";
+    if (contains(text, "@layout(C)")) {
+      pendingLayout_ = "C";
+    } else if (contains(text, "@layout(Source)")) {
+      pendingLayout_ = "Source";
+    } else if (auto alignment = packedAlignmentFromAttribute(text)) {
+      pendingLayout_ = "Packed(" + std::to_string(*alignment) + ")";
+    }
   }
 
   void emitAttributeArgs(const std::string &attributeName,
@@ -4919,6 +5027,10 @@ private:
     if (!alreadyConsumedOpen && !match("{")) return;
     std::string detail = "kind=body";
     if (!role.empty()) detail += " role=" + role;
+    if (current_ > 0 && tokens_[current_ - 1].text == "{") {
+      const std::size_t close = findMatchingToken(current_ - 1, tokens_.size(), "{", "}");
+      if (close < tokens_.size()) detail += " endLine=" + std::to_string(tokens_[close].line);
+    }
     add("block", owner, owner, detail, lineNo);
     while (!eof() && !check("}")) {
       if (isItemKeyword(peek().text) && (peek().text != "const" && peek().text != "static")) {
@@ -5384,19 +5496,28 @@ private:
                   std::size_t end,
                   int lineNo) {
     (void)lineNo;
+    std::size_t index = 0;
     for (const auto &[paramBegin, paramEnd] : splitTopLevel(begin, end, ",")) {
       if (paramBegin >= paramEnd) continue;
       std::size_t nameBegin = paramBegin;
       std::string mode = "read";
       if (tokens_[nameBegin].text == "mut" || tokens_[nameBegin].text == "move") mode = tokens_[nameBegin++].text;
       if (nameBegin < paramEnd && tokens_[nameBegin].text == "self") {
-        add("param", owner, owner, "kind=receiver mode=" + mode + " name=self", tokens_[paramBegin].line);
+        add("param", owner, owner,
+            "kind=receiver mode=" + mode + " name=self index=" + std::to_string(index) + " type=Self",
+            tokens_[paramBegin].line);
+        ++index;
         continue;
       }
       const std::size_t colon = findTopLevelToken(nameBegin, paramEnd, ":");
       const std::string name = colon < paramEnd ? join(nameBegin, colon) : join(nameBegin, paramEnd);
-      add("param", owner, owner, "kind=value mode=" + mode + " name=" + name, tokens_[paramBegin].line);
+      const std::string type = colon < paramEnd ? join(colon + 1, paramEnd) : "inferred";
+      add("param", owner, owner,
+          "kind=value mode=" + mode + " name=" + name +
+              " index=" + std::to_string(index) + " type=" + type,
+          tokens_[paramBegin].line);
       if (colon < paramEnd) emitType(owner, "param", colon + 1, paramEnd, tokens_[paramBegin].line);
+      ++index;
     }
   }
 
@@ -5496,6 +5617,7 @@ private:
       } else {
         form = "block";
         body = "block";
+        if (bodyOpen < end) bodyBegin = bodyOpen + 1;
       }
     } else if (after < end && tokens_[after].text == "=>") {
       form = "expr";
@@ -5505,6 +5627,7 @@ private:
       if (bodyOpen < end) {
         form = "block";
         body = "block";
+        bodyBegin = bodyOpen + 1;
       }
     }
 
@@ -5513,8 +5636,22 @@ private:
       body = exprFact(bodyBegin, bodyEnd);
     }
 
+    auto hasMutatingAssignment = [&](std::size_t from, std::size_t to) {
+      static const std::set<std::string> assignmentOps = {"=", "+=", "-=", "*=", "/=", "%="};
+      for (std::size_t i = from; i < to && i < tokens_.size(); ++i) {
+        if (!assignmentOps.count(tokens_[i].text)) continue;
+        const std::string previous = i > 0 ? tokens_[i - 1].text : "";
+        if (previous == "val" || previous == "var" || previous == "let" || previous == "const") continue;
+        return true;
+      }
+      return false;
+    };
+    const std::string capability = capture == "move"
+                                       ? "OnceFn"
+                                       : (form == "block" && hasMutatingAssignment(bodyBegin, end) ? "MutFn" : "Fn");
     std::string detail = "capture=" + capture + " form=" + form + " body=" + body;
     if (!returnType.empty()) detail += " returnType=" + returnType;
+    detail += " capability=" + capability;
     add("closure-expr", owner, owner, detail, lineNo);
     if (form == "expr" && bodyBegin < bodyEnd) emitExpression(owner, bodyBegin, bodyEnd, lineNo);
   }
@@ -5761,8 +5898,9 @@ private:
       const bool isMove = startsWith(fact, "move:");
       const std::string mode = isMove ? "move" : "mut";
       const std::size_t exprBegin = begin < end && tokens_[begin].text == mode ? begin + 1 : begin;
-      add("access-expr", owner, owner, "mode=" + mode + " operand=" + fact.substr(mode.size() + 1), lineNo);
-      if (exprBegin < end) emitExpression(owner, exprBegin, end, lineNo);
+      const std::string operand = fact.substr(mode.size() + 1);
+      add("access-expr", owner, owner, "mode=" + mode + " operand=" + operand, lineNo);
+      if (exprBegin < end && !startsWith(operand, "method-call:")) emitExpression(owner, exprBegin, end, lineNo);
     } else if (fact == "async-block") {
       const bool moveCapture = begin + 1 < end && tokens_[begin].text == "async" && tokens_[begin + 1].text == "move";
       add("async-expr", owner, owner, std::string("capture=") + (moveCapture ? "move" : "read") + " body=block", lineNo);
@@ -6330,9 +6468,9 @@ std::optional<std::string> syntaxDetailValue(const std::string &detail, const st
   static const std::vector<std::string> keys{
       "kind", "owner", "visibility", "async", "trusted", "abi", "attrs", "layout",
       "signature", "attr", "role", "component", "index", "text", "parent", "constraint", "mode", "name", "pattern", "literalKind",
-      "type", "value", "expr", "target", "op", "scrutinee", "condition", "path", "item", "iterable", "field",
+      "type", "value", "expr", "target", "op", "scrutinee", "condition", "path", "item", "iterable", "field", "endLine",
       "variant", "segment", "side", "base", "receiver", "callee", "targetType", "left", "right", "operand", "method", "guard",
-      "capture", "form", "body", "returnType", "futureCandidate"};
+      "capture", "form", "body", "returnType", "capability", "futureCandidate"};
   for (const auto &candidate : keys) {
     const std::string marker = " " + candidate + "=";
     const std::size_t next = detail.find(marker, start);
@@ -6465,6 +6603,8 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
     std::map<std::string, std::string> aggregateVisibility;
     std::map<std::string, std::map<std::string, std::vector<std::string>>> typeFacts;
     std::map<std::string, std::string> functionReturnTypes;
+    std::map<std::string, std::size_t> blockOrdinals;
+    std::map<std::string, std::size_t> statementOrdinals;
 
     for (const auto &syntax : syntaxNodes) {
       if (syntax.kind == "item" && syntaxDetailValue(syntax.detail, "kind").value_or("") == "interface") {
@@ -6631,7 +6771,19 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
       } else if (syntax.kind == "block") {
         const std::string blockKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string role = syntaxDetailValue(syntax.detail, "role").value_or(blockKind);
+        const std::string endLine = syntaxDetailValue(syntax.detail, "endLine").value_or(std::to_string(syntax.lineNo));
         const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        const std::string ordinal = std::to_string(blockOrdinals[owner]++);
+        addNode(file,
+                module,
+                "block.order",
+                owner + ".block." + ordinal,
+                ordinal,
+                syntax.lineNo,
+                {},
+                blockKind,
+                role,
+                endLine);
         addNode(file,
                 module,
                 "block." + blockKind,
@@ -6872,7 +7024,8 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 {},
                 syntaxDetailValue(syntax.detail, "capture").value_or("read"),
                 syntaxDetailValue(syntax.detail, "body").value_or("unit"),
-                syntaxDetailValue(syntax.detail, "returnType").value_or(""));
+                syntaxDetailValue(syntax.detail, "returnType").value_or(""),
+                syntaxDetailValue(syntax.detail, "capability").value_or("Fn"));
       } else if (syntax.kind == "if-expr" || syntax.kind == "while-expr") {
         const std::string exprKind = syntax.kind == "if-expr" ? "expr.if" : "expr.while";
         const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("");
@@ -6940,6 +7093,10 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 syntaxDetailValue(syntax.detail, "guard").value_or("none"),
                 syntaxDetailValue(syntax.detail, "expr").value_or("unit"),
                 pattern);
+      } else if (syntax.kind == "expr") {
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        const std::string expr = syntaxDetailValue(syntax.detail, "kind").value_or("opaque");
+        addNode(file, module, "expr.surface", owner, "", syntax.lineNo, {}, "", expr);
       } else if (syntax.kind == "pattern") {
         const std::string patternKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string role = syntaxDetailValue(syntax.detail, "role").value_or("unknown");
@@ -7004,20 +7161,37 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
                 constraint,
                 text,
                 paramName);
+      } else if (syntax.kind == "closure-param") {
+        const std::string pattern = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+        const std::string type = syntaxDetailValue(syntax.detail, "type").value_or("inferred");
+        const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
+        addNode(file,
+                module,
+                "closure-param",
+                owner + "." + pattern,
+                "",
+                syntax.lineNo,
+                {},
+                "",
+                pattern,
+                type);
       } else if (syntax.kind == "param") {
         const std::string paramKind = syntaxDetailValue(syntax.detail, "kind").value_or("unknown");
         const std::string mode = syntaxDetailValue(syntax.detail, "mode").value_or("read");
         const std::string name = syntaxDetailValue(syntax.detail, "name").value_or("");
+        const std::string index = syntaxDetailValue(syntax.detail, "index").value_or("0");
+        const std::string type = syntaxDetailValue(syntax.detail, "type").value_or("inferred");
         const std::string owner = legacySyntaxText(syntax.owner.empty() ? module : syntax.owner);
         addNode(file,
                 module,
                 "param." + paramKind,
                 owner + "." + name,
-                "",
+                index,
                 syntax.lineNo,
                 {},
                 mode,
-                name);
+                name,
+                type);
       } else if (syntax.kind == "variant") {
         std::string payload;
         const auto typeIt = typeFacts.find(legacySyntaxText(syntax.name));
@@ -7104,6 +7278,33 @@ std::vector<ParsedAstNode> parseTopLevelAst(const fs::path &packageRoot,
         const std::string stmtKind = syntaxDetailValue(syntax.detail, "kind").value_or("");
         const std::string owner = legacySyntaxText(syntax.owner);
         const std::string expected = functionReturnTypes.count(owner) ? functionReturnTypes[owner] : "";
+        const std::string ordinal = std::to_string(statementOrdinals[owner]++);
+        std::string stmtSubject = syntaxDetailValue(syntax.detail, "name").value_or("");
+        if (stmtSubject.empty()) stmtSubject = syntaxDetailValue(syntax.detail, "target").value_or("");
+        if (stmtSubject.empty()) stmtSubject = syntaxDetailValue(syntax.detail, "pattern").value_or("");
+        if (stmtSubject.empty()) stmtSubject = syntaxDetailValue(syntax.detail, "item").value_or("");
+        if (stmtSubject.empty()) stmtSubject = syntaxDetailValue(syntax.detail, "scrutinee").value_or("");
+        if (stmtSubject.empty()) stmtSubject = syntaxDetailValue(syntax.detail, "condition").value_or("");
+        std::string stmtExpr = syntaxDetailValue(syntax.detail, "expr").value_or("");
+        if (stmtExpr.empty() && (stmtKind == "if" || stmtKind == "while")) {
+          stmtExpr = syntaxDetailValue(syntax.detail, "condition").value_or("");
+        } else if (stmtExpr.empty() && (stmtKind == "if-pattern" || stmtKind == "while-pattern")) {
+          stmtExpr = syntaxDetailValue(syntax.detail, "scrutinee").value_or("");
+        } else if (stmtExpr.empty() && stmtKind == "for") {
+          stmtExpr = syntaxDetailValue(syntax.detail, "iterable").value_or("");
+        } else if (stmtExpr.empty() && stmtKind == "match") {
+          stmtExpr = syntaxDetailValue(syntax.detail, "scrutinee").value_or("");
+        }
+        addNode(file,
+                module,
+                "stmt.order",
+                owner + ".stmt." + ordinal,
+                ordinal,
+                syntax.lineNo,
+                {},
+                stmtKind,
+                stmtSubject,
+                stmtExpr);
         if (stmtKind == "return") {
           const std::string expr = syntaxDetailValue(syntax.detail, "expr").value_or("");
           addNode(file, module, "stmt.return", owner, "", syntax.lineNo, {}, "", expr, expected);
@@ -8241,6 +8442,7 @@ struct BuildSummary {
   std::set<std::string> interfaces;
   std::set<std::string> impls;
   std::set<std::string> genericSignatures;
+  std::set<std::string> overloadSets;
   std::set<std::string> staticInterfaceReturns;
   std::set<std::string> exports;
   std::set<std::string> trustCapabilities;
@@ -8350,6 +8552,12 @@ std::string declarationVisibility(const std::string &visibility) {
   return "package";
 }
 
+std::string visibilityScopeForMetadata(const std::string &visibility) {
+  if (visibility == "pub") return "external";
+  if (visibility == "private") return "file";
+  return "package";
+}
+
 void addPrefixedFacts(std::set<std::string> &facts, const std::string &prefix, const std::set<std::string> &values) {
   for (const auto &value : values) facts.insert(prefix + value);
 }
@@ -8361,6 +8569,21 @@ std::string sourceRelativePathForMetadata(const BuildPackage &package, const fs:
   return relative.string();
 }
 
+std::string sourceFileIdForMetadata(const BuildPackage &package, const fs::path &file) {
+  const std::string relative = sourceRelativePathForMetadata(package, file);
+  return "fnv1a64:" + hex64(fnv1a64(package.name + ":" + relative));
+}
+
+std::string stableDeclarationNodeId(const BuildPackage &package,
+                                    const std::string &moduleName,
+                                    const std::string &kind,
+                                    const std::string &name,
+                                    const std::string &signature) {
+  const std::string module = moduleName.empty() ? "root" : moduleName;
+  const std::string identity = package.name + ":" + module + ":" + kind + ":" + name + ":" + signature;
+  return "fnv1a64:" + hex64(fnv1a64(identity));
+}
+
 std::string declarationMetadataFact(const BuildPackage &package,
                                     const fs::path &file,
                                     const std::string &moduleName,
@@ -8370,9 +8593,8 @@ std::string declarationMetadataFact(const BuildPackage &package,
                                     const std::string &signature,
                                     int lineNo) {
   const std::string module = moduleName.empty() ? "root" : moduleName;
-  const std::string identity = package.name + ":" + module + ":" + kind + ":" + name + ":" + signature;
   return kind + " " + name +
-         " stableNodeId=fnv1a64:" + hex64(fnv1a64(identity)) +
+         " stableNodeId=" + stableDeclarationNodeId(package, moduleName, kind, name, signature) +
          " module=" + module +
          " visibility=" + declarationVisibility(visibility) +
          " span=" + sourceRelativePathForMetadata(package, file) + ":" + std::to_string(lineNo) + ":1";
@@ -8423,6 +8645,7 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
         !startsWith(node.kind, "generic-param.") && !startsWith(node.kind, "generic-arg.") &&
         node.kind != "expr.if" && node.kind != "expr.while" && node.kind != "expr.for" && node.kind != "expr.match" &&
         node.kind != "expr.closure" && node.kind != "expr.match-arm" && node.kind != "expr.control-body" &&
+        node.kind != "stmt.order" &&
         !startsWith(node.kind, "param.")) {
       if (startsWith(node.kind, "stmt.")) fact += " mode=" + node.generic;
       else fact += " generic=" + node.generic;
@@ -8464,6 +8687,11 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
     } else if (node.kind == "import.item") {
       if (!node.generic.empty()) fact += " path=" + node.generic;
       if (!node.params.empty()) fact += " item=" + node.params;
+    } else if (node.kind == "block.order") {
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.generic.empty()) fact += " kind=" + node.generic;
+      if (!node.params.empty()) fact += " role=" + node.params;
+      if (!node.returnType.empty()) fact += " endLine=" + node.returnType;
     } else if (startsWith(node.kind, "block.")) {
       if (!node.generic.empty()) fact += " kind=" + node.generic;
       if (!node.params.empty()) fact += " role=" + node.params;
@@ -8504,6 +8732,11 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
     } else if (startsWith(node.kind, "param.")) {
       if (!node.generic.empty()) fact += " mode=" + node.generic;
       if (!node.params.empty()) fact += " name=" + node.params;
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.returnType.empty()) fact += " type=" + node.returnType;
+    } else if (node.kind == "closure-param") {
+      if (!node.params.empty()) fact += " pattern=" + node.params;
+      if (!node.returnType.empty()) fact += " type=" + node.returnType;
     } else if (node.kind == "path.segment") {
       if (!node.generic.empty()) fact += " role=" + node.generic;
       if (!node.visibility.empty()) fact += " index=" + node.visibility;
@@ -8522,6 +8755,9 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
       if (!node.visibility.empty()) fact += " form=" + node.visibility;
       if (!node.params.empty()) fact += " body=" + node.params;
       if (!node.returnType.empty()) fact += " returnType=" + node.returnType;
+      if (!node.layout.empty() && node.layout != "Auto") fact += " capability=" + node.layout;
+    } else if (node.kind == "expr.surface") {
+      if (!node.params.empty()) fact += " expr=" + node.params;
     } else if (node.kind == "expr.if" || node.kind == "expr.while") {
       if (!node.visibility.empty()) fact += " kind=" + node.visibility;
       if (!node.generic.empty()) fact += " mode=" + node.generic;
@@ -8543,6 +8779,11 @@ std::set<std::string> collectTopLevelAstNodes(const BuildPackage &package) {
       if (!node.returnType.empty()) fact += " pattern=" + node.returnType;
       if (!node.generic.empty()) fact += " guard=" + node.generic;
       if (!node.params.empty()) fact += " expr=" + node.params;
+    } else if (node.kind == "stmt.order") {
+      if (!node.visibility.empty()) fact += " index=" + node.visibility;
+      if (!node.generic.empty()) fact += " kind=" + node.generic;
+      if (!node.params.empty()) fact += " subject=" + node.params;
+      if (!node.returnType.empty()) fact += " expr=" + node.returnType;
     }
     if ((node.kind == "decl.const" || node.kind == "decl.static" ||
          node.kind == "stmt.return" || node.kind == "stmt.val" || node.kind == "stmt.var" ||
@@ -8621,8 +8862,74 @@ std::set<std::string> collectSyntaxSpineAstFacts(const BuildPackage &package,
 void collectPipelineFactsFromAst(const BuildPackage &package,
                                  const std::vector<ParsedAstNode> &ast,
                                  BuildSummary &summary) {
-  (void)package;
+  std::set<std::string> interfaceNames;
+  std::set<std::string> destroyTypes;
+  std::map<std::string, std::string> functionReturnTypes;
+  std::map<std::string, std::string> activeMatchMode;
+  std::map<std::string, std::string> activeMatchScrutinee;
+  std::map<std::string, std::string> activeMatchExprMode;
+  std::map<std::string, std::string> activeMatchExprScrutinee;
+  std::map<std::string, std::vector<ParsedAstNode>> blockOrderNodes;
+  std::map<std::string, std::vector<ParsedAstNode>> stmtOrderNodes;
+
+  for (const auto &node : ast) {
+    if (node.kind == "decl.interface") interfaceNames.insert(node.name);
+    if (node.kind == "decl.destroy" && !contains(node.name, " for ")) destroyTypes.insert(node.name);
+    if ((node.kind == "decl.fn" || node.kind == "decl.async-fn") && !node.returnType.empty()) {
+      functionReturnTypes[node.name] = node.returnType;
+    }
+    if (node.kind == "block.order") {
+      const std::size_t marker = node.name.find(".block.");
+      const std::string functionName = marker == std::string::npos ? node.name : node.name.substr(0, marker);
+      blockOrderNodes[functionName].push_back(node);
+    } else if (node.kind == "stmt.order") {
+      const std::size_t marker = node.name.find(".stmt.");
+      const std::string functionName = marker == std::string::npos ? node.name : node.name.substr(0, marker);
+      stmtOrderNodes[functionName].push_back(node);
+    }
+  }
+  auto numericText = [](const std::string &text, std::size_t fallback) {
+    if (text.empty()) return fallback;
+    try {
+      return static_cast<std::size_t>(std::stoull(text));
+    } catch (...) {
+      return fallback;
+    }
+  };
+  auto sortByVisibilityIndex = [&](std::vector<ParsedAstNode> &nodes) {
+    std::stable_sort(nodes.begin(), nodes.end(), [&](const ParsedAstNode &lhs, const ParsedAstNode &rhs) {
+      const std::size_t left = numericText(lhs.visibility, static_cast<std::size_t>(lhs.lineNo));
+      const std::size_t right = numericText(rhs.visibility, static_cast<std::size_t>(rhs.lineNo));
+      if (left != right) return left < right;
+      return lhs.lineNo < rhs.lineNo;
+    });
+  };
+  for (auto &[_, nodes] : blockOrderNodes) sortByVisibilityIndex(nodes);
+  for (auto &[_, nodes] : stmtOrderNodes) sortByVisibilityIndex(nodes);
+  std::map<std::string, std::map<std::string, std::string>> dropLocalTypes;
+
+  auto inferredExpressionType = [&](const std::string &expr) -> std::optional<std::string> {
+    if (startsWith(expr, "call:")) {
+      const std::string callee = expr.substr(5);
+      if (functionReturnTypes.count(callee)) return functionReturnTypes[callee];
+    }
+    if (startsWith(expr, "struct-literal:")) return expr.substr(15);
+    return std::nullopt;
+  };
+
   auto functionNameForNode = [](const ParsedAstNode &node) {
+    if (node.kind == "closure-param") {
+      const std::size_t dot = node.name.rfind('.');
+      if (dot != std::string::npos) return node.name.substr(0, dot);
+    }
+    if (node.kind == "stmt.order") {
+      const std::size_t marker = node.name.find(".stmt.");
+      if (marker != std::string::npos) return node.name.substr(0, marker);
+    }
+    if (node.kind == "block.order") {
+      const std::size_t marker = node.name.find(".block.");
+      if (marker != std::string::npos) return node.name.substr(0, marker);
+    }
     if (node.kind == "expr.control-body") {
       const std::size_t marker = node.name.find(".control-body.");
       if (marker != std::string::npos) return node.name.substr(0, marker);
@@ -8643,11 +8950,13 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
         node.kind == "expr.paren" || node.kind == "expr.block" ||
         node.kind == "expr.try" || node.kind == "expr.async-block" || node.kind == "expr.await" ||
         node.kind == "expr.access" || node.kind == "expr.trust-block" ||
+        node.kind == "expr.surface" ||
         node.kind == "arg" || node.kind == "arg.block" ||
         startsWith(node.kind, "pattern.") ||
+        node.kind == "path.segment" ||
         node.kind == "stmt.pattern-val" || node.kind == "stmt.pattern-var" ||
         node.kind == "stmt.for" || node.kind == "stmt.if-pattern" || node.kind == "stmt.while-pattern" ||
-        node.kind == "stmt.match-arm") {
+        node.kind == "stmt.match-arm" || node.kind == "stmt.order" || node.kind == "closure-param") {
       const std::size_t dot = startsWith(node.kind, "expr.") ? node.name.rfind('.') : node.name.find('.');
       if (dot != std::string::npos) return node.name.substr(0, dot);
     }
@@ -8658,9 +8967,839 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     if (dot == std::string::npos) return node.name;
     return node.name.substr(dot + 1);
   };
+  auto genericOwnerForNode = [](const ParsedAstNode &node) {
+    const std::size_t dot = node.name.find('.');
+    if (dot == std::string::npos) return node.name;
+    return node.name.substr(0, dot);
+  };
+  auto rootNameForType = [](std::string path) {
+    path = trim(path);
+    if (startsWith(path, "mut ")) path = trim(path.substr(4));
+    if (startsWith(path, "move ")) path = trim(path.substr(5));
+    const std::size_t generic = path.find('<');
+    if (generic != std::string::npos) path = path.substr(0, generic);
+    const std::size_t dot = path.find('.');
+    if (dot != std::string::npos) path = path.substr(0, dot);
+    return trim(path);
+  };
+  auto implInterfaceName = [&](const std::string &implName) {
+    const std::size_t marker = implName.find(" for ");
+    if (marker == std::string::npos) return std::string();
+    return rootNameForType(implName.substr(0, marker));
+  };
+  auto implConcreteType = [&](const std::string &implName) {
+    const std::size_t marker = implName.find(" for ");
+    if (marker == std::string::npos) return rootNameForType(implName);
+    return trim(implName.substr(marker + 5));
+  };
+  auto methodOwnerName = [](const std::string &methodName) {
+    const std::size_t dot = methodName.rfind('.');
+    if (dot == std::string::npos) return std::string();
+    return methodName.substr(0, dot);
+  };
+  auto methodLocalName = [](const std::string &methodName) {
+    const std::size_t dot = methodName.rfind('.');
+    if (dot == std::string::npos) return methodName;
+    return methodName.substr(dot + 1);
+  };
+
+  struct OverloadCandidate {
+    std::string key;
+    std::vector<std::string> paramTypes;
+    std::string returnType;
+    std::string visibility;
+  };
+
+  std::map<std::string, std::vector<std::string>> genericParamOrder;
+  std::map<std::string, std::map<std::string, std::string>> genericInterfaceConstraints;
+  std::map<std::string, std::map<std::string, std::string>> functionParamTypes;
+  std::map<std::string, std::map<std::string, std::string>> localValueTypes;
+  std::map<std::string, std::vector<ParsedAstNode>> callArgsByFunctionLine;
+  std::map<std::string, std::vector<OverloadCandidate>> overloadCandidates;
+  std::map<std::string, std::string> packageSymbolKinds;
+  std::map<std::string, std::string> packageSymbolModules;
+  std::map<std::string, std::string> packageSymbolVisibilities;
+  std::map<std::string, std::string> packageSymbolFileIds;
+  std::map<std::string, std::string> importedItemPaths;
+  std::map<std::string, std::string> importedItemTargets;
+  std::map<std::string, std::vector<std::string>> interfaceSlotMethods;
+  std::map<std::string, std::map<std::string, std::string>> interfaceSlotParams;
+  std::map<std::string, std::map<std::string, std::string>> interfaceSlotReturns;
+  std::map<std::string, std::vector<std::string>> interfaceImpls;
+  std::map<std::string, std::string> implConcreteTypes;
+  std::map<std::string, std::set<std::string>> implMethods;
+  std::set<std::string> implDestroyGlue;
+  std::map<std::string, std::string> structLayouts;
+  std::map<std::string, std::vector<std::string>> structFieldOrder;
+  std::map<std::string, std::map<std::string, std::string>> structFieldTypesByOwner;
+  for (const auto &node : ast) {
+    if (startsWith(node.kind, "decl.")) {
+      const std::string declKind = node.kind.substr(5);
+      const bool packageNamedDecl =
+          declKind == "fn" || declKind == "async-fn" || declKind == "extern" ||
+          declKind == "struct" || declKind == "enum" || declKind == "interface" ||
+          declKind == "const" || declKind == "static" || declKind == "type";
+      if (packageNamedDecl && !node.name.empty() && !contains(node.name, ".") && !contains(node.name, " for ")) {
+        const std::string symbolKind = declKind == "async-fn" ? "fn" : declKind;
+        if (packageSymbolKinds.count(node.name) && packageSymbolKinds[node.name] == "fn" && symbolKind == "fn") {
+          packageSymbolKinds[node.name] = "overload-set";
+        } else if (!packageSymbolKinds.count(node.name)) {
+          packageSymbolKinds[node.name] = symbolKind;
+        }
+        packageSymbolModules[node.name] = node.moduleName.empty() ? "root" : node.moduleName;
+        packageSymbolVisibilities[node.name] = declarationVisibility(node.visibility);
+        packageSymbolFileIds[node.name] = sourceFileIdForMetadata(package, node.file);
+      }
+      if (declKind == "fn" || declKind == "async-fn" || declKind == "extern") {
+        overloadCandidates[node.name].push_back(OverloadCandidate{
+            overloadKey(node.name, node.params),
+            overloadParameterTypes(node.params),
+            node.returnType.empty() ? "Unit" : node.returnType,
+            declarationVisibility(node.visibility)});
+      } else if (declKind == "struct") {
+        structLayouts[node.name] = node.layout.empty() ? "Auto" : node.layout;
+      } else if (declKind == "interface-method") {
+        const std::string iface = methodOwnerName(node.name);
+        const std::string method = methodLocalName(node.name);
+        if (!iface.empty() && !method.empty()) {
+          interfaceSlotMethods[iface].push_back(method);
+          interfaceSlotParams[iface][method] = node.params;
+          interfaceSlotReturns[iface][method] = node.returnType.empty() ? "Unit" : node.returnType;
+        }
+      } else if (declKind == "impl") {
+        const std::string iface = implInterfaceName(node.name);
+        if (!iface.empty()) {
+          interfaceImpls[iface].push_back(node.name);
+          implConcreteTypes[node.name] = implConcreteType(node.name);
+        }
+      } else if (declKind == "impl-method") {
+        const std::string owner = methodOwnerName(node.name);
+        const std::string method = methodLocalName(node.name);
+        if (!owner.empty() && !method.empty()) implMethods[owner].insert(method);
+      } else if (declKind == "destroy") {
+        implDestroyGlue.insert(node.name);
+      } else if (declKind == "field") {
+        const std::string owner = methodOwnerName(node.name);
+        const std::string field = methodLocalName(node.name);
+        if (!owner.empty() && !field.empty()) {
+          if (std::find(structFieldOrder[owner].begin(), structFieldOrder[owner].end(), field) == structFieldOrder[owner].end()) {
+            structFieldOrder[owner].push_back(field);
+          }
+          structFieldTypesByOwner[owner][field] = node.returnType.empty() ? "inferred" : node.returnType;
+        }
+      }
+    } else if (node.kind == "import.item") {
+      const std::string path = node.generic.empty() ? "unknown" : node.generic;
+      const std::string item = node.params.empty() ? node.name : node.params;
+      if (!item.empty()) {
+        importedItemPaths[item] = path;
+        importedItemTargets[item] = path == "unknown" ? item : path + "." + item;
+      }
+    }
+    if (startsWith(node.kind, "generic-param.")) {
+      const std::string owner = genericOwnerForNode(node);
+      const std::string paramName = node.returnType.empty() ? localNameForNode(node) : node.returnType;
+      if (!paramName.empty() && std::find(genericParamOrder[owner].begin(), genericParamOrder[owner].end(), paramName) == genericParamOrder[owner].end()) {
+        genericParamOrder[owner].push_back(paramName);
+      }
+      if (!node.generic.empty() && node.generic != "none") {
+        genericInterfaceConstraints[owner][paramName] = node.generic;
+      }
+    } else if (startsWith(node.kind, "param.")) {
+      const std::size_t ownerDot = node.name.rfind('.');
+      const std::string owner = ownerDot == std::string::npos ? node.name : node.name.substr(0, ownerDot);
+      const std::string paramName = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      functionParamTypes[owner][paramName] = type;
+    } else if (node.kind == "stmt.val" || node.kind == "stmt.var" || node.kind == "stmt.const") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string localName = localNameForNode(node);
+      std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      if (type == "inferred") {
+        if (auto inferred = inferredExpressionType(node.params)) type = *inferred;
+      }
+      localValueTypes[functionName][localName] = type;
+    } else if (node.kind == "arg" || node.kind == "arg.block") {
+      callArgsByFunctionLine[functionNameForNode(node) + ":" + std::to_string(node.lineNo)].push_back(node);
+    }
+  }
+  auto concreteTypeForExpr = [&](const std::string &functionName, const std::string &expr) {
+    if (startsWith(expr, "name:")) {
+      const std::string local = expr.substr(5);
+      auto functionIt = localValueTypes.find(functionName);
+      if (functionIt != localValueTypes.end() && functionIt->second.count(local)) return functionIt->second[local];
+      auto paramIt = functionParamTypes.find(functionName);
+      if (paramIt != functionParamTypes.end() && paramIt->second.count(local)) return paramIt->second[local];
+    }
+    if (startsWith(expr, "struct-literal:")) return expr.substr(15);
+    return std::string("unknown");
+  };
+  auto pathRootName = [](std::string path) {
+    path = trim(path);
+    if (path.empty()) return std::string("unknown");
+    if (startsWith(path, "mut ")) path = trim(path.substr(4));
+    if (startsWith(path, "move ")) path = trim(path.substr(5));
+    if (startsWith(path, "(")) return std::string("tuple");
+    const std::size_t generic = path.find('<');
+    if (generic != std::string::npos) path = path.substr(0, generic);
+    const std::size_t dot = path.find('.');
+    if (dot != std::string::npos) path = path.substr(0, dot);
+    return trim(path);
+  };
+  auto typeOwnerForNode = [](const ParsedAstNode &node, const std::string &role) {
+    const std::string suffix = "." + role;
+    if (!role.empty() && node.name.size() > suffix.size() &&
+        node.name.compare(node.name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+      return node.name.substr(0, node.name.size() - suffix.size());
+    }
+    const std::size_t dot = node.name.rfind('.');
+    if (dot != std::string::npos) return node.name.substr(0, dot);
+    return node.name;
+  };
+  const std::set<std::string> builtinTypes = builtinTypeNames();
+  auto resolveTypeName = [&](const std::string &owner,
+                             const std::string &text,
+                             const std::string &typeKind) {
+    const std::string root = pathRootName(text);
+    if (typeKind == "primitive" || primitiveTypeNames().count(root)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "primitive", root, "primitive", "builtin"};
+    }
+    if (root == "tuple") {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "structural", text, "tuple", owner};
+    }
+    if (typeKind == "fn" || root == "Fn" || root == "MutFn" || root == "OnceFn") {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          builtinTypes.count(root) ? "builtin" : "structural",
+          root,
+          "fn-type",
+          builtinTypes.count(root) ? "core" : owner};
+    }
+    if (typeKind.rfind("access:", 0) == 0) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "access", root, typeKind, owner};
+    }
+    const auto genericIt = genericParamOrder.find(owner);
+    if (genericIt != genericParamOrder.end() &&
+        std::find(genericIt->second.begin(), genericIt->second.end(), root) != genericIt->second.end()) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "generic", "%" + root, "generic-param", owner};
+    }
+    if (packageSymbolKinds.count(root)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "package", root, packageSymbolKinds[root], packageSymbolModules[root]};
+    }
+    if (importedItemTargets.count(root)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "import", importedItemTargets[root], "import-item", importedItemPaths[root]};
+    }
+    if (builtinTypes.count(root)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "builtin", root, "builtin-type", "core"};
+    }
+    return std::tuple<std::string, std::string, std::string, std::string>{
+        "unresolved", root, "unknown", "unknown"};
+  };
+  auto emitTypeBindingFacts = [&](const std::string &owner,
+                                  const std::string &factName,
+                                  const std::string &role,
+                                  const std::string &text,
+                                  const std::string &typeKind,
+                                  const std::string &span) {
+    const auto [scope, target, targetKind, targetModule] = resolveTypeName(owner, text, typeKind);
+    summary.hirNodes.insert("hir.type-binding " + factName +
+                            " owner=" + owner + " role=" + role +
+                            " text=" + text + " root=" + pathRootName(text) +
+                            " scope=" + scope + " target=" + target +
+                            " kind=" + targetKind + " module=" + targetModule +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.type-binding " + factName +
+                            " owner=" + owner + " role=" + role +
+                            " root=" + pathRootName(text) +
+                            " scope=" + scope + " target=" + target +
+                            " kind=" + targetKind);
+    summary.llvmNodes.insert("llvm.type-binding-preview " + factName +
+                             " owner=" + owner + " role=" + role +
+                             " target=" + target + " kind=" + targetKind +
+                             " scope=" + scope);
+  };
+  auto isCtfeLiteralText = [](const std::string &expr) {
+    if (expr.empty()) return false;
+    if (startsWith(expr, "int-literal:") || startsWith(expr, "float-literal:") ||
+        startsWith(expr, "bool-literal:") || expr == "string-literal" || expr == "char-literal") {
+      return true;
+    }
+    return std::all_of(expr.begin(), expr.end(), [](unsigned char ch) {
+      return std::isdigit(ch) || ch == '_' || ch == 'x' || ch == 'X' ||
+             (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+    });
+  };
+  auto ctfeExprKind = [&](const std::string &expr) {
+    if (isCtfeLiteralText(expr)) return std::string("literal");
+    if (startsWith(expr, "name:")) return std::string("name-ref");
+    if (startsWith(expr, "binary:")) return std::string("binary");
+    if (startsWith(expr, "compare:")) return std::string("compare");
+    if (startsWith(expr, "prefix:")) return std::string("prefix");
+    if (startsWith(expr, "call:")) return std::string("call");
+    if (startsWith(expr, "method-call:")) return std::string("method-call");
+    if (startsWith(expr, "type-static-call:")) return std::string("type-static-call");
+    if (startsWith(expr, "struct-literal:")) return std::string("struct-literal");
+    if (startsWith(expr, "field:")) return std::string("field-ref");
+    if (startsWith(expr, "match:")) return std::string("match");
+    if (startsWith(expr, "range:")) return std::string("range");
+    return std::string("opaque");
+  };
+  auto ctfeReasonForKind = [](const std::string &kind) {
+    if (kind == "literal" || kind == "name-ref" || kind == "binary" ||
+        kind == "compare" || kind == "prefix" || kind == "struct-literal" ||
+        kind == "field-ref" || kind == "range") {
+      return kind;
+    }
+    if (kind == "call" || kind == "method-call" || kind == "type-static-call") {
+      return std::string("evaluator");
+    }
+    if (kind == "match") return std::string("control-flow");
+    return std::string("requires-evaluator");
+  };
+  auto emitCtfeFacts = [&](const std::string &owner,
+                           const std::string &role,
+                           const std::string &subject,
+                           const std::string &expr,
+                           const std::string &type,
+                           const std::string &span) {
+    const std::string normalizedType = type.empty() ? "inferred" : type;
+    const std::string kind = ctfeExprKind(expr);
+    const std::string reason = ctfeReasonForKind(kind);
+    const std::string materialization = role == "static" ? "global-init" :
+                                        role == "const-generic" ? "generic-argument" :
+                                        "constant-value";
+    summary.hirNodes.insert("hir.ctfe-input " + owner +
+                            " role=" + role + " subject=" + subject +
+                            " expr=" + expr + " kind=" + kind +
+                            " type=" + normalizedType +
+                            " evaluator=required span=" + span);
+    summary.mirNodes.insert("mir.ctfe-eval " + owner +
+                            " role=" + role + " subject=" + subject +
+                            " expr=" + expr + " kind=" + kind +
+                            " type=" + normalizedType);
+    summary.mirNodes.insert("mir.verifier-ctfe " + owner +
+                            " role=" + role + " subject=" + subject +
+                            " result=materialized reason=" + reason +
+                            " span=" + span);
+    summary.hirNodes.insert("hir.ctfe-safety " + owner +
+                            " role=" + role + " subject=" + subject +
+                            " result=accepted reason=ctfe-materialized" +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.verifier-ctfe-safety " + owner +
+                            " role=" + role + " subject=" + subject +
+                            " result=accepted reason=ctfe-materialized" +
+                            " span=" + span);
+    summary.llvmNodes.insert("llvm.ctfe-materialized-preview @" + owner +
+                             " role=" + role + " subject=" + subject +
+                             " type=" + normalizedType +
+                             " materialization=" + materialization +
+                             " source=mir.verifier-ctfe");
+    summary.llvmNodes.insert("llvm.ctfe-safety-preview @" + owner +
+                             " role=" + role + " subject=" + subject +
+                             " result=accepted source=mir.verifier-ctfe-safety");
+  };
+  auto vtableSymbol = [](const std::string &iface, const std::string &concrete) {
+    return "vtable." + syntaxNameFragment(iface) + "." + syntaxNameFragment(concrete);
+  };
+  auto emitBoxInterfaceObjectFacts = [&](const std::string &factName,
+                                         const std::string &iface,
+                                         const std::string &role,
+                                         const std::string &span) {
+    summary.hirNodes.insert("hir.box-interface-object " + factName +
+                            " interface=" + iface + " role=" + role +
+                            " representation=fat-pointer data=owned-ptr vtable=readonly span=" + span);
+    summary.mirNodes.insert("mir.box-interface-object " + factName +
+                            " interface=" + iface + " role=" + role +
+                            " layout=data*,vtable* allocation=reused noRealloc=true");
+    summary.llvmNodes.insert("llvm.box-interface-lowering-preview " + factName +
+                             " interface=" + iface +
+                             " layout=data*,vtable* noRealloc=true");
+    const auto implIt = interfaceImpls.find(iface);
+    if (implIt == interfaceImpls.end()) return;
+    for (const auto &implName : implIt->second) {
+      const std::string concrete = implConcreteTypes.count(implName) ? implConcreteTypes[implName] : implConcreteType(implName);
+      const std::string symbol = vtableSymbol(iface, concrete);
+      const bool hasDestroy = implDestroyGlue.count(implName) > 0 || implDestroyGlue.count(concrete) > 0;
+      summary.hirNodes.insert("hir.vtable " + implName +
+                              " interface=" + iface + " concrete=" + concrete +
+                              " slots=" + std::to_string(interfaceSlotMethods[iface].size()) +
+                              " destroy=" + std::string(hasDestroy ? "present" : "default"));
+      summary.mirNodes.insert("mir.vtable " + implName +
+                              " interface=" + iface + " concrete=" + concrete +
+                              " symbol=" + symbol +
+                              " slots=" + std::to_string(interfaceSlotMethods[iface].size()) +
+                              " destroy=" + std::string(hasDestroy ? "present" : "default"));
+      summary.llvmNodes.insert("llvm.vtable-preview @" + symbol +
+                               " interface=" + iface + " concrete=" + concrete +
+                               " slots=" + std::to_string(interfaceSlotMethods[iface].size()));
+      for (std::size_t i = 0; i < interfaceSlotMethods[iface].size(); ++i) {
+        const std::string method = interfaceSlotMethods[iface][i];
+        const std::string target = implName + "." + method;
+        const bool implemented = implMethods[implName].count(method) > 0;
+        summary.hirNodes.insert("hir.vtable-slot " + implName + "." + method +
+                                " interface=" + iface +
+                                " slot=" + std::to_string(i) +
+                                " method=" + method +
+                                " target=" + target +
+                                " implemented=" + std::string(implemented ? "true" : "false"));
+        summary.mirNodes.insert("mir.vtable-slot " + implName + "." + method +
+                                " interface=" + iface +
+                                " slot=" + std::to_string(i) +
+                                " method=" + method +
+                                " target=" + target +
+                                " dispatch=dynamic implemented=" + std::string(implemented ? "true" : "false"));
+        summary.llvmNodes.insert("llvm.vtable-slot-preview @" + symbol +
+                                 " slot=" + std::to_string(i) +
+                                 " method=" + method +
+                                 " target=@" + syntaxNameFragment(target));
+      }
+      summary.mirNodes.insert("mir.box-destroy-lowering " + implName +
+                              " interface=" + iface + " concrete=" + concrete +
+                              " drop=" + std::string(hasDestroy ? "destroy" : "field-drop") +
+                              " source=vtable");
+      summary.llvmNodes.insert("llvm.box-destroy-preview @" + symbol +
+                               " concrete=" + concrete +
+                               " drop=" + std::string(hasDestroy ? "destroy" : "field-drop"));
+    }
+  };
+  auto resolveSymbol = [&](const std::string &functionName, const std::string &name) {
+    const std::string symbol = pathRootName(name);
+    auto localIt = localValueTypes.find(functionName);
+    if (localIt != localValueTypes.end() && localIt->second.count(symbol)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "local", "%" + symbol, "local", functionName};
+    }
+    auto paramIt = functionParamTypes.find(functionName);
+    if (paramIt != functionParamTypes.end() && paramIt->second.count(symbol)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "param", "%" + symbol, "param", functionName};
+    }
+    if (packageSymbolKinds.count(symbol)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "package", symbol, packageSymbolKinds[symbol], packageSymbolModules[symbol]};
+    }
+    if (importedItemTargets.count(symbol)) {
+      return std::tuple<std::string, std::string, std::string, std::string>{
+          "import", importedItemTargets[symbol], "import-item", importedItemPaths[symbol]};
+    }
+    return std::tuple<std::string, std::string, std::string, std::string>{
+        "unresolved", symbol, "unknown", "unknown"};
+  };
+  auto visibilityAccessReason = [&](const std::string &target, const fs::path &currentFile) {
+    const std::string visibility = packageSymbolVisibilities.count(target) ? packageSymbolVisibilities[target] : "package";
+    if (visibility == "pub") return std::tuple<std::string, std::string>{"allowed", "public"};
+    if (visibility == "package") return std::tuple<std::string, std::string>{"allowed", "same-package"};
+    const std::string currentFileId = sourceFileIdForMetadata(package, currentFile);
+    const std::string targetFileId = packageSymbolFileIds.count(target) ? packageSymbolFileIds[target] : "unknown";
+    if (currentFileId == targetFileId) return std::tuple<std::string, std::string>{"allowed", "same-file"};
+    return std::tuple<std::string, std::string>{"denied", "private-file"};
+  };
+  auto emitVisibilityCheckFacts = [&](const std::string &functionName,
+                                      const std::string &role,
+                                      const std::string &name,
+                                      const fs::path &currentFile,
+                                      const std::string &span) {
+    const auto [scope, target, targetKind, targetModule] = resolveSymbol(functionName, name);
+    if (scope != "package") return;
+    const std::string visibility = packageSymbolVisibilities.count(target) ? packageSymbolVisibilities[target] : "package";
+    const std::string visibilityScope = visibilityScopeForMetadata(visibility);
+    const std::string fileId = packageSymbolFileIds.count(target) ? packageSymbolFileIds[target] : "unknown";
+    const auto [access, reason] = visibilityAccessReason(target, currentFile);
+    summary.hirNodes.insert("hir.visibility-check " + functionName +
+                            " role=" + role + " name=" + name +
+                            " target=" + target + " visibility=" + visibility +
+                            " scope=" + visibilityScope + " access=" + access +
+                            " reason=" + reason + " fileId=" + fileId +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.visibility-check " + functionName +
+                            " role=" + role + " target=" + target +
+                            " visibility=" + visibility + " scope=" + visibilityScope +
+                            " access=" + access + " reason=" + reason);
+    summary.llvmNodes.insert("llvm.visibility-check-preview @" + functionName +
+                             " role=" + role + " target=" + target +
+                             " visibility=" + visibility + " scope=" + visibilityScope +
+                             " access=" + access + " source=mir.visibility-check");
+  };
+  auto emitResolutionFacts = [&](const std::string &functionName,
+                                 const std::string &role,
+                                 const std::string &name,
+                                 const fs::path &currentFile,
+                                 const std::string &span) {
+    const auto [scope, target, targetKind, targetModule] = resolveSymbol(functionName, name);
+    summary.hirNodes.insert("hir.name-resolution " + functionName +
+                            " role=" + role + " name=" + name +
+                            " scope=" + scope + " target=" + target +
+                            " kind=" + targetKind + " module=" + targetModule +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.symbol-ref " + functionName +
+                            " role=" + role + " name=" + name +
+                            " scope=" + scope + " target=" + target +
+                            " kind=" + targetKind);
+    summary.llvmNodes.insert("llvm.symbol-ref-preview @" + functionName +
+                             " role=" + role + " name=" + name +
+                             " target=" + target + " kind=" + targetKind);
+    emitVisibilityCheckFacts(functionName, role, name, currentFile, span);
+  };
+  auto callArgumentTypes = [&](const std::string &functionName, int lineNo) {
+    std::vector<std::string> argTypes;
+    const auto argsIt = callArgsByFunctionLine.find(functionName + ":" + std::to_string(lineNo));
+    if (argsIt == callArgsByFunctionLine.end()) return argTypes;
+    for (const auto &arg : argsIt->second) {
+      argTypes.push_back(concreteTypeForExpr(functionName, arg.params));
+    }
+    return argTypes;
+  };
+  auto joinTypeList = [](const std::vector<std::string> &types) {
+    std::string out;
+    for (std::size_t i = 0; i < types.size(); ++i) {
+      if (i != 0) out += ",";
+      out += types[i];
+    }
+    return out;
+  };
+  auto selectOverloadCandidate = [&](const std::string &callee,
+                                     const std::vector<std::string> &argTypes) -> std::optional<OverloadCandidate> {
+    const auto overloadIt = overloadCandidates.find(callee);
+    if (overloadIt == overloadCandidates.end()) return std::nullopt;
+    for (const auto &candidate : overloadIt->second) {
+      if (candidate.paramTypes == argTypes) return candidate;
+    }
+    return std::nullopt;
+  };
+  auto joinStringSet = [](const std::set<std::string> &values) {
+    std::string out;
+    for (const auto &value : values) {
+      if (!out.empty()) out += ",";
+      out += value;
+    }
+    return out.empty() ? std::string("linear") : out;
+  };
+  std::map<std::string, std::set<std::string>> ctfeBodyFeatures;
+  auto addCtfeFeature = [&](const std::string &functionName, const std::string &feature) {
+    if (functionName.empty() || functionName == "unknown") return;
+    ctfeBodyFeatures[functionName].insert(feature);
+  };
+  for (const auto &node : ast) {
+    if (node.kind == "decl.fn" || node.kind == "decl.async-fn" || node.kind == "decl.impl-method") {
+      addCtfeFeature(node.name, "function-body");
+      if (!node.generic.empty()) addCtfeFeature(node.name, "generic");
+    } else if (node.kind == "expr.call") {
+      addCtfeFeature(functionNameForNode(node), "call");
+    } else if (node.kind == "expr.method-call") {
+      addCtfeFeature(functionNameForNode(node), "method-call");
+    } else if (node.kind == "expr.type-static-call") {
+      addCtfeFeature(functionNameForNode(node), "type-static-call");
+    } else if (node.kind == "expr.match" || node.kind == "expr.match-arm" ||
+               node.kind == "stmt.match" || node.kind == "stmt.match-arm") {
+      addCtfeFeature(functionNameForNode(node), "match");
+    } else if (node.kind == "expr.while" || node.kind == "expr.for" ||
+               node.kind == "stmt.while" || node.kind == "stmt.while-pattern" ||
+               node.kind == "stmt.for") {
+      addCtfeFeature(functionNameForNode(node), "loop");
+    } else if (startsWith(node.kind, "generic-param.") && !node.generic.empty() && node.generic != "none") {
+      addCtfeFeature(genericOwnerForNode(node), "static-interface");
+    }
+  }
+  auto emitCtfeBodyFacts = [&](const std::string &functionName,
+                               const std::string &returnType,
+                               const std::string &span) {
+    const std::string features = joinStringSet(ctfeBodyFeatures[functionName]);
+    summary.hirNodes.insert("hir.ctfe-body " + functionName +
+                            " features=" + features +
+                            " return=" + returnType +
+                            " evaluator=available span=" + span);
+    summary.mirNodes.insert("mir.ctfe-evaluator " + functionName +
+                            " entry=bb0 features=" + features +
+                            " source=hir.ctfe-body");
+    summary.mirNodes.insert("mir.verifier-ctfe-body " + functionName +
+                            " result=accepted features=" + features +
+                            " span=" + span);
+    summary.llvmNodes.insert("llvm.ctfe-body-preview @" + functionName +
+                             " features=" + features +
+                             " source=mir.verifier-ctfe-body");
+  };
+  auto emitCtfeStepFacts = [&](const std::string &functionName,
+                               const std::string &kind,
+                               const std::string &subject,
+                               const std::string &detail,
+                               const std::string &span) {
+    summary.hirNodes.insert("hir.ctfe-step " + functionName +
+                            " kind=" + kind +
+                            " subject=" + subject +
+                            " " + detail +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.ctfe-step " + functionName +
+                            " kind=" + kind +
+                            " subject=" + subject +
+                            " " + detail);
+    summary.llvmNodes.insert("llvm.ctfe-step-preview @" + functionName +
+                             " kind=" + kind +
+                             " subject=" + subject +
+                             " source=mir.ctfe-step");
+  };
+  auto scalarLayoutPreview = [](const std::string &typeName) {
+    const std::string normalized = normalizeSignatureType(typeName);
+    if (normalized == "Bool" || normalized == "I8" || normalized == "U8" || normalized == "Char") {
+      return std::pair<std::string, std::string>{"1", "1"};
+    }
+    if (normalized == "I16" || normalized == "U16") {
+      return std::pair<std::string, std::string>{"2", "2"};
+    }
+    if (normalized == "I32" || normalized == "U32" || normalized == "F32") {
+      return std::pair<std::string, std::string>{"4", "4"};
+    }
+    if (normalized == "I64" || normalized == "U64" || normalized == "F64" ||
+        normalized == "ISize" || normalized == "USize") {
+      return std::pair<std::string, std::string>{"8", "8"};
+    }
+    return std::pair<std::string, std::string>{"aggregate", "aggregate"};
+  };
+  auto capPackedAlign = [](std::string align, const std::string &layout) {
+    if (!startsWith(layout, "Packed(") || !contains(layout, ")")) return align;
+    if (align == "aggregate") return align;
+    const std::size_t open = layout.find('(');
+    const std::size_t close = layout.find(')', open + 1);
+    if (open == std::string::npos || close == std::string::npos) return align;
+    try {
+      const int cap = std::stoi(layout.substr(open + 1, close - open - 1));
+      const int value = std::stoi(align);
+      return std::to_string(std::min(value, cap));
+    } catch (...) {
+      return align;
+    }
+  };
+  auto layoutQueryKey = [&](const std::string &typeName, const std::string &layout) {
+    std::string seed = typeName + ":" + layout;
+    for (const auto &field : structFieldOrder[typeName]) {
+      seed += ":" + field + ":" + structFieldTypesByOwner[typeName][field];
+    }
+    return "fnv1a64:" + hex64(fnv1a64(seed));
+  };
+  auto emitLayoutQueryFacts = [&](const std::string &typeName,
+                                  const std::string &layout,
+                                  const std::string &span) {
+    const std::string fields = std::to_string(structFieldOrder[typeName].size());
+    const std::string key = layoutQueryKey(typeName, layout);
+    summary.hirNodes.insert("hir.ctfe-layout-query " + typeName +
+                            " layout=" + layout + " fields=" + fields +
+                            " key=" + key + " span=" + span);
+    summary.mirNodes.insert("mir.layout-query " + typeName +
+                            " layout=" + layout + " fields=" + fields +
+                            " key=" + key + " source=hir.ctfe-layout-query");
+    summary.mirNodes.insert("mir.verifier-layout-query " + typeName +
+                            " result=accepted layout=" + layout +
+                            " fields=" + fields + " key=" + key +
+                            " span=" + span);
+    summary.llvmNodes.insert("llvm.layout-constant-preview %" + typeName +
+                             " layout=" + layout + " fields=" + fields +
+                             " key=" + key + " source=mir.verifier-layout-query");
+  };
+  auto emitLayoutFieldQueryFacts = [&](const std::string &owner,
+                                       const std::string &field,
+                                       const std::string &type,
+                                       const std::string &layout,
+                                       const std::string &span) {
+    const auto &fields = structFieldOrder[owner];
+    const auto found = std::find(fields.begin(), fields.end(), field);
+    const std::size_t index = found == fields.end() ? 0 : static_cast<std::size_t>(std::distance(fields.begin(), found));
+    const auto [size, baseAlign] = scalarLayoutPreview(type);
+    const std::string align = capPackedAlign(baseAlign, layout);
+    const std::string offset = "field-index:" + std::to_string(index);
+    summary.hirNodes.insert("hir.ctfe-layout-field " + owner + "." + field +
+                            " owner=" + owner + " index=" + std::to_string(index) +
+                            " type=" + type + " layout=" + layout +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.layout-field-query " + owner + "." + field +
+                            " owner=" + owner + " index=" + std::to_string(index) +
+                            " type=" + type + " offset=" + offset +
+                            " size=" + size + " align=" + align +
+                            " layout=" + layout);
+    summary.llvmNodes.insert("llvm.layout-field-preview %" + owner + "." + field +
+                             " index=" + std::to_string(index) +
+                             " offset=" + offset + " size=" + size +
+                             " align=" + align + " layout=" + layout);
+  };
+
+  std::map<std::string, std::map<std::string, std::string>> plannedDropLocalTypes;
+  for (const auto &node : ast) {
+    if (node.kind != "stmt.val" && node.kind != "stmt.var") continue;
+    const std::string functionName = functionNameForNode(node);
+    const std::string localName = localNameForNode(node);
+    std::string dropType = node.returnType.empty() ? "inferred" : node.returnType;
+    if (dropType == "inferred") {
+      if (auto inferred = inferredExpressionType(node.params)) dropType = *inferred;
+    }
+    if (destroyTypes.count(dropType)) plannedDropLocalTypes[functionName][localName] = dropType;
+  }
+
   auto emitCallPreview = [&](const std::string &expr, const std::string &functionName) {
     if (startsWith(expr, "call:")) {
       summary.llvmNodes.insert("llvm.call-preview @" + expr.substr(5) + " in @" + functionName);
+    }
+  };
+  auto cleanupStateForFunction = [&](const std::string &functionName) {
+    auto it = dropLocalTypes.find(functionName);
+    if (it == dropLocalTypes.end() || it->second.empty()) return std::string("none");
+    return std::string("tracked");
+  };
+  auto emitTryCleanupDrops = [&](const std::string &functionName) {
+    auto it = dropLocalTypes.find(functionName);
+    if (it == dropLocalTypes.end()) return;
+    for (const auto &[localName, dropType] : it->second) {
+      summary.mirNodes.insert("mir.cleanup-drop " + functionName + " local=%" + localName +
+                              " type=" + dropType + " target=try-error");
+      summary.mirNodes.insert("mir.cleanup-edge " + functionName + " try-error drop=%" + localName);
+      summary.mirNodes.insert("mir.verifier-cleanup " + functionName + " target=try-error local=%" +
+                              localName + " type=" + dropType + " reason=try-error");
+      summary.llvmNodes.insert("llvm.cleanup-drop-preview @" + functionName + " local=%" + localName +
+                               " type=" + dropType + " target=try-error");
+    }
+  };
+  auto enumPayloadAccessKind = [](const std::string &mode) {
+    if (mode == "move") return std::string("move");
+    if (mode == "mut") return std::string("borrow-mut");
+    return std::string("borrow-read");
+  };
+  auto enumPayloadAliasKind = [](const std::string &mode) {
+    if (mode == "mut") return std::string("noalias");
+    if (mode == "move") return std::string("owned");
+    return std::string("readonly");
+  };
+  auto aliasProofKind = [](const std::string &mode) {
+    if (mode == "mut") return std::string("unique-mut");
+    if (mode == "move") return std::string("owned-move");
+    return std::string("shared-read");
+  };
+  auto aliasAttributes = [](const std::string &mode) {
+    if (mode == "mut") return std::string("noalias,nocapture");
+    if (mode == "move") return std::string("noalias,nocapture");
+    return std::string("readonly");
+  };
+  auto ownershipSubjectFromOperand = [](std::string operand) {
+    operand = trim(operand);
+    if (startsWith(operand, "name:")) return operand.substr(5);
+    if (startsWith(operand, "field:")) return operand.substr(6);
+    if (startsWith(operand, "move:")) return trim(operand.substr(5));
+    if (startsWith(operand, "mut:")) return trim(operand.substr(4));
+    return operand;
+  };
+  auto ownershipPlace = [](const std::string &subject) {
+    if (subject.empty() || subject == "unknown") return std::string("%unknown");
+    if (startsWith(subject, "%")) return subject;
+    if (contains(subject, ".")) return subject;
+    return "%" + subject;
+  };
+  auto rootPlaceName = [](const std::string &subject) {
+    const std::size_t dot = subject.find('.');
+    if (dot != std::string::npos) return subject.substr(0, dot);
+    return subject;
+  };
+  auto typeForOwnershipSubject = [&](const std::string &functionName,
+                                     const std::string &subject,
+                                     const std::string &fallback) {
+    const std::string root = rootPlaceName(subject);
+    auto localIt = localValueTypes.find(functionName);
+    if (localIt != localValueTypes.end() && localIt->second.count(root)) return localIt->second[root];
+    auto paramIt = functionParamTypes.find(functionName);
+    if (paramIt != functionParamTypes.end() && paramIt->second.count(root)) return paramIt->second[root];
+    return fallback.empty() ? std::string("unknown") : fallback;
+  };
+  auto emitInitializationState = [&](const std::string &functionName,
+                                     const std::string &subject,
+                                     const std::string &type,
+                                     const std::string &reason,
+                                     const std::string &span) {
+    const std::string place = ownershipPlace(subject);
+    summary.hirNodes.insert("hir.initialization-state " + functionName +
+                            " subject=" + subject + " type=" + type +
+                            " state=initialized reason=" + reason +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.initialization-state " + functionName +
+                            " place=" + place + " type=" + type +
+                            " state=initialized reason=" + reason);
+    summary.mirNodes.insert("mir.verifier-initialization " + functionName +
+                            " place=" + place + " state=initialized" +
+                            " reason=" + reason + " span=" + span);
+    summary.llvmNodes.insert("llvm.initialization-preview @" + functionName +
+                             " place=" + place + " type=" + type +
+                             " state=initialized source=mir.verifier-initialization");
+  };
+  auto emitOwnershipState = [&](const std::string &functionName,
+                                const std::string &subject,
+                                const std::string &type,
+                                const std::string &state,
+                                const std::string &reason,
+                                const std::string &span) {
+    const std::string place = ownershipPlace(subject);
+    summary.hirNodes.insert("hir.ownership-state " + functionName +
+                            " subject=" + subject + " type=" + type +
+                            " state=" + state + " reason=" + reason +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.ownership-state " + functionName +
+                            " place=" + place + " type=" + type +
+                            " state=" + state + " reason=" + reason);
+    summary.mirNodes.insert("mir.verifier-ownership " + functionName +
+                            " place=" + place + " state=" + state +
+                            " reason=" + reason + " span=" + span);
+    summary.llvmNodes.insert("llvm.ownership-preview @" + functionName +
+                             " place=" + place + " type=" + type +
+                             " state=" + state + " source=mir.verifier-ownership");
+  };
+  auto emitAccessProof = [&](const std::string &functionName,
+                             const std::string &role,
+                             const std::string &mode,
+                             const std::string &operand,
+                             const std::string &span) {
+    if (mode != "read" && mode != "mut" && mode != "move") return;
+    const std::string proof = aliasProofKind(mode);
+    const std::string attrs = aliasAttributes(mode);
+    summary.mirNodes.insert("mir.verifier-access " + functionName +
+                            " role=" + role + " mode=" + mode +
+                            " operand=" + operand + " proof=" + proof +
+                            " span=" + span);
+    summary.mirNodes.insert("mir.alias-proof " + functionName +
+                            " role=" + role + " mode=" + mode +
+                            " operand=" + operand + " attrs=" + attrs +
+                            " source=mir.verifier-access");
+    summary.llvmNodes.insert("llvm.alias-attr-preview @" + functionName +
+                             " role=" + role + " mode=" + mode +
+                             " operand=" + operand + " attrs=" + attrs +
+                             " source=mir.alias-proof");
+  };
+  auto emitEnumPayloadAccessFacts = [&](const std::string &functionName,
+                                        const std::string &role,
+                                        const std::string &pattern,
+                                        const std::string &mode,
+                                        const std::string &source,
+                                        const std::string &span) {
+    for (const auto &binding : enumPayloadBindings(pattern)) {
+      const std::string access = enumPayloadAccessKind(mode);
+      const std::string alias = enumPayloadAliasKind(mode);
+      summary.hirNodes.insert("hir.enum-payload-access " + functionName +
+                              " role=" + role + " pattern=" + pattern +
+                              " binding=" + binding + " mode=" + mode +
+                              " source=" + source + " span=" + span);
+      summary.mirNodes.insert("mir.enum-payload-access " + functionName +
+                              " role=" + role + " binding=%" + binding +
+                              " mode=" + mode + " access=" + access +
+                              " source=" + source);
+      emitAccessProof(functionName, "enum-payload:" + role, mode, "%" + binding, span);
+      summary.llvmNodes.insert("llvm.enum-payload-access-preview @" + functionName +
+                               " role=" + role + " binding=" + binding +
+                               " mode=" + mode + " alias=" + alias);
+      if (mode == "move") {
+        summary.mirNodes.insert("mir.enum-payload-move " + functionName +
+                                " binding=%" + binding +
+                                " source=" + source + " clearsPayloadDropFlag=true");
+        summary.llvmNodes.insert("llvm.enum-payload-move-preview @" + functionName +
+                                 " binding=" + binding + " source=" + source);
+      }
     }
   };
   auto emitMirExpressionFacts = [&](const std::string &functionName, const std::string &expr, const std::string &span) {
@@ -8688,6 +9827,9 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=try");
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + expr + " kind=try");
       summary.mirNodes.insert("mir.cleanup-edge " + functionName + " try-error");
+      emitTryCleanupDrops(functionName);
+      summary.mirNodes.insert("mir.verifier-try " + functionName + " expr=" + expr +
+                              " ok=continue err=try-error cleanup=" + cleanupStateForFunction(functionName));
       summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=try expr=" + expr);
     } else if (startsWith(expr, "struct-literal:")) {
       summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=aggregate");
@@ -8769,28 +9911,219 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.mirNodes.insert("mir.operand " + functionName + " expr=" + expr + " kind=opaque");
     }
   };
+  auto cfgBlockId = [&](const ParsedAstNode &node) {
+    return "bb" + std::to_string(numericText(node.visibility, 0));
+  };
+  auto cfgBlockList = [&](const std::string &functionName) {
+    std::vector<std::string> blocks;
+    const auto blockIt = blockOrderNodes.find(functionName);
+    if (blockIt != blockOrderNodes.end()) {
+      for (const auto &block : blockIt->second) blocks.push_back(cfgBlockId(block));
+    }
+    if (blocks.empty()) blocks.push_back("bb0");
+    if (std::find(blocks.begin(), blocks.end(), "bb0") == blocks.end()) {
+      blocks.insert(blocks.begin(), "bb0");
+    }
+    std::string out;
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+      if (i != 0) out += ",";
+      out += blocks[i];
+    }
+    return out;
+  };
+  auto findCfgBlock = [&](const std::string &functionName,
+                          const std::string &role,
+                          int lineNo) -> std::optional<std::string> {
+    const auto blockIt = blockOrderNodes.find(functionName);
+    if (blockIt == blockOrderNodes.end()) return std::nullopt;
+    for (const auto &block : blockIt->second) {
+      if (block.params == role && block.lineNo == lineNo) return cfgBlockId(block);
+    }
+    for (const auto &block : blockIt->second) {
+      if (block.params == role) return cfgBlockId(block);
+    }
+    return std::nullopt;
+  };
+  auto blockEndLine = [&](const ParsedAstNode &block) {
+    return static_cast<int>(numericText(block.returnType, static_cast<std::size_t>(block.lineNo)));
+  };
+  auto cfgBlockForLine = [&](const std::string &functionName, int lineNo) {
+    const auto blockIt = blockOrderNodes.find(functionName);
+    if (blockIt == blockOrderNodes.end()) return std::string("bb0");
+    const ParsedAstNode *best = nullptr;
+    for (const auto &block : blockIt->second) {
+      if (block.lineNo > lineNo) continue;
+      if (blockEndLine(block) < lineNo) continue;
+      if (block.lineNo == lineNo && block.params != "body") continue;
+      if (best == nullptr || block.lineNo > best->lineNo ||
+          (block.lineNo == best->lineNo &&
+           numericText(block.visibility, 0) > numericText(best->visibility, 0))) {
+        best = &block;
+      }
+    }
+    return best == nullptr ? std::string("bb0") : cfgBlockId(*best);
+  };
+  auto cfgBlockForStmt = [&](const std::string &functionName, const ParsedAstNode &stmt) {
+    return cfgBlockForLine(functionName, stmt.lineNo);
+  };
+  auto neverEndpointKind = [](const std::string &expr) -> std::optional<std::string> {
+    if (expr == "call:panic" || startsWith(expr, "call:panic.")) return std::string("panic");
+    if (expr == "call:oom" || startsWith(expr, "call:oom.")) return std::string("oom");
+    return std::nullopt;
+  };
+  auto endpointStrategy = [&](const std::string &kind) {
+    const std::string profile = package.manifestProfile.empty() ? "hosted" : package.manifestProfile;
+    if (kind == "panic") {
+      return package.panicStrategy.empty() ? defaultStrategyForProfile(profile) : package.panicStrategy;
+    }
+    if (kind == "oom") {
+      return package.oomStrategy.empty() ? defaultStrategyForProfile(profile) : package.oomStrategy;
+    }
+    return std::string("none");
+  };
+  auto emitCfgSkeleton = [&](const std::string &functionName, const std::string &returnType) {
+    const std::string blocks = cfgBlockList(functionName);
+    const bool hasCleanup = plannedDropLocalTypes.count(functionName) > 0;
+    summary.mirNodes.insert("mir.cfg " + functionName + " entry=bb0 blocks=" + blocks +
+                            " cleanup=" + std::string(hasCleanup ? "tracked" : "none"));
+    summary.llvmNodes.insert("llvm.lowering-input @" + functionName + " from=mir.cfg entry=bb0 blocks=" + blocks);
+    const auto blockIt = blockOrderNodes.find(functionName);
+    if (blockIt != blockOrderNodes.end()) {
+      for (const auto &block : blockIt->second) {
+        const std::string span = sourceRelativePathForMetadata(package, block.file) + ":" +
+                                 std::to_string(block.lineNo) + ":1";
+        const std::string blockId = cfgBlockId(block);
+        const std::string kind = block.generic.empty() ? "unknown" : block.generic;
+        const std::string role = block.params.empty() ? kind : block.params;
+        const std::string endLine = block.returnType.empty() ? std::to_string(block.lineNo) : block.returnType;
+        summary.mirNodes.insert("mir.cfg-block " + functionName + " " + blockId +
+                                " index=" + block.visibility +
+                                " kind=" + kind + " role=" + role + " span=" + span +
+                                " endLine=" + endLine);
+        summary.llvmNodes.insert("llvm.cfg-block-preview @" + functionName + " " + blockId +
+                                 " kind=" + kind + " role=" + role + " endLine=" + endLine);
+      }
+    } else {
+      summary.mirNodes.insert("mir.cfg-block " + functionName + " bb0 index=0 kind=body role=body");
+      summary.llvmNodes.insert("llvm.cfg-block-preview @" + functionName + " bb0 kind=body role=body");
+    }
+    const auto stmtIt = stmtOrderNodes.find(functionName);
+    if (stmtIt == stmtOrderNodes.end()) return;
+    for (const auto &stmt : stmtIt->second) {
+      const std::string stmtIndex = stmt.visibility.empty() ? "0" : stmt.visibility;
+      const std::string stmtKind = stmt.generic.empty() ? "unknown" : stmt.generic;
+      const std::string expr = stmt.returnType.empty() ? "unit" : stmt.returnType;
+      const std::string currentBlock = cfgBlockForStmt(functionName, stmt);
+      const auto emitEdge = [&](const std::string &detail) {
+        summary.mirNodes.insert("mir.cfg-edge " + functionName + " stmt=" + stmtIndex + " " + detail);
+        summary.llvmNodes.insert("llvm.cfg-edge-preview @" + functionName + " stmt=" + stmtIndex + " " + detail);
+      };
+      if (stmtKind == "if" || stmtKind == "if-pattern") {
+        const std::string thenBlock = findCfgBlock(functionName, "if-then", stmt.lineNo).value_or("if.then");
+        const std::string elseBlock = findCfgBlock(functionName, "if-else", stmt.lineNo).value_or("fallthrough");
+        emitEdge("kind=" + stmtKind + " from=" + currentBlock + " then=" + thenBlock + " else=" + elseBlock +
+                 " condition=" + expr);
+      } else if (stmtKind == "while" || stmtKind == "while-pattern") {
+        const std::string bodyBlock = findCfgBlock(functionName, "while-body", stmt.lineNo).value_or("while.body");
+        emitEdge("kind=" + stmtKind + " from=" + currentBlock + " body=" + bodyBlock +
+                 " exit=while.exit condition=" + expr);
+      } else if (stmtKind == "for") {
+        const std::string bodyBlock = findCfgBlock(functionName, "for-body", stmt.lineNo).value_or("for.body");
+        emitEdge("kind=for from=" + currentBlock + " body=" + bodyBlock + " exit=for.exit iterable=" + expr);
+      } else if (stmtKind == "match") {
+        const std::string matchBlock = findCfgBlock(functionName, "match", stmt.lineNo).value_or("match.dispatch");
+        emitEdge("kind=match from=" + currentBlock + " dispatch=" + matchBlock + " scrutinee=" + expr);
+      } else if (stmtKind == "match-arm") {
+        const std::string armBlock = findCfgBlock(functionName, "match-arm-body", stmt.lineNo).value_or("match.arm");
+        emitEdge("kind=match-arm from=match.dispatch body=" + armBlock +
+                 " pattern=" + (stmt.params.empty() ? "unknown" : stmt.params));
+      } else if (stmtKind == "try") {
+        emitEdge("kind=try from=" + currentBlock + " ok=fallthrough err=try-error expr=" + expr);
+      } else if (stmtKind == "return" || stmtKind == "break" || stmtKind == "continue") {
+        const std::string target = stmtKind == "return" ? "return" : (stmtKind == "break" ? "loop.exit" : "loop.header");
+        summary.mirNodes.insert("mir.cfg-terminator " + functionName + " stmt=" + stmtIndex +
+                                " bb=" + currentBlock + " kind=" + stmtKind + " target=" + target +
+                                " value=" + expr + " return=" + returnType);
+        summary.llvmNodes.insert("llvm.cfg-terminator-preview @" + functionName + " stmt=" + stmtIndex +
+                                 " kind=" + stmtKind + " target=" + target);
+      } else if (stmtKind == "expr") {
+        if (auto endpoint = neverEndpointKind(expr)) {
+          const std::string strategy = endpointStrategy(*endpoint);
+          summary.mirNodes.insert("mir.cfg-terminator " + functionName + " stmt=" + stmtIndex +
+                                  " bb=" + currentBlock + " kind=" + *endpoint +
+                                  " target=" + *endpoint + "." + strategy +
+                                  " value=" + expr + " return=" + returnType);
+          summary.llvmNodes.insert("llvm.cfg-terminator-preview @" + functionName + " stmt=" + stmtIndex +
+                                   " kind=" + *endpoint + " target=" + *endpoint + "." + strategy);
+        }
+      }
+    }
+  };
 
   for (const auto &node : ast) {
     const std::string module = node.moduleName.empty() ? "root" : node.moduleName;
     const std::string span = sourceRelativePathForMetadata(package, node.file) + ":" + std::to_string(node.lineNo) + ":1";
+    if (node.kind == "module") {
+      summary.hirNodes.insert("hir.module " + node.name + " file=" + sourceRelativePathForMetadata(package, node.file) +
+                              " declared=" + node.name + " inferred=" + module + " span=" + span);
+      summary.mirNodes.insert("mir.module " + node.name + " file=" + sourceRelativePathForMetadata(package, node.file) +
+                              " declared=" + node.name + " inferred=" + module);
+      summary.llvmNodes.insert("llvm.module-metadata-preview " + node.name +
+                               " file=" + sourceRelativePathForMetadata(package, node.file));
+    }
     if (startsWith(node.kind, "decl.")) {
       summary.hirNodes.insert("hir." + node.kind.substr(5) + " " + node.name + " module=" + module + " span=" + span);
+      const std::string declKind = node.kind.substr(5);
+      const bool packageNamedDecl =
+          declKind == "fn" || declKind == "async-fn" || declKind == "extern" ||
+          declKind == "struct" || declKind == "enum" || declKind == "interface" ||
+          declKind == "const" || declKind == "static" || declKind == "type";
+      if (packageNamedDecl && !node.name.empty() && !contains(node.name, ".") && !contains(node.name, " for ")) {
+        const std::string visibility = declarationVisibility(node.visibility);
+        const std::string visibilityScope = visibilityScopeForMetadata(visibility);
+        const std::string fileId = sourceFileIdForMetadata(package, node.file);
+        summary.hirNodes.insert("hir.visibility-scope " + node.name +
+                                " visibility=" + visibility + " scope=" + visibilityScope +
+                                " fileId=" + fileId + " module=" + module +
+                                " span=" + span);
+        summary.mirNodes.insert("mir.visibility-gate " + node.name +
+                                " visibility=" + visibility + " scope=" + visibilityScope +
+                                " access=" + visibilityScope + " fileId=" + fileId);
+        summary.llvmNodes.insert("llvm.visibility-metadata-preview " + node.name +
+                                 " visibility=" + visibility + " scope=" + visibilityScope +
+                                 " fileId=" + fileId);
+      }
       if (!node.generic.empty() && node.kind != "decl.variant-field" && node.kind != "decl.variant-payload") {
         summary.hirNodes.insert("hir.generic-params " + node.name + " params=" + node.generic + " span=" + span);
         summary.mirNodes.insert("mir.generic-input " + node.name + " params=" + node.generic);
+        summary.mirNodes.insert("mir.monomorphization-plan " + node.name +
+                                " params=" + node.generic +
+                                " policy=per-concrete-args stage=before-llvm");
+        summary.llvmNodes.insert("llvm.lowering-gate @" + node.name +
+                                 " requires=monomorphized-input source=mir.monomorphization-plan");
       }
     }
     if (node.kind == "import.path") {
       const std::string path = node.params.empty() ? node.name : node.params;
       summary.hirNodes.insert("hir.import-path " + path + " module=" + module + " span=" + span);
+      summary.hirNodes.insert("hir.module-resolution " + module + " import=" + path +
+                              " root=" + pathRootName(path) + " source=builtin-or-package span=" + span);
       summary.mirNodes.insert("mir.import-path " + path + " module=" + module);
+      summary.mirNodes.insert("mir.import-binding module=" + module + " path=" + path +
+                              " source=hir.module-resolution");
       summary.llvmNodes.insert("llvm.import-preview module=" + module + " path=" + path + " runtime=none");
     } else if (node.kind == "import.item") {
       const std::string path = node.generic.empty() ? "unknown" : node.generic;
       const std::string item = node.params.empty() ? node.name : node.params;
       summary.hirNodes.insert("hir.import-item " + node.name + " path=" + path + " item=" + item + " span=" + span);
+      summary.hirNodes.insert("hir.import-binding " + item + " target=" + path + "." + item +
+                              " module=" + module + " visibility=module span=" + span);
       summary.mirNodes.insert("mir.import-item " + node.name + " path=" + path + " item=" + item);
+      summary.mirNodes.insert("mir.import-binding module=" + module + " item=" + item +
+                              " target=" + path + "." + item + " source=hir.import-binding");
       summary.llvmNodes.insert("llvm.import-preview module=" + module + " path=" + path + " item=" + item + " runtime=none");
+      summary.llvmNodes.insert("llvm.import-binding-preview module=" + module + " item=" + item +
+                               " target=" + path + "." + item + " runtime=none");
     } else if (node.kind == "attribute.arg") {
       const std::string attr = node.visibility.empty() ? "unknown" : node.visibility;
       const std::string argKind = node.generic.empty() ? "unknown" : node.generic;
@@ -8807,6 +10140,16 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.arg " + node.name + " index=" + index + " mode=" + mode + " expr=" + expr + " owner=" + functionName + " span=" + span);
       emitMirExpressionFacts(functionName, expr, span);
       summary.mirNodes.insert("mir.arg " + functionName + " index=" + index + " mode=" + mode + " operand=" + expr);
+      emitAccessProof(functionName, "arg:" + index, mode, expr, span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(expr);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-arg",
+                           span);
+      }
       summary.llvmNodes.insert("llvm.arg-preview @" + functionName + " index=" + index + " mode=" + mode + " operand=" + expr);
       if (node.kind == "arg.block") {
         const std::string futureCandidate = node.returnType.empty() ? "false" : node.returnType;
@@ -8826,6 +10169,22 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.path-segment " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path + " span=" + span);
       summary.mirNodes.insert("mir.path-segment " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path);
       summary.llvmNodes.insert("llvm.path-segment-preview " + node.name + " role=" + role + " index=" + index + " segment=" + segment + " path=" + path);
+      if (index == "0") {
+        const std::string functionName = functionNameForNode(node);
+        const auto [scope, target, targetKind, targetModule] = resolveSymbol(functionName, segment);
+        summary.hirNodes.insert("hir.path-resolution " + node.name + " role=" + role +
+                                " path=" + path + " root=" + segment +
+                                " scope=" + scope + " target=" + target +
+                                " kind=" + targetKind + " module=" + targetModule +
+                                " span=" + span);
+        summary.mirNodes.insert("mir.symbol-ref " + node.name + " role=path:" + role +
+                                " name=" + segment + " scope=" + scope +
+                                " target=" + target + " kind=" + targetKind);
+        summary.llvmNodes.insert("llvm.symbol-ref-preview " + node.name +
+                                 " role=path:" + role + " name=" + segment +
+                                 " target=" + target + " kind=" + targetKind);
+        emitVisibilityCheckFacts(functionName, "path:" + role, segment, node.file, span);
+      }
     } else if (node.kind == "interface.parent") {
       const std::string index = node.visibility.empty() ? "0" : node.visibility;
       const std::string parent = node.params.empty() ? "unknown" : node.params;
@@ -8835,13 +10194,27 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     }
     if (node.kind == "decl.fn" || node.kind == "decl.async-fn") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
+      const std::string key = overloadKey(node.name, node.params);
       summary.hirNodes.insert("hir.fn-signature " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
-      summary.mirNodes.insert("mir.cfg " + node.name + " entry=bb0 blocks=bb0 cleanup=none");
+      summary.hirNodes.insert("hir.overload-entry " + node.name + " key=" + key + " params=(" + node.params + ") return=" + returnType + " span=" + span);
+      if (interfaceNames.count(returnType)) {
+        summary.hirNodes.insert("hir.static-interface-return " + node.name + " interface=" + returnType + " span=" + span);
+        summary.mirNodes.insert("mir.static-interface-return " + node.name + " interface=" + returnType);
+        summary.mirNodes.insert("mir.static-interface-return-proof " + node.name +
+                                " interface=" + returnType + " representation=concrete noBox=true noAllocator=true");
+        summary.llvmNodes.insert("llvm.static-interface-return-preview @" + node.name + " interface=" + returnType);
+        summary.llvmNodes.insert("llvm.static-interface-return-lowering @" + node.name +
+                                 " interface=" + returnType + " dispatch=direct noBox=true noAllocator=true");
+      }
+      emitCfgSkeleton(node.name, returnType);
+      emitCtfeBodyFacts(node.name, returnType, span);
       summary.mirNodes.insert("mir.fn " + node.name + " entry=bb0 return=" + returnType);
+      summary.mirNodes.insert("mir.overload-entry " + node.name + " key=" + key + " return=" + returnType);
       summary.mirNodes.insert("mir.cleanup-edge " + node.name + " none");
-      summary.mirNodes.insert("mir.drop-flags " + node.name + " state=none-preview");
+      const std::string dropState = plannedDropLocalTypes.count(node.name) ? "tracked" : "none-preview";
+      summary.mirNodes.insert("mir.drop-flags " + node.name + " state=" + dropState);
       summary.llvmNodes.insert("llvm.define-preview @" + node.name + " return=" + returnType);
-      summary.llvmNodes.insert("llvm.lowering-input @" + node.name + " from=mir.cfg entry=bb0");
+      summary.llvmNodes.insert("llvm.overload-entry-preview @" + node.name + " key=" + key + " return=" + returnType);
     } else if (node.kind == "decl.extern") {
       summary.hirNodes.insert("hir.extern " + node.name + " abi=" + (node.abi.empty() ? "unknown" : node.abi));
       summary.mirNodes.insert("mir.extern " + node.name + " abi=" + (node.abi.empty() ? "unknown" : node.abi));
@@ -8849,6 +10222,7 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     } else if (node.kind == "decl.struct") {
       summary.hirNodes.insert("hir.layout-input " + node.name + " layout=" + node.layout);
       if (!node.returnType.empty()) summary.hirNodes.insert("hir.struct-marker " + node.name + " marker=" + node.returnType);
+      emitLayoutQueryFacts(node.name, node.layout.empty() ? "Auto" : node.layout, span);
       summary.mirNodes.insert("mir.type " + node.name + " layout=" + node.layout);
       summary.llvmNodes.insert("llvm.type %" + node.name + " layout=" + node.layout);
     } else if (node.kind == "decl.interface") {
@@ -8865,6 +10239,12 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
       const std::string visibility = node.visibility.empty() ? "package" : declarationVisibility(node.visibility);
       summary.hirNodes.insert("hir.field " + node.name + " type=" + type + " span=" + span + " visibility=" + visibility);
+      const std::string owner = methodOwnerName(node.name);
+      const std::string field = methodLocalName(node.name);
+      if (!owner.empty() && !field.empty()) {
+        const std::string layout = structLayouts.count(owner) ? structLayouts[owner] : "Auto";
+        emitLayoutFieldQueryFacts(owner, field, type, layout, span);
+      }
       summary.mirNodes.insert("mir.field " + node.name + " type=" + type + " visibility=" + visibility);
       summary.llvmNodes.insert("llvm.field-preview " + node.name + " type=" + type + " visibility=" + visibility);
     } else if (node.kind == "decl.variant") {
@@ -8895,12 +10275,14 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     } else if (node.kind == "decl.impl-method") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.impl-method " + node.name + " params=(" + node.params + ") return=" + returnType + " span=" + span);
+      emitCtfeBodyFacts(node.name, returnType, span);
       summary.mirNodes.insert("mir.impl-method " + node.name + " params=(" + node.params + ") return=" + returnType);
       summary.llvmNodes.insert("llvm.impl-method-preview " + node.name + " return=" + returnType);
     } else if (node.kind == "decl.impl-const") {
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
       summary.hirNodes.insert("hir.impl-const " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
+      emitCtfeFacts(node.name, "impl-const", localNameForNode(node), node.params, type, span);
       summary.mirNodes.insert("mir.impl-const " + node.name + " value=" + node.params + " type=" + type);
     } else if (node.kind == "decl.destroy") {
       summary.hirNodes.insert("hir.destroy " + node.name + " span=" + span);
@@ -8914,6 +10296,7 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
       summary.hirNodes.insert("hir." + itemKind + " " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
+      emitCtfeFacts(node.name, itemKind, node.name, node.params, type, span);
       if (itemKind == "const") {
         summary.mirNodes.insert("mir.const " + node.name + " value=" + node.params + " type=" + type);
         summary.llvmNodes.insert("llvm.const-preview @" + node.name + " value=" + node.params + " type=" + type);
@@ -8930,6 +10313,11 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.field-init " + node.name + " field=" + fieldName + " expr=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.aggregate-field-init " + functionName + " field=" + fieldName + " value=" + node.params);
+      emitInitializationState(functionName,
+                              node.name,
+                              "field",
+                              "aggregate-field-init",
+                              span);
       summary.llvmNodes.insert("llvm.aggregate-field-preview @" + functionName + " field=" + fieldName + " value=" + node.params);
     } else if (node.kind == "expr.index-access") {
       const std::string functionName = functionNameForNode(node);
@@ -8958,21 +10346,127 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string method = node.returnType.empty() ? localNameForNode(node) : node.returnType;
       const std::string mode = node.generic.empty() ? "read" : node.generic;
       summary.hirNodes.insert("hir.method-call " + node.name + " receiver=" + node.params + " method=" + method + " mode=" + mode + " span=" + span);
+      emitResolutionFacts(functionName, "method-receiver", node.params, node.file, span);
       emitMirExpressionFacts(functionName, expressionAstFact(node.params), span);
       summary.mirNodes.insert("mir.method-call " + functionName + " receiver=" + node.params + " method=" + method + " mode=" + mode);
+      emitCtfeStepFacts(functionName, "method-call", method,
+                        "receiver=" + node.params + " mode=" + mode,
+                        span);
+      if (mode == "move") {
+        emitOwnershipState(functionName,
+                           node.params,
+                           typeForOwnershipSubject(functionName, node.params, "unknown"),
+                           "moved",
+                           "move-receiver",
+                           span);
+      }
+      auto paramTypeIt = functionParamTypes.find(functionName);
+      if (paramTypeIt != functionParamTypes.end() && paramTypeIt->second.count(node.params)) {
+        const std::string receiverType = paramTypeIt->second[node.params];
+        auto constraintIt = genericInterfaceConstraints.find(functionName);
+        if (constraintIt != genericInterfaceConstraints.end() && constraintIt->second.count(receiverType)) {
+          const std::string iface = constraintIt->second[receiverType];
+          summary.mirNodes.insert("mir.static-dispatch " + functionName + " receiver=" + node.params +
+                                  " method=" + method + " generic=" + receiverType +
+                                  " interface=" + iface + " dispatch=direct noVtable=true noBox=true");
+          emitCtfeStepFacts(functionName, "static-interface-dispatch", method,
+                            "receiver=" + node.params + " generic=" + receiverType +
+                            " interface=" + iface + " dispatch=direct",
+                            span);
+          summary.llvmNodes.insert("llvm.direct-call-preview @" + functionName +
+                                   " receiver=" + node.params + " method=" + method +
+                                   " interface=" + iface + " noVtable=true noAlloc=true");
+        }
+        if (auto iface = firstGenericArgument(receiverType, "Box"); iface && interfaceNames.count(*iface)) {
+          std::size_t slot = 0;
+          const auto slotIt = interfaceSlotMethods.find(*iface);
+          if (slotIt != interfaceSlotMethods.end()) {
+            const auto found = std::find(slotIt->second.begin(), slotIt->second.end(), method);
+            if (found != slotIt->second.end()) {
+              slot = static_cast<std::size_t>(std::distance(slotIt->second.begin(), found));
+            }
+          }
+          summary.hirNodes.insert("hir.dynamic-dispatch " + functionName +
+                                  " receiver=" + node.params +
+                                  " interface=" + *iface +
+                                  " method=" + method +
+                                  " slot=" + std::to_string(slot) +
+                                  " span=" + span);
+          summary.mirNodes.insert("mir.dynamic-dispatch " + functionName +
+                                  " receiver=%" + node.params +
+                                  " interface=" + *iface +
+                                  " method=" + method +
+                                  " slot=" + std::to_string(slot) +
+                                  " dispatch=vtable source=hir.dynamic-dispatch");
+          summary.mirNodes.insert("mir.vtable-load " + functionName +
+                                  " receiver=%" + node.params +
+                                  " interface=" + *iface +
+                                  " slot=" + std::to_string(slot));
+          summary.llvmNodes.insert("llvm.virtual-call-preview @" + functionName +
+                                   " receiver=%" + node.params +
+                                   " interface=" + *iface +
+                                   " method=" + method +
+                                   " slot=" + std::to_string(slot) +
+                                   " source=mir.dynamic-dispatch");
+        }
+      }
       summary.llvmNodes.insert("llvm.method-call-preview @" + functionName + " receiver=" + node.params + " method=" + method + " mode=" + mode);
     } else if (node.kind == "expr.call") {
       const std::string functionName = functionNameForNode(node);
       const std::string callee = node.params.empty() ? localNameForNode(node) : node.params;
       summary.hirNodes.insert("hir.call " + node.name + " callee=" + callee + " span=" + span);
+      emitResolutionFacts(functionName, "callee", callee, node.file, span);
       summary.mirNodes.insert("mir.call " + functionName + " callee=@" + callee);
+      emitCtfeStepFacts(functionName, "call", callee, "callee=@" + callee, span);
+      const std::vector<std::string> argTypes = callArgumentTypes(functionName, node.lineNo);
+      if (auto selected = selectOverloadCandidate(callee, argTypes);
+          selected && overloadCandidates[callee].size() > 1) {
+        const std::string argList = joinTypeList(argTypes);
+        summary.hirNodes.insert("hir.overload-resolution " + functionName +
+                                " callee=" + callee +
+                                " args=(" + argList + ")" +
+                                " selected=" + selected->key +
+                                " return=" + selected->returnType +
+                                " visibility=" + selected->visibility +
+                                " span=" + span);
+        summary.mirNodes.insert("mir.resolved-call " + functionName +
+                                " callee=@" + callee +
+                                " overloadKey=" + selected->key +
+                                " argTypes=(" + argList + ")" +
+                                " return=" + selected->returnType);
+        summary.llvmNodes.insert("llvm.call-overload-preview @" + functionName +
+                                 " callee=@" + callee +
+                                 " overloadKey=" + selected->key +
+                                 " return=" + selected->returnType);
+      }
+      auto genericIt = genericParamOrder.find(callee);
+      if (genericIt != genericParamOrder.end() && !genericIt->second.empty()) {
+        std::string bindings;
+        for (std::size_t i = 0; i < genericIt->second.size(); ++i) {
+          if (i != 0) bindings += ",";
+          const std::string concrete = i < argTypes.size() ? argTypes[i] : "unknown";
+          bindings += genericIt->second[i] + "=" + concrete;
+        }
+        summary.mirNodes.insert("mir.monomorph-instance " + callee + "<" + bindings + ">" +
+                                " caller=" + functionName + " callee=" + callee +
+                                " source=call-site span=" + span);
+        summary.mirNodes.insert("mir.lowering-input " + callee + "<" + bindings + ">" +
+                                " source=mir.monomorph-instance stage=before-llvm");
+        summary.llvmNodes.insert("llvm.monomorphized-call-preview @" + functionName +
+                                 " callee=@" + callee + " instance=<" + bindings + ">" +
+                                 " source=mir.lowering-input");
+      }
       summary.llvmNodes.insert("llvm.call-detail-preview @" + functionName + " callee=@" + callee);
     } else if (node.kind == "expr.type-static-call") {
       const std::string functionName = functionNameForNode(node);
       const std::string method = node.params.empty() ? localNameForNode(node) : node.params;
       const std::string targetType = node.generic.empty() ? "unknown" : node.generic;
       summary.hirNodes.insert("hir.type-static-call " + node.name + " target=" + targetType + " method=" + method + " span=" + span);
+      emitResolutionFacts(functionName, "static-target", targetType, node.file, span);
       summary.mirNodes.insert("mir.type-static-call " + functionName + " target=" + targetType + " method=" + method);
+      emitCtfeStepFacts(functionName, "type-static-call", method,
+                        "target=" + targetType + " method=" + method,
+                        span);
       summary.llvmNodes.insert("llvm.type-static-call-preview @" + functionName + " target=" + targetType + " method=" + method);
     } else if (node.kind == "expr.binary" || node.kind == "expr.compare" || node.kind == "expr.range") {
       const std::string functionName = functionNameForNode(node);
@@ -9001,6 +10495,7 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string functionName = functionNameForNode(node);
       const std::string name = node.params.empty() ? localNameForNode(node) : node.params;
       summary.hirNodes.insert("hir.name " + functionName + " name=" + name + " span=" + span);
+      emitResolutionFacts(functionName, "value", name, node.file, span);
       summary.mirNodes.insert("mir.name " + functionName + " name=" + name);
       summary.llvmNodes.insert("llvm.name-detail-preview @" + functionName + " name=" + name);
     } else if (node.kind == "expr.literal") {
@@ -9055,22 +10550,45 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.access-expr " + functionName + " mode=" + mode + " operand=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.access-expr " + functionName + " mode=" + mode + " operand=" + node.params);
+      emitAccessProof(functionName, "access-expr", mode, node.params, span);
+      if (mode == "move" && startsWith(node.params, "name:")) {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-access",
+                           span);
+      }
       summary.llvmNodes.insert("llvm.access-detail-preview @" + functionName + " mode=" + mode + " operand=" + node.params);
     } else if (node.kind == "expr.trust-block") {
       const std::string functionName = functionNameForNode(node);
       summary.hirNodes.insert("hir.trust-expr " + functionName + " span=" + span);
       summary.mirNodes.insert("mir.trust-expr " + functionName);
       summary.llvmNodes.insert("llvm.trust-detail-preview @" + functionName);
+    } else if (node.kind == "expr.surface") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string expr = node.params.empty() ? "opaque" : node.params;
+      summary.hirNodes.insert("hir.expr-surface " + functionName + " expr=" + expr + " span=" + span);
+      summary.mirNodes.insert("mir.expr-surface " + functionName + " expr=" + expr);
+      summary.llvmNodes.insert("llvm.expr-surface-preview @" + functionName + " expr=" + expr);
     } else if (node.kind == "expr.closure") {
       const std::string functionName = functionNameForNode(node);
       const std::string capture = node.generic.empty() ? "read" : node.generic;
       const std::string form = node.visibility.empty() ? "expr" : node.visibility;
       const std::string body = node.params.empty() ? (form == "block" ? "block" : "unit") : node.params;
       const std::string returnType = node.returnType.empty() ? "inferred" : node.returnType;
+      const std::string capability = (!node.layout.empty() && node.layout != "Auto")
+                                         ? node.layout
+                                         : (capture == "move" ? "OnceFn" : "Fn");
       summary.hirNodes.insert("hir.closure-expr " + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType + " span=" + span);
+      summary.hirNodes.insert("hir.callable-capability " + functionName + " capture=" + capture + " form=" + form + " body=" + body + " capability=" + capability + " span=" + span);
       if (body != "block") emitMirExpressionFacts(functionName, body, span);
       summary.mirNodes.insert("mir.closure " + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType + " mayEscape=false");
+      summary.mirNodes.insert("mir.callable-capability " + functionName + " capability=" + capability + " receiver=closure mayEscape=false");
+      summary.mirNodes.insert("mir.verifier-callable-capability " + functionName + " result=accepted capability=" + capability);
       summary.llvmNodes.insert("llvm.closure-detail-preview @" + functionName + " capture=" + capture + " form=" + form + " body=" + body + " return=" + returnType);
+      summary.llvmNodes.insert("llvm.callable-capability-preview @" + functionName + " capability=" + capability + " mayEscape=false");
     } else if (startsWith(node.kind, "pattern.")) {
       const std::string functionName = functionNameForNode(node);
       const std::string patternKind = node.kind.substr(8);
@@ -9115,6 +10633,13 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.type-ref " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text + " span=" + span);
       summary.mirNodes.insert("mir.type-ref " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text);
       summary.llvmNodes.insert("llvm.type-ref-preview " + node.name + " role=" + role + " kind=" + typeKind + " text=" + text);
+      emitTypeBindingFacts(typeOwnerForNode(node, role), node.name, role, text, typeKind, span);
+      if (auto iface = firstGenericArgument(text, "Box"); iface && interfaceNames.count(*iface)) {
+        summary.hirNodes.insert("hir.box-interface-type " + node.name + " interface=" + *iface + " role=" + role + " span=" + span);
+        summary.mirNodes.insert("mir.box-interface-type " + node.name + " interface=" + *iface + " role=" + role);
+        summary.llvmNodes.insert("llvm.box-interface-type-preview " + node.name + " interface=" + *iface + " role=" + role);
+        emitBoxInterfaceObjectFacts(node.name, *iface, role, span);
+      }
     } else if (startsWith(node.kind, "type-component.")) {
       const std::string component = node.kind.substr(15);
       const std::string role = node.generic.empty() ? "unknown" : node.generic;
@@ -9124,14 +10649,27 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.type-component " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent + " span=" + span);
       summary.mirNodes.insert("mir.type-component " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent);
       summary.llvmNodes.insert("llvm.type-component-preview " + node.name + " component=" + component + " role=" + role + " kind=" + kind + " text=" + text + " parent=" + parent);
+      emitTypeBindingFacts(typeOwnerForNode(node, role), node.name, "type-component:" + component, text, kind, span);
     } else if (startsWith(node.kind, "generic-param.")) {
       const std::string paramKind = node.kind.substr(14);
       const std::string text = node.params.empty() ? localNameForNode(node) : node.params;
       const std::string constraint = node.generic.empty() ? "none" : node.generic;
       const std::string paramName = node.returnType.empty() ? "unknown" : node.returnType;
       const std::string paramType = node.visibility.empty() ? "none" : node.visibility;
+      const std::string owner = genericOwnerForNode(node);
       summary.hirNodes.insert("hir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " span=" + span + " name=" + paramName + " type=" + paramType);
       summary.mirNodes.insert("mir.generic-param " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " name=" + paramName + " type=" + paramType);
+      if (constraint != "none") {
+        emitTypeBindingFacts(owner, node.name + ".constraint", "generic-constraint", constraint, "path", span);
+        summary.hirNodes.insert("hir.interface-constraint " + owner + " param=" + paramName +
+                                " interface=" + constraint + " dispatch=static span=" + span);
+        summary.mirNodes.insert("mir.static-interface-constraint " + owner + " param=" + paramName +
+                                " interface=" + constraint + " dispatch=static witness=compile-time");
+        summary.mirNodes.insert("mir.dispatch-proof " + owner + " param=" + paramName +
+                                " interface=" + constraint + " kind=static noVtable=true noBox=true");
+        summary.llvmNodes.insert("llvm.static-dispatch-preview @" + owner +
+                                 " interface=" + constraint + " dispatch=direct noVtable=true noAlloc=true");
+      }
       summary.llvmNodes.insert("llvm.generic-param-preview " + node.name + " kind=" + paramKind + " text=" + text + " constraint=" + constraint + " name=" + paramName + " type=" + paramType);
     } else if (startsWith(node.kind, "generic-arg.")) {
       const std::string argKind = node.kind.substr(12);
@@ -9141,13 +10679,72 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.generic-arg " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent + " span=" + span);
       summary.mirNodes.insert("mir.generic-arg " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent);
       summary.llvmNodes.insert("llvm.generic-arg-preview " + node.name + " kind=" + argKind + " role=" + role + " text=" + text + " parent=" + parent);
+      if (argKind == "type") {
+        emitTypeBindingFacts(typeOwnerForNode(node, role), node.name, "generic-arg:" + role, text, "path", span);
+      } else if (argKind == "expr") {
+        summary.hirNodes.insert("hir.const-generic-arg " + node.name +
+                                " role=" + role + " value=" + text +
+                                " parent=" + parent + " span=" + span);
+        summary.mirNodes.insert("mir.const-generic-arg " + node.name +
+                                " role=" + role + " value=" + text +
+                                " parent=" + parent + " constEval=required");
+        summary.llvmNodes.insert("llvm.const-generic-arg-preview " + node.name +
+                                 " role=" + role + " value=" + text +
+                                 " parent=" + parent);
+        emitCtfeFacts(node.name, "const-generic", node.name, text, "const", span);
+      }
     } else if (startsWith(node.kind, "param.")) {
       const std::string paramKind = node.kind.substr(6);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
       const std::string name = node.params.empty() ? localNameForNode(node) : node.params;
-      summary.hirNodes.insert("hir.param " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name + " span=" + span);
-      summary.mirNodes.insert("mir.param " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name);
-      summary.llvmNodes.insert("llvm.param-preview " + node.name + " kind=" + paramKind + " mode=" + mode + " name=" + name);
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      const std::size_t ownerDot = node.name.rfind('.');
+      const std::string functionName = ownerDot == std::string::npos ? node.name : node.name.substr(0, ownerDot);
+      const std::string baseDetail = " kind=" + paramKind + " mode=" + mode + " name=" + name;
+      const std::string typedDetail = baseDetail + " index=" + index + " type=" + type;
+      summary.hirNodes.insert("hir.param " + node.name + baseDetail + " span=" + span +
+                              " index=" + index + " type=" + type);
+      summary.mirNodes.insert("mir.param " + node.name + typedDetail);
+      emitAccessProof(functionName, "param:" + index, mode, "%" + name, span);
+      const std::string ownershipState = mode == "move" ? "owned" : (mode == "mut" ? "borrowed-mut" : "borrowed-read");
+      emitOwnershipState(functionName, name, type, ownershipState, mode + "-param", span);
+      auto constraintIt = genericInterfaceConstraints.find(functionName);
+      if (constraintIt != genericInterfaceConstraints.end() && constraintIt->second.count(type)) {
+        const std::string iface = constraintIt->second[type];
+        summary.hirNodes.insert("hir.static-interface-param " + functionName + " param=" + name +
+                                " generic=" + type + " interface=" + iface + " span=" + span);
+        summary.mirNodes.insert("mir.static-interface-param " + functionName + " param=" + name +
+                                " generic=" + type + " interface=" + iface +
+                                " dispatch=static witness=compile-time");
+        summary.mirNodes.insert("mir.dispatch-proof " + functionName + " param=" + name +
+                                " interface=" + iface + " kind=static noVtable=true noBox=true");
+        summary.llvmNodes.insert("llvm.static-interface-param-preview @" + functionName +
+                                 " param=" + name + " generic=" + type +
+                                 " interface=" + iface + " dispatch=direct noVtable=true noAlloc=true");
+      }
+      summary.llvmNodes.insert("llvm.param-preview " + node.name + typedDetail);
+    } else if (node.kind == "closure-param") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string pattern = node.params.empty() ? localNameForNode(node) : node.params;
+      const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
+      summary.hirNodes.insert("hir.closure-param " + functionName + " pattern=" + pattern + " type=" + type + " span=" + span);
+      summary.mirNodes.insert("mir.closure-param " + functionName + " pattern=" + pattern + " type=" + type);
+      emitInitializationState(functionName, pattern, type, "closure-param", span);
+      summary.llvmNodes.insert("llvm.closure-param-preview @" + functionName + " pattern=" + pattern + " type=" + type);
+    } else if (node.kind == "block.order") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string blockKind = node.generic.empty() ? "unknown" : node.generic;
+      const std::string role = node.params.empty() ? blockKind : node.params;
+      const std::string endLine = node.returnType.empty() ? std::to_string(node.lineNo) : node.returnType;
+      summary.hirNodes.insert("hir.block-order " + functionName + " index=" + index +
+                              " kind=" + blockKind + " role=" + role + " span=" + span +
+                              " endLine=" + endLine);
+      summary.mirNodes.insert("mir.block-order " + functionName + " index=" + index +
+                              " kind=" + blockKind + " role=" + role + " endLine=" + endLine);
+      summary.llvmNodes.insert("llvm.block-order-preview @" + functionName + " index=" + index +
+                               " kind=" + blockKind + " role=" + role + " endLine=" + endLine);
     } else if (startsWith(node.kind, "block.")) {
       const std::string functionName = functionNameForNode(node);
       const std::string blockKind = node.generic.empty() ? node.kind.substr(6) : node.generic;
@@ -9165,6 +10762,10 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       if (!node.returnType.empty()) detail += " pattern=" + node.returnType;
       summary.hirNodes.insert("hir." + exprKind + "-expr " + functionName + " " + detail + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
+      emitCtfeStepFacts(functionName, exprKind == "while" ? "loop" : "branch",
+                        exprKind,
+                        detail,
+                        span);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=" + exprKind + " kind=" + exprKind + " " + detail);
       summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=" + exprKind + " " + detail);
     } else if (node.kind == "expr.for") {
@@ -9173,6 +10774,9 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string item = node.returnType.empty() ? "unknown" : node.returnType;
       summary.hirNodes.insert("hir.for-expr " + functionName + " item=" + item + " mode=" + mode + " iterable=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
+      emitCtfeStepFacts(functionName, "loop", "for-expr",
+                        "item=" + item + " mode=" + mode + " iterable=" + node.params,
+                        span);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=for kind=for item=" + item + " mode=" + mode + " iterable=" + node.params);
       summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=for item=" + item + " mode=" + mode + " iterable=" + node.params);
     } else if (node.kind == "expr.control-body") {
@@ -9187,7 +10791,21 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
     } else if (node.kind == "expr.match") {
       const std::string functionName = functionNameForNode(node);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
+      activeMatchExprMode[functionName] = mode;
+      activeMatchExprScrutinee[functionName] = node.params;
       summary.hirNodes.insert("hir.match-expr " + functionName + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitCtfeStepFacts(functionName, "match", "match-expr",
+                        "mode=" + mode + " scrutinee=" + node.params,
+                        span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-match-expr",
+                           span);
+      }
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.rvalue " + functionName + " expr=match kind=match mode=" + mode + " scrutinee=" + node.params);
       summary.llvmNodes.insert("llvm.control-preview @" + functionName + " expr=match mode=" + mode + " scrutinee=" + node.params);
@@ -9197,17 +10815,51 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string pattern = node.returnType.empty() ? "unknown" : node.returnType;
       const std::string guard = node.generic.empty() ? "none" : node.generic;
       const std::string body = node.params.empty() ? "unit" : node.params;
+      const std::string mode = activeMatchExprMode.count(functionName) ? activeMatchExprMode[functionName] : "read";
+      const std::string scrutinee = activeMatchExprScrutinee.count(functionName) ? activeMatchExprScrutinee[functionName] : "unknown";
       summary.hirNodes.insert("hir.match-expr-arm " + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " expr=" + body + " span=" + span);
+      emitCtfeStepFacts(functionName, "match-arm", pattern,
+                        "index=" + index + " guard=" + guard + " body=" + body,
+                        span);
+      emitEnumPayloadAccessFacts(functionName, "match-expr-arm", pattern, mode, scrutinee, span);
       if (guard != "none") emitMirExpressionFacts(functionName, guard, span);
       emitMirExpressionFacts(functionName, body, span);
       summary.mirNodes.insert("mir.match-expr-arm " + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " body=" + body);
       summary.llvmNodes.insert("llvm.match-arm-preview @" + functionName + " index=" + index + " pattern=" + pattern + " guard=" + guard + " body=" + body);
+    } else if (node.kind == "stmt.order") {
+      const std::string functionName = functionNameForNode(node);
+      const std::string index = node.visibility.empty() ? "0" : node.visibility;
+      const std::string stmtKind = node.generic.empty() ? "unknown" : node.generic;
+      std::string detail = functionName + " index=" + index + " kind=" + stmtKind;
+      if (!node.params.empty()) detail += " subject=" + node.params;
+      if (!node.returnType.empty()) detail += " expr=" + node.returnType;
+      summary.hirNodes.insert("hir.stmt-order " + detail + " span=" + span);
+      summary.mirNodes.insert("mir.stmt-order " + detail);
+      summary.llvmNodes.insert("llvm.stmt-order-preview @" + detail);
     } else if (node.kind == "stmt.return") {
       const std::string returnType = node.returnType.empty() ? "Unit" : node.returnType;
       summary.hirNodes.insert("hir.return " + node.name + " expr=" + node.params + " expected=" + returnType + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
+      if (startsWith(node.params, "name:")) {
+        const std::string local = node.params.substr(5);
+        emitOwnershipState(node.name,
+                           local,
+                           typeForOwnershipSubject(node.name, local, returnType),
+                           "moved",
+                           "return",
+                           span);
+        if (dropLocalTypes[node.name].count(local)) {
+          const std::string type = dropLocalTypes[node.name][local];
+          summary.mirNodes.insert("mir.drop-flag " + node.name + " local=%" + local + " type=" + type + " state=moved");
+          summary.mirNodes.insert("mir.move-clear-drop-flag " + node.name + " local=%" + local + " reason=return");
+          summary.mirNodes.insert("mir.verifier-drop-flag " + node.name + " local=%" + local +
+                                  " type=" + type + " state=moved reason=return");
+          summary.llvmNodes.insert("llvm.drop-flag-clear-preview @" + node.name + " local=%" + local + " reason=return");
+        }
+      }
       summary.mirNodes.insert("mir.return " + node.name + " value=" + node.params + " type=" + returnType);
-      summary.mirNodes.insert("mir.terminator " + node.name + " bb=bb0 kind=return value=" + node.params);
+      summary.mirNodes.insert("mir.terminator " + node.name + " bb=" + cfgBlockForLine(node.name, node.lineNo) +
+                              " kind=return value=" + node.params);
       emitCallPreview(node.params, node.name);
       summary.llvmNodes.insert("llvm.ret-preview @" + node.name + " type=" + returnType + " value=" + node.params);
     } else if (node.kind == "stmt.val" || node.kind == "stmt.var") {
@@ -9221,7 +10873,28 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.mirNodes.insert("mir.local " + node.name + " init=" + node.params + " mutable=" + mutableFlag);
       summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=" + mutableFlag + " type=" + type);
       summary.mirNodes.insert("mir.place " + functionName + " %" + localName + " kind=local span=" + span);
-      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params);
+      summary.mirNodes.insert("mir.assign " + functionName + " bb=" + cfgBlockForLine(functionName, node.lineNo) +
+                              " place=%" + localName + " rvalue=" + node.params);
+      std::string localFactType = type;
+      if (localFactType == "inferred") {
+        if (auto inferred = inferredExpressionType(node.params)) localFactType = *inferred;
+      }
+      emitInitializationState(functionName, localName, localFactType, mode + "-binding", span);
+      emitOwnershipState(functionName, localName, localFactType, "available", "local-binding", span);
+      std::string dropType = type;
+      if (dropType == "inferred") {
+        if (auto inferred = inferredExpressionType(node.params)) dropType = *inferred;
+      }
+      if (destroyTypes.count(dropType)) {
+        dropLocalTypes[functionName][localName] = dropType;
+        summary.hirNodes.insert("hir.drop-scope " + functionName + " local=" + localName + " type=" + dropType + " span=" + span);
+        summary.mirNodes.insert("mir.drop-flag " + functionName + " local=%" + localName + " type=" + dropType + " state=initialized");
+        summary.mirNodes.insert("mir.cleanup-drop " + functionName + " local=%" + localName + " type=" + dropType + " target=scope-exit");
+        summary.mirNodes.insert("mir.cleanup-edge " + functionName + " scope-exit drop=%" + localName);
+        summary.mirNodes.insert("mir.verifier-cleanup " + functionName + " target=scope-exit local=%" +
+                                localName + " type=" + dropType + " reason=scope-exit");
+        summary.llvmNodes.insert("llvm.cleanup-drop-preview @" + functionName + " local=%" + localName + " type=" + dropType);
+      }
       emitCallPreview(node.params, functionName);
     } else if (node.kind == "stmt.const") {
       const std::string type = node.returnType.empty() ? "inferred" : node.returnType;
@@ -9229,8 +10902,11 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string localName = localNameForNode(node);
       summary.hirNodes.insert("hir.local-const " + node.name + " expr=" + node.params + " type=" + type + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
+      emitCtfeFacts(node.name, "local-const", localName, node.params, type, span);
       summary.mirNodes.insert("mir.local-const " + node.name + " value=" + node.params + " type=" + type);
       summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=false type=" + type);
+      emitInitializationState(functionName, localName, type, "const-binding", span);
+      emitOwnershipState(functionName, localName, type, "available", "const-binding", span);
       emitCallPreview(node.params, functionName);
     } else if (node.kind == "stmt.assign") {
       const std::string functionName = functionNameForNode(node);
@@ -9238,7 +10914,8 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string assignOp = node.visibility.empty() ? "=" : node.visibility;
       summary.hirNodes.insert("hir.assign " + node.name + " expr=" + node.params + " span=" + span + " op=" + assignOp);
       emitMirExpressionFacts(functionName, node.params, span);
-      summary.mirNodes.insert("mir.assign " + functionName + " bb=bb0 place=%" + localName + " rvalue=" + node.params + " op=" + assignOp);
+      summary.mirNodes.insert("mir.assign " + functionName + " bb=" + cfgBlockForLine(functionName, node.lineNo) +
+                              " place=%" + localName + " rvalue=" + node.params + " op=" + assignOp);
       summary.mirNodes.insert("mir.store-preview " + functionName + " place=%" + localName + " value=" + node.params + " op=" + assignOp);
       summary.llvmNodes.insert("llvm.store-preview @" + functionName + " %" + localName + " value=" + node.params + " op=" + assignOp);
       emitCallPreview(node.params, functionName);
@@ -9250,6 +10927,7 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.pattern-local " + functionName + " mode=" + mode + " pattern=" + pattern + " expr=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.pattern-bind " + functionName + " pattern=" + pattern + " source=" + node.params + " mutable=" + mutableFlag);
+      emitInitializationState(functionName, pattern, "pattern", "pattern-binding", span);
       summary.llvmNodes.insert("llvm.pattern-preview @" + functionName + " pattern=" + pattern + " source=" + node.params);
     } else if (node.kind == "stmt.if") {
       summary.hirNodes.insert("hir.if " + node.name + " condition=" + node.params + " span=" + span);
@@ -9262,6 +10940,16 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string pattern = localNameForNode(node);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
       summary.hirNodes.insert("hir.if-pattern " + functionName + " pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitEnumPayloadAccessFacts(functionName, "if-condition", pattern, mode, node.params, span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-if-pattern",
+                           span);
+      }
       emitMirExpressionFacts(functionName, node.params, span);
       summary.mirNodes.insert("mir.branch " + functionName + " kind=if-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " then=if.then else=if.cont");
       summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=if-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params);
@@ -9272,6 +10960,9 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       summary.hirNodes.insert("hir.while " + node.name + " condition=" + node.params + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
       emitCallPreview(node.params, node.name);
+      emitCtfeStepFacts(node.name, "loop", "while",
+                        "condition=" + node.params,
+                        span);
       summary.mirNodes.insert("mir.loop " + node.name + " condition=" + node.params + " header=while.cond body=while.body exit=while.exit");
       summary.mirNodes.insert("mir.branch " + node.name + " kind=while condition=" + node.params + " then=while.body else=while.exit");
       summary.llvmNodes.insert("llvm.loop-preview @" + node.name + " condition=" + node.params);
@@ -9281,7 +10972,20 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string pattern = localNameForNode(node);
       const std::string mode = node.generic.empty() ? "read" : node.generic;
       summary.hirNodes.insert("hir.while-pattern " + functionName + " pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitEnumPayloadAccessFacts(functionName, "while-condition", pattern, mode, node.params, span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-while-pattern",
+                           span);
+      }
       emitMirExpressionFacts(functionName, node.params, span);
+      emitCtfeStepFacts(functionName, "loop", "while-pattern",
+                        "pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params,
+                        span);
       summary.mirNodes.insert("mir.loop " + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params + " header=while.cond body=while.body exit=while.exit");
       summary.mirNodes.insert("mir.branch " + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " then=while.body else=while.exit");
       summary.llvmNodes.insert("llvm.loop-preview @" + functionName + " kind=while-pattern pattern=" + pattern + " mode=" + mode + " scrutinee=" + node.params);
@@ -9291,14 +10995,41 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string mode = node.returnType.empty() ? "read" : node.returnType;
       summary.hirNodes.insert("hir.for " + functionName + " item=" + localName + " mode=" + mode + " iterable=" + node.params + " span=" + span);
       emitMirExpressionFacts(functionName, node.params, span);
+      emitCtfeStepFacts(functionName, "loop", "for",
+                        "item=" + localName + " mode=" + mode + " iterable=" + node.params,
+                        span);
       summary.mirNodes.insert("mir.loop " + functionName + " kind=for item=%" + localName + " mode=" + mode + " iterable=" + node.params);
       summary.mirNodes.insert("mir.branch " + functionName + " kind=for item=%" + localName + " mode=" + mode + " iterable=" + node.params + " then=for.body else=for.exit");
       summary.mirNodes.insert("mir.local-slot " + functionName + " %" + localName + " mutable=" + std::string(mode == "mut" ? "true" : "false") + " type=iterator-item");
+      emitInitializationState(functionName, localName, "iterator-item", "for-binding", span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(functionName,
+                           subject,
+                           typeForOwnershipSubject(functionName, subject, "unknown"),
+                           "moved",
+                           "move-for-iterable",
+                           span);
+      }
       summary.llvmNodes.insert("llvm.loop-preview @" + functionName + " kind=for mode=" + mode + " iterable=" + node.params);
       summary.llvmNodes.insert("llvm.branch-preview @" + functionName + " kind=for mode=" + mode + " iterable=" + node.params);
     } else if (node.kind == "stmt.match") {
       const std::string mode = node.generic.empty() ? "read" : node.generic;
+      activeMatchMode[node.name] = mode;
+      activeMatchScrutinee[node.name] = node.params;
       summary.hirNodes.insert("hir.match " + node.name + " mode=" + mode + " scrutinee=" + node.params + " span=" + span);
+      emitCtfeStepFacts(node.name, "match", "match",
+                        "mode=" + mode + " scrutinee=" + node.params,
+                        span);
+      if (mode == "move") {
+        const std::string subject = ownershipSubjectFromOperand(node.params);
+        emitOwnershipState(node.name,
+                           subject,
+                           typeForOwnershipSubject(node.name, subject, "unknown"),
+                           "moved",
+                           "move-match",
+                           span);
+      }
       emitMirExpressionFacts(node.name, node.params, span);
       summary.mirNodes.insert("mir.switch " + node.name + " mode=" + mode + " scrutinee=" + node.params + " arms=preview");
       summary.llvmNodes.insert("llvm.switch-preview @" + node.name + " mode=" + mode + " scrutinee=" + node.params);
@@ -9306,7 +11037,13 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       const std::string functionName = functionNameForNode(node);
       const std::string pattern = localNameForNode(node);
       const std::string guard = node.returnType.empty() ? "none" : node.returnType;
+      const std::string mode = activeMatchMode.count(functionName) ? activeMatchMode[functionName] : "read";
+      const std::string scrutinee = activeMatchScrutinee.count(functionName) ? activeMatchScrutinee[functionName] : "unknown";
       summary.hirNodes.insert("hir.match-arm " + functionName + " pattern=" + pattern + " guard=" + guard + " expr=" + node.params + " span=" + span);
+      emitCtfeStepFacts(functionName, "match-arm", pattern,
+                        "guard=" + guard + " body=" + node.params,
+                        span);
+      emitEnumPayloadAccessFacts(functionName, "match-arm", pattern, mode, scrutinee, span);
       emitMirExpressionFacts(functionName, node.params, span);
       if (!node.returnType.empty()) emitMirExpressionFacts(functionName, node.returnType, span);
       summary.mirNodes.insert("mir.match-arm " + functionName + " pattern=" + pattern + " guard=" + guard + " body=" + node.params);
@@ -9319,21 +11056,37 @@ void collectPipelineFactsFromAst(const BuildPackage &package,
       emitMirExpressionFacts(node.name, node.params, span);
       summary.mirNodes.insert("mir.try " + node.name + " expr=" + node.params + " ok=continue err=return");
       summary.mirNodes.insert("mir.cleanup-edge " + node.name + " try-error");
+      summary.mirNodes.insert("mir.verifier-try " + node.name + " expr=" + node.params +
+                              " ok=continue err=return cleanup=" + cleanupStateForFunction(node.name));
       summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=try expr=" + node.params);
     } else if (node.kind == "stmt.break") {
       summary.hirNodes.insert("hir.break " + node.name + " expr=" + node.params + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
-      summary.mirNodes.insert("mir.terminator " + node.name + " kind=break target=loop.exit value=" + node.params);
+      summary.mirNodes.insert("mir.terminator " + node.name + " bb=" + cfgBlockForLine(node.name, node.lineNo) +
+                              " kind=break target=loop.exit value=" + node.params);
       summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=break target=loop.exit");
     } else if (node.kind == "stmt.continue") {
       summary.hirNodes.insert("hir.continue " + node.name + " span=" + span);
-      summary.mirNodes.insert("mir.terminator " + node.name + " kind=continue target=loop.header");
+      summary.mirNodes.insert("mir.terminator " + node.name + " bb=" + cfgBlockForLine(node.name, node.lineNo) +
+                              " kind=continue target=loop.header");
       summary.llvmNodes.insert("llvm.branch-preview @" + node.name + " kind=continue target=loop.header");
     } else if (node.kind == "stmt.expr") {
       summary.hirNodes.insert("hir.expr " + node.name + " expr=" + node.params + " span=" + span);
       emitMirExpressionFacts(node.name, node.params, span);
+      const std::string bb = cfgBlockForLine(node.name, node.lineNo);
       summary.mirNodes.insert("mir.eval " + node.name + " expr=" + node.params);
-      summary.mirNodes.insert("mir.eval " + node.name + " bb=bb0 operand=" + node.params);
+      summary.mirNodes.insert("mir.eval " + node.name + " bb=" + bb + " operand=" + node.params);
+      if (auto endpoint = neverEndpointKind(node.params)) {
+        const std::string strategy = endpointStrategy(*endpoint);
+        summary.mirNodes.insert("mir.terminator " + node.name + " bb=" + bb +
+                                " kind=" + *endpoint + " target=" + *endpoint + "." + strategy +
+                                " value=" + node.params);
+        summary.mirNodes.insert("mir.verifier-terminal " + node.name + " bb=" + bb +
+                                " kind=" + *endpoint + " strategy=" + strategy +
+                                " operand=" + node.params + " span=" + span);
+        summary.llvmNodes.insert("llvm.terminal-preview @" + node.name + " bb=" + bb +
+                                 " kind=" + *endpoint + " target=" + *endpoint + "." + strategy);
+      }
       emitCallPreview(node.params, node.name);
     }
   }
@@ -9376,6 +11129,76 @@ std::vector<TopLevelDeclaration> collectTopLevelDeclarations(const BuildPackage 
   return declarations;
 }
 
+std::string declarationCollectionSignature(const TopLevelDeclaration &decl) {
+  if (decl.kind == "fn") return decl.generic + overloadKey(decl.name, decl.params);
+  if (decl.kind == "extern") return decl.generic + overloadKey(decl.name, decl.params);
+  if (decl.kind == "const" || decl.kind == "static") return decl.returnType + "=" + decl.params;
+  return decl.generic;
+}
+
+void collectSourceManagerAndDeclarationFacts(const BuildPackage &package,
+                                             const std::vector<fs::path> &sourceFiles,
+                                             const std::vector<TopLevelDeclaration> &declarations,
+                                             BuildSummary &summary) {
+  summary.hirNodes.insert("hir.source-manager package=" + package.name +
+                          " files=" + std::to_string(sourceFiles.size()) +
+                          " encoding=utf8 spanFormat=fileId:line:column");
+  summary.mirNodes.insert("mir.source-manager package=" + package.name +
+                          " files=" + std::to_string(sourceFiles.size()) +
+                          " spanFormat=fileId:line:column");
+  summary.llvmNodes.insert("llvm.debug-source-manager-preview package=" + package.name +
+                           " files=" + std::to_string(sourceFiles.size()));
+
+  for (const auto &file : sourceFiles) {
+    if (file.extension() != ".zn") continue;
+    const SourceText source = loadSource(file);
+    const std::string module =
+        explicitModulePath(source.text).value_or(modulePathForSource(package.root, file, package.name));
+    const std::string path = sourceRelativePathForMetadata(package, file);
+    const std::string fileId = sourceFileIdForMetadata(package, file);
+    const std::string lines = std::to_string(splitLines(source.text).size());
+    const std::string bytes = std::to_string(source.text.size());
+    summary.hirNodes.insert("hir.source-file fileId=" + fileId +
+                            " path=" + path + " module=" + (module.empty() ? "root" : module) +
+                            " lines=" + lines + " bytes=" + bytes);
+    summary.mirNodes.insert("mir.source-file fileId=" + fileId +
+                            " path=" + path + " module=" + (module.empty() ? "root" : module));
+    summary.llvmNodes.insert("llvm.debug-file-preview fileId=" + fileId +
+                             " path=" + path + " module=" + (module.empty() ? "root" : module));
+  }
+
+  for (const auto &decl : declarations) {
+    const std::string module = decl.moduleName.empty() ? "root" : decl.moduleName;
+    const std::string signature = declarationCollectionSignature(decl);
+    const std::string stableNodeId = stableDeclarationNodeId(package, decl.moduleName, decl.kind, decl.name, signature);
+    const std::string fileId = sourceFileIdForMetadata(package, decl.file);
+    const std::string span = sourceRelativePathForMetadata(package, decl.file) + ":" +
+                             std::to_string(decl.lineNo) + ":1";
+    const std::string key = (decl.kind == "fn" || decl.kind == "extern") ? overloadKey(decl.name, decl.params) : "none";
+    const std::string visibility = declarationVisibility(decl.visibility);
+    const std::string detail = decl.name +
+                               " kind=" + decl.kind +
+                               " module=" + module +
+                               " visibility=" + visibility +
+                               " stableNodeId=" + stableNodeId +
+                               " fileId=" + fileId +
+                               " span=" + span +
+                               " overloadKey=" + key;
+    summary.hirNodes.insert("hir.decl-collection-entry " + detail);
+    summary.hirNodes.insert("hir.source-span stableNodeId=" + stableNodeId +
+                            " fileId=" + fileId + " span=" + span +
+                            " owner=" + decl.name);
+    summary.mirNodes.insert("mir.decl-table-entry " + detail);
+    summary.mirNodes.insert("mir.source-span stableNodeId=" + stableNodeId +
+                            " fileId=" + fileId + " line=" + std::to_string(decl.lineNo) +
+                            " column=1");
+    summary.llvmNodes.insert("llvm.decl-metadata-preview " + decl.name +
+                             " stableNodeId=" + stableNodeId +
+                             " fileId=" + fileId +
+                             " visibility=" + visibility);
+  }
+}
+
 BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   BuildSummary summary;
   std::vector<fs::path> sourceFiles = buildSourceFiles(package);
@@ -9384,9 +11207,13 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   for (const auto &fact : collectSyntaxSpineAstFacts(package, sourceFiles)) summary.astNodes.insert(fact);
   collectPipelineFactsFromAst(package, ast, summary);
   const auto topLevelDeclarations = collectTopLevelDeclarations(package);
+  collectSourceManagerAndDeclarationFacts(package, sourceFiles, topLevelDeclarations, summary);
   const std::regex structPattern(R"(^\s*(pub\s+|private\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)(<[^>]+>)?)");
   const std::regex implPattern(R"(^\s*(trust\s+)?impl(?:<[^>]+>)?\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)\s+for\s+([A-Za-z_][A-Za-z0-9_]*))");
   const std::regex inherentImplPattern(R"(^\s*impl\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{)");
+  const std::regex fnDeclPattern(R"(^\s*(?:pub\s+|private\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\))");
+  const std::regex valTypePattern(R"(^\s*(?:val|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^=]+)\s*=)");
+  const std::regex valStructLiteralPattern(R"(^\s*(?:val|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\{)");
   const std::regex exportPattern(R"re(@export\s*\(\s*"([^"]+)".*(abi:\s*C|bridge:\s*C))re");
   const std::regex importPattern(R"(^\s*import\s+([A-Za-z_][A-Za-z0-9_]*))");
   std::string currentImplType;
@@ -9394,10 +11221,39 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   int structBraceDepth = 0;
   std::set<std::string> structTypes;
   std::set<std::string> nonAutoSendSyncTypes;
+  std::map<std::string, std::set<std::string>> nonAutoSendSyncReasons;
+  std::map<std::string, std::string> typeDeclSpans;
+  std::map<std::string, std::map<std::string, std::string>> functionLocalTypes;
+  std::map<std::string, std::string> trustedMarkerImpls;
+  struct ThreadSpawnFact {
+    std::string functionName;
+    std::string span;
+    std::string captureMode;
+    std::set<std::string> captures;
+  };
+  std::vector<ThreadSpawnFact> threadSpawnFacts;
+  std::map<std::string, int> topLevelFnNameCounts;
+  std::set<std::string> topLevelInterfaceNames;
+  for (const auto &decl : topLevelDeclarations) {
+    if (decl.kind == "fn") ++topLevelFnNameCounts[decl.name];
+    if (decl.kind == "interface") topLevelInterfaceNames.insert(decl.name);
+    if (decl.kind == "fn" || decl.kind == "async-fn") {
+      for (const auto &param : splitArguments(decl.params)) {
+        const std::size_t colon = param.find(':');
+        if (colon == std::string::npos) continue;
+        std::string name = trim(param.substr(0, colon));
+        if (startsWith(name, "move ")) name = trim(name.substr(5));
+        if (startsWith(name, "mut ")) name = trim(name.substr(4));
+        const std::string type = trim(param.substr(colon + 1));
+        if (!name.empty() && !type.empty()) functionLocalTypes[decl.name][name] = normalizeSignatureType(type);
+      }
+    }
+  }
 
   for (const auto &decl : topLevelDeclarations) {
     if (decl.kind == "struct") {
       structTypes.insert(decl.name);
+      typeDeclSpans[decl.name] = sourceRelativePathForMetadata(package, decl.file) + ":" + std::to_string(decl.lineNo) + ":1";
       summary.declarations.insert(declarationMetadataFact(package, decl.file, decl.moduleName, decl.kind, decl.name, decl.visibility, decl.generic, decl.lineNo));
       summary.layouts.insert(decl.name + ":" + decl.layout + ":fingerprint=" + hex64(fnv1a64(decl.name + ":" + decl.layout)));
       if (decl.visibility == "pub ") summary.publicApi.insert("struct " + decl.name);
@@ -9415,13 +11271,16 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
       else if (decl.visibility != "private ") summary.packageApi.insert("interface " + decl.name);
       if (!decl.generic.empty()) summary.genericSignatures.insert("interface " + decl.name + decl.generic);
     } else if (decl.kind == "fn") {
-      summary.declarations.insert(declarationMetadataFact(package, decl.file, decl.moduleName, decl.kind, decl.name, decl.visibility, decl.generic + overloadKey(decl.name, decl.params), decl.lineNo));
+      const std::string key = overloadKey(decl.name, decl.params);
+      summary.declarations.insert(declarationMetadataFact(package, decl.file, decl.moduleName, decl.kind, decl.name, decl.visibility, decl.generic + key, decl.lineNo));
+      if (topLevelFnNameCounts[decl.name] > 1) {
+        const std::string returnType = decl.returnType.empty() ? "Unit" : decl.returnType;
+        summary.overloadSets.insert(decl.name + " key=" + key + " params=(" + decl.params + ") return=" + returnType + " visibility=" + declarationVisibility(decl.visibility));
+      }
       if (decl.visibility == "pub ") summary.publicApi.insert("fn " + decl.name);
       else if (decl.visibility != "private ") summary.packageApi.insert("fn " + decl.name);
       if (!decl.generic.empty()) summary.genericSignatures.insert("fn " + decl.name + decl.generic);
-      if (!decl.returnType.empty() && !startsWith(decl.returnType, "Result<") && !startsWith(decl.returnType, "Option<") &&
-          !isCCompatibleType(decl.returnType) && !startsWith(decl.returnType, "Array<") && !startsWith(decl.returnType, "Vector<") &&
-          decl.returnType != "String" && decl.returnType != "Unit") {
+      if (topLevelInterfaceNames.count(decl.returnType)) {
         summary.staticInterfaceReturns.insert(decl.name + "->" + decl.returnType);
       }
     } else if (decl.kind == "const" || decl.kind == "static") {
@@ -9438,7 +11297,13 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
         const std::string interfaceName = decl.name.substr(0, split);
         const std::string typeName = decl.name.substr(split + 5);
         if (decl.trusted && (interfaceName == "Send" || interfaceName == "Sync")) {
+          const std::string span = sourceRelativePathForMetadata(package, decl.file) + ":" + std::to_string(decl.lineNo) + ":1";
           summary.sendSyncFacts.insert(typeName + ":" + interfaceName + ":trusted");
+          trustedMarkerImpls[typeName + ":" + interfaceName] = decl.name;
+          summary.hirNodes.insert("hir.send-sync " + typeName + " capability=" + interfaceName + " source=trusted impl=" + decl.name + " span=" + span);
+          summary.mirNodes.insert("mir.send-sync " + typeName + " capability=" + interfaceName + " source=trusted impl=" + decl.name);
+          summary.mirNodes.insert("mir.verifier-send-sync " + typeName + " capability=" + interfaceName + " result=accepted reason=trusted-impl span=" + span);
+          summary.llvmNodes.insert("llvm.send-sync-preview " + typeName + " capability=" + interfaceName + " source=trusted");
           summary.trustCapabilities.insert("threadSafety");
         }
       }
@@ -9448,11 +11313,41 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   for (const auto &file : sourceFiles) {
     if (file.extension() != ".zn") continue;
     const SourceText source = loadSource(file);
-    for (const auto &rawLine : splitLines(source.text)) {
+    const auto sourceLines = splitLines(source.text);
+    std::string currentFunctionName;
+    int functionBraceDepth = 0;
+    bool inThreadSpawnMetadata = false;
+    int threadSpawnMetadataBraceDepth = 0;
+    std::size_t currentThreadSpawnIndex = 0;
+    auto mentionsIdentifier = [](const std::string &text, const std::string &name) {
+      if (name.empty()) return false;
+      const std::regex pattern("(^|[^A-Za-z0-9_])" + name + "([^A-Za-z0-9_]|$)");
+      return std::regex_search(text, pattern);
+    };
+    for (std::size_t lineIndex = 0; lineIndex < sourceLines.size(); ++lineIndex) {
+      const int lineNo = static_cast<int>(lineIndex + 1);
+      const auto &rawLine = sourceLines[lineIndex];
       const std::string line = stripLineComment(rawLine);
       const std::string trimmed = trim(line);
       if (trimmed.empty()) {
         continue;
+      }
+      if (auto fnDecl = matchRegex(trimmed, fnDeclPattern)) {
+        currentFunctionName = (*fnDecl)[1];
+        functionBraceDepth = braceDelta(line);
+      } else if (!currentFunctionName.empty()) {
+        functionBraceDepth += braceDelta(line);
+        if (functionBraceDepth <= 0 && contains(trimmed, "}")) {
+          currentFunctionName.clear();
+          functionBraceDepth = 0;
+        }
+      }
+      if (!currentFunctionName.empty()) {
+        if (auto typed = matchRegex(trimmed, valTypePattern)) {
+          functionLocalTypes[currentFunctionName][(*typed)[1]] = normalizeSignatureType(trim(std::string((*typed)[2])));
+        } else if (auto literal = matchRegex(trimmed, valStructLiteralPattern)) {
+          functionLocalTypes[currentFunctionName][(*literal)[1]] = (*literal)[2];
+        }
       }
       if (contains(trimmed, "module alloc.")) summary.runtimeNeeds.insert("allocator");
       if (contains(trimmed, "module std.thread")) summary.runtimeNeeds.insert("thread");
@@ -9473,11 +11368,20 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
       if (startsWith(trimmed, "destroy")) {
         summary.dropGlue.insert(currentImplType + ":destroy");
         nonAutoSendSyncTypes.insert(currentImplType);
+        nonAutoSendSyncReasons[currentImplType].insert("destroy");
       }
       if (!currentStructType.empty()) {
-        if (contains(trimmed, "RawPointer<") || contains(trimmed, "ArraySlice<") || contains(trimmed, "StringSlice") ||
-            contains(trimmed, "TaskContext") || contains(trimmed, "PanicInfo") || contains(trimmed, "StackFrames")) {
+        if (contains(trimmed, "RawPointer<")) {
           nonAutoSendSyncTypes.insert(currentStructType);
+          nonAutoSendSyncReasons[currentStructType].insert("raw-pointer");
+        }
+        if (contains(trimmed, "ArraySlice<") || contains(trimmed, "StringSlice")) {
+          nonAutoSendSyncTypes.insert(currentStructType);
+          nonAutoSendSyncReasons[currentStructType].insert("borrowed-view");
+        }
+        if (contains(trimmed, "TaskContext") || contains(trimmed, "PanicInfo") || contains(trimmed, "StackFrames")) {
+          nonAutoSendSyncTypes.insert(currentStructType);
+          nonAutoSendSyncReasons[currentStructType].insert("runtime-context");
         }
         structBraceDepth += braceDelta(line);
         if (structBraceDepth <= 0 && contains(trimmed, "}")) {
@@ -9496,7 +11400,29 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
       if (usesInlineAsmTrustCapability(trimmed)) summary.trustCapabilities.insert("inlineAsm");
       if (usesInterruptTrustCapability(trimmed)) summary.trustCapabilities.insert("interrupts");
       if (contains(trimmed, "trust {")) summary.trustCapabilities.insert("trust-block");
-      if (contains(trimmed, "Thread.spawn")) summary.runtimeNeeds.insert("thread");
+      if (contains(trimmed, "Thread.spawn")) {
+        summary.runtimeNeeds.insert("thread");
+        const std::string functionName = currentFunctionName.empty() ? "module" : currentFunctionName;
+        const std::string span = sourceRelativePathForMetadata(package, file) + ":" + std::to_string(lineNo) + ":1";
+        const std::string captureMode = contains(trimmed, "Thread.spawn(move") ? "move" : "read";
+        threadSpawnFacts.push_back(ThreadSpawnFact{functionName, span, captureMode, {}});
+        inThreadSpawnMetadata = true;
+        currentThreadSpawnIndex = threadSpawnFacts.size() - 1;
+        threadSpawnMetadataBraceDepth = braceDelta(line);
+      }
+      if (inThreadSpawnMetadata && currentThreadSpawnIndex < threadSpawnFacts.size()) {
+        const auto localIt = functionLocalTypes.find(threadSpawnFacts[currentThreadSpawnIndex].functionName);
+        if (localIt != functionLocalTypes.end()) {
+          for (const auto &[localName, _] : localIt->second) {
+            if (mentionsIdentifier(trimmed, localName)) threadSpawnFacts[currentThreadSpawnIndex].captures.insert(localName);
+          }
+        }
+        if (!contains(trimmed, "Thread.spawn")) threadSpawnMetadataBraceDepth += braceDelta(line);
+        if (threadSpawnMetadataBraceDepth <= 0 && contains(trimmed, "});")) {
+          inThreadSpawnMetadata = false;
+          threadSpawnMetadataBraceDepth = 0;
+        }
+      }
       if (contains(trimmed, "runtime.spawn")) summary.runtimeNeeds.insert("task-runtime");
       if (contains(trimmed, "TaskGroup<")) summary.runtimeNeeds.insert("task-group");
       if (contains(trimmed, "withCapacity") || contains(trimmed, "String.from")) summary.runtimeNeeds.insert("allocator");
@@ -9516,10 +11442,98 @@ BuildSummary summarizeBuildPackage(const BuildPackage &package) {
   for (const auto &trust : package.manifestTrust) {
     summary.trustCapabilities.insert("manifest:" + trust);
   }
+  auto joinedReasonSet = [](const std::set<std::string> &reasons) {
+    std::string out;
+    for (const auto &reason : reasons) {
+      if (!out.empty()) out += "+";
+      out += reason;
+    }
+    return out;
+  };
   for (const auto &typeName : structTypes) {
-    if (nonAutoSendSyncTypes.count(typeName)) continue;
-    summary.sendSyncFacts.insert(typeName + ":Send:auto");
-    summary.sendSyncFacts.insert(typeName + ":Sync:auto");
+    const std::string span = typeDeclSpans.count(typeName) ? typeDeclSpans[typeName] : "unknown:1:1";
+    const bool autoAllowed = !nonAutoSendSyncTypes.count(typeName);
+    const std::string reason = autoAllowed
+                                   ? "plain-data"
+                                   : (nonAutoSendSyncReasons[typeName].empty() ? "requires-trust" : joinedReasonSet(nonAutoSendSyncReasons[typeName]));
+    summary.hirNodes.insert("hir.send-sync-candidate " + typeName + " auto=" + (autoAllowed ? "true" : "false") + " reason=" + reason + " span=" + span);
+    if (autoAllowed) {
+      summary.hirNodes.insert("hir.send-sync " + typeName + " capability=Send source=auto span=" + span);
+      summary.hirNodes.insert("hir.send-sync " + typeName + " capability=Sync source=auto span=" + span);
+      summary.mirNodes.insert("mir.send-sync " + typeName + " capability=Send source=auto");
+      summary.mirNodes.insert("mir.send-sync " + typeName + " capability=Sync source=auto");
+      summary.mirNodes.insert("mir.verifier-send-sync " + typeName + " capability=Send result=accepted reason=auto-plain-data span=" + span);
+      summary.mirNodes.insert("mir.verifier-send-sync " + typeName + " capability=Sync result=accepted reason=auto-plain-data span=" + span);
+      summary.llvmNodes.insert("llvm.send-sync-preview " + typeName + " capability=Send source=auto");
+      summary.llvmNodes.insert("llvm.send-sync-preview " + typeName + " capability=Sync source=auto");
+      summary.sendSyncFacts.insert(typeName + ":Send:auto");
+      summary.sendSyncFacts.insert(typeName + ":Sync:auto");
+    } else {
+      summary.mirNodes.insert("mir.verifier-send-sync " + typeName + " capability=Send result=rejected reason=" + reason + " span=" + span);
+      summary.mirNodes.insert("mir.verifier-send-sync " + typeName + " capability=Sync result=rejected reason=" + reason + " span=" + span);
+      summary.llvmNodes.insert("llvm.send-sync-preview " + typeName + " capability=auto source=rejected reason=" + reason);
+    }
+  }
+  auto boxInterfaceName = [](const std::string &type) -> std::optional<std::string> {
+    const std::string normalized = normalizeSignatureType(type);
+    if (!startsWith(normalized, "Box<") || normalized.back() != '>') return std::nullopt;
+    return trim(normalized.substr(4, normalized.size() - 5));
+  };
+  auto sendProofForType = [&](const std::string &type) {
+    const std::string normalized = normalizeSignatureType(type);
+    if (auto iface = boxInterfaceName(normalized)) {
+      const bool interfaceCarriesSend = contains(*iface, "Send") || contains(*iface, "Thread");
+      return std::tuple<bool, std::string>{
+          interfaceCarriesSend,
+          interfaceCarriesSend ? "box-interface-includes-send" : "box-interface-missing-send"};
+    }
+    const std::string root = baseTypeName(normalized);
+    if (!nonAutoSendSyncTypes.count(root)) {
+      return std::tuple<bool, std::string>{true, "auto-send"};
+    }
+    if (trustedMarkerImpls.count(root + ":Send")) {
+      return std::tuple<bool, std::string>{true, "trusted-impl"};
+    }
+    return std::tuple<bool, std::string>{false, "not-send"};
+  };
+  for (const auto &spawn : threadSpawnFacts) {
+    const std::string captureCount = std::to_string(spawn.captures.size());
+    summary.hirNodes.insert("hir.thread-spawn " + spawn.functionName +
+                            " api=Thread.spawn capture=" + spawn.captureMode +
+                            " captures=" + captureCount + " runtime=thread span=" + spawn.span);
+    summary.mirNodes.insert("mir.thread-spawn " + spawn.functionName +
+                            " api=Thread.spawn capture=" + spawn.captureMode +
+                            " captures=" + captureCount + " runtime=thread");
+    summary.mirNodes.insert("mir.verifier-thread-spawn " + spawn.functionName +
+                            " result=" + (spawn.captureMode == "move" ? "accepted" : "rejected") +
+                            " capture=" + spawn.captureMode +
+                            " reason=" + (spawn.captureMode == "move" ? "move-closure" : "requires-move-closure") +
+                            " span=" + spawn.span);
+    summary.llvmNodes.insert("llvm.thread-spawn-preview @" + spawn.functionName +
+                             " api=Thread.spawn capture=" + spawn.captureMode +
+                             " runtime=thread");
+    for (const auto &capture : spawn.captures) {
+      std::string type = "unknown";
+      const auto fnIt = functionLocalTypes.find(spawn.functionName);
+      if (fnIt != functionLocalTypes.end() && fnIt->second.count(capture)) type = fnIt->second.at(capture);
+      const auto [accepted, proof] = sendProofForType(type);
+      const std::string result = accepted ? "accepted" : "rejected";
+      summary.hirNodes.insert("hir.thread-capture " + spawn.functionName +
+                              " name=" + capture + " type=" + type +
+                              " mode=move requirement=Send result=" + result +
+                              " proof=" + proof + " span=" + spawn.span);
+      summary.mirNodes.insert("mir.thread-capture " + spawn.functionName +
+                              " place=%" + capture + " type=" + type +
+                              " mode=move requirement=Send result=" + result +
+                              " proof=" + proof);
+      summary.mirNodes.insert("mir.verifier-thread-send " + spawn.functionName +
+                              " place=%" + capture + " type=" + type +
+                              " result=" + result + " proof=" + proof +
+                              " span=" + spawn.span);
+      summary.llvmNodes.insert("llvm.thread-capture-preview @" + spawn.functionName +
+                               " place=%" + capture + " type=" + type +
+                               " send=" + result + " proof=" + proof);
+    }
   }
   return summary;
 }
@@ -12505,6 +14519,7 @@ int commandBuild(const Options &options, std::ostream *statusOut = &std::cout) {
   addPrefixedFacts(interfaceFacts, "interface:", summary.interfaces);
   addPrefixedFacts(interfaceFacts, "impl:", summary.impls);
   addPrefixedFacts(interfaceFacts, "generic:", summary.genericSignatures);
+  addPrefixedFacts(interfaceFacts, "overload:", summary.overloadSets);
   addPrefixedFacts(interfaceFacts, "static-return:", summary.staticInterfaceReturns);
   const std::string interfaceHash = setFingerprint(interfaceFacts);
   const std::string abiHash = setFingerprint(summary.exports);
@@ -12620,6 +14635,7 @@ int commandBuild(const Options &options, std::ostream *statusOut = &std::cout) {
        << "interfaces = " << joinedSet(summary.interfaces) << "\n"
        << "impls = " << joinedSet(summary.impls) << "\n"
        << "genericSignatures = " << joinedSet(summary.genericSignatures) << "\n"
+       << "overloadSets = " << joinedSet(summary.overloadSets) << "\n"
        << "staticInterfaceReturns = " << joinedSet(summary.staticInterfaceReturns) << "\n"
        << "exports = " << joinedSet(summary.exports) << "\n"
        << "trustCapabilities = " << joinedSet(summary.trustCapabilities) << "\n"

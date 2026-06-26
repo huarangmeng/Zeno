@@ -64,10 +64,10 @@
 # zmeta-contains: mir.branch sumClosed kind=for item=%i mode=read iterable=range:closed then=for.body else=for.exit
 # zmeta-contains: mir.branch sumForSkipBreak kind=if condition=compare:== then=if.then else=if.cont
 # zmeta-contains: mir.branch sumWhileSkipBreak kind=if condition=compare:== then=if.then else=if.cont
-# zmeta-contains: mir.terminator sumForSkipBreak kind=continue target=loop.header
-# zmeta-contains: mir.terminator sumForSkipBreak kind=break target=loop.exit value=unit
-# zmeta-contains: mir.terminator sumWhileSkipBreak kind=continue target=loop.header
-# zmeta-contains: mir.terminator sumWhileSkipBreak kind=break target=loop.exit value=unit
+# zmeta-contains: mir.terminator sumForSkipBreak bb=bb2 kind=continue target=loop.header
+# zmeta-contains: mir.terminator sumForSkipBreak bb=bb3 kind=break target=loop.exit value=unit
+# zmeta-contains: mir.terminator sumWhileSkipBreak bb=bb2 kind=continue target=loop.header
+# zmeta-contains: mir.terminator sumWhileSkipBreak bb=bb3 kind=break target=loop.exit value=unit
 # zmeta-contains: mir.rvalue sumHalfOpen expr=range:half-open kind=range mode=half-open
 # zmeta-contains: mir.rvalue sumClosed expr=range:closed kind=range mode=closed
 # zmeta-contains: mir.store-preview sumHalfOpen place=%acc value=binary:+

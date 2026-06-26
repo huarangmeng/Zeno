@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "interfaceAbiCache"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:3956653c6c3e4a67"
-contentHash = "fnv1a64:4d57444137331e6a"
+manifestHash = "fnv1a64:cfd3ce89da0159cc"
+contentHash = "fnv1a64:5904b908d125c3ad"
 trust = []
 dependencies = [
 ]

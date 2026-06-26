@@ -47,26 +47,58 @@
 # zmeta-contains: decl.fn nativeStaticAdd module=syntax span=src/lib.zn:215:1 params=(value: I32) return=I32
 # zmeta-contains: const LIMIT stableNodeId=fnv1a64:
 # zmeta-contains: static Seed stableNodeId=fnv1a64:
-# zmeta-contains: exports = ["zeno_surface_add:abi=C"]
+# zmeta-contains: hir.source-manager package=astSyntaxSurface files=1 encoding=utf8 spanFormat=fileId:line:column
+# zmeta-contains: hir.source-file fileId=fnv1a64:2462ef970fd568f1 path=src/lib.zn module=syntax lines=463 bytes=9275
+# zmeta-contains: mir.source-file fileId=fnv1a64:2462ef970fd568f1 path=src/lib.zn module=syntax
+# zmeta-contains: llvm.debug-file-preview fileId=fnv1a64:2462ef970fd568f1 path=src/lib.zn module=syntax
+# zmeta-contains: hir.decl-collection-entry Buffer kind=struct module=syntax visibility=package stableNodeId=fnv1a64:c0d68b05e2cbf1c4 fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:20:1 overloadKey=none
+# zmeta-contains: hir.decl-collection-entry exportedAdd kind=fn module=syntax visibility=pub stableNodeId=fnv1a64:3367810f70c61307 fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:202:1 overloadKey=exportedAdd(I32,I32)
+# zmeta-contains: hir.visibility-scope exportedAdd visibility=pub scope=external fileId=fnv1a64:2462ef970fd568f1 module=syntax span=src/lib.zn:202:1
+# zmeta-contains: mir.visibility-gate exportedAdd visibility=pub scope=external access=external fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: llvm.visibility-metadata-preview exportedAdd visibility=pub scope=external fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: hir.decl-collection-entry selectOverload kind=fn module=syntax visibility=package stableNodeId=fnv1a64:3e5ed4d2aef42481 fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:373:1 overloadKey=selectOverload(I32)
+# zmeta-contains: hir.decl-collection-entry staticConsumerDispatch kind=fn module=syntax visibility=package stableNodeId=fnv1a64:fa3aa8fa91f82137 fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:445:1 overloadKey=staticConsumerDispatch()
+# zmeta-contains: mir.decl-table-entry staticConsumerDispatch kind=fn module=syntax visibility=package stableNodeId=fnv1a64:fa3aa8fa91f82137 fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:445:1 overloadKey=staticConsumerDispatch()
+# zmeta-contains: llvm.decl-metadata-preview staticConsumerDispatch stableNodeId=fnv1a64:fa3aa8fa91f82137 fileId=fnv1a64:2462ef970fd568f1 visibility=package
+# zmeta-contains: publicApi = ["fn exportedAdd", "fn exportedMaybe", "struct CPacket"]
+# zmeta-contains: packageApi = ["const LIMIT", "const NativeOffset", "enum ParseError", "fn accessModes", "fn allocationTrap", "fn asyncSyntax", "fn blockExpression", "fn callBoxWriter", "fn classify", "fn closureCapabilityModes", "fn closureModes", "fn consumeFuture", "fn controlExpressions", "fn drain", "fn enumPayloadModes", "fn expressions", "fn failFast", "fn futureBlockArgument", "fn genericIdentity", "fn guaranteedValue", "fn inspectMove", "fn integerLiteralForms", "fn makeMeasured", "fn moveIteration", "fn moveReceiverCall", "fn moveWriterSlot", "fn mutateValue", "fn nativeConstAdd", "fn nativeStaticAdd", "fn nextMaybe", "fn observe", "fn operatorExpressions", "fn optional", "fn overloadDispatch", "fn parenExpression", "fn parseDigit", "fn patternModes", "fn raiiScopeDrop", "fn rangeExpressions", "fn readMeasured", "fn returnResource", "fn selectOverload", "fn stackOnly", "fn staticConsumer", "fn staticConsumerDispatch", "fn sumValues", "fn touch", "fn trustedHostRead", "fn tryCleanupResource", "interface Consumer", "interface Measured", "interface Writer", "static NativeSeed", "static Seed", "struct Buffer", "struct Counter", "struct Future", "struct MoveBox", "struct PackedHeader", "struct Point", "struct WriterSlot"]
+# zmeta-contains: exports = ["zeno_surface_add:abi=C", "zeno_surface_maybe:bridge=C"]
 # zmeta-contains: manifestTrust = ["dependencyTrust=false", "ffi=true", "hardware=false", "inlineAsm=false", "interrupts=false", "rawMemory=false", "threadSafety=true"]
-# zmeta-contains: sendSync = ["Buffer:Send:auto", "Buffer:Sync:auto", "Counter:Send:trusted", "Future:Send:auto", "Future:Sync:auto", "Point:Send:auto", "Point:Sync:auto"]
+# zmeta-contains: sendSync = ["Buffer:Send:auto", "Buffer:Sync:auto", "CPacket:Send:auto", "CPacket:Sync:auto", "Counter:Send:trusted", "FileSecret:Send:auto", "FileSecret:Sync:auto", "Future:Send:auto", "Future:Sync:auto", "LocalLayout:Send:auto", "LocalLayout:Sync:auto", "MoveBox:Send:auto", "MoveBox:Sync:auto", "PackedHeader:Send:auto", "PackedHeader:Sync:auto", "Point:Send:auto", "Point:Sync:auto", "WriterSlot:Send:auto", "WriterSlot:Sync:auto"]
+# zmeta-contains: interfaces = ["Consumer<T>", "Measured", "Writer"]
+# zmeta-contains: impls = ["Consumer<U32> for Counter", "Iterator<U32> for Counter", "Measured for Counter", "Send for Counter", "Writer for Buffer<U8, 4>"]
+# zmeta-contains: runtimeNeeds = ["allocator", "c-abi-boundary", "oom", "panic"]
+# zmeta-contains: linkRuntimeNeeds = ["allocator", "c-abi-boundary", "oom", "panic"]
+# zmeta-contains: overloadSets = ["selectOverload key=selectOverload(I32) params=(value: I32) return=I32 visibility=package", "selectOverload key=selectOverload(U32) params=(value: U32) return=U32 visibility=package"]
+# zmeta-contains: staticInterfaceReturns = ["makeMeasured->Measured"]
+# zmeta-contains: costInputs = ["box-interface", "pattern-lowering", "slice-provenance", "try-cleanup"]
 # zmeta-contains: trustCapabilities = ["ffi", "manifest:dependencyTrust=false", "manifest:ffi=true", "manifest:hardware=false", "manifest:inlineAsm=false", "manifest:interrupts=false", "manifest:rawMemory=false", "manifest:threadSafety=true", "threadSafety", "trust-block"]
 # zmeta-contains: syntax.attribute-arg layout.0 module=syntax span=src/lib.zn:19:1 attr=layout index=0 kind=positional value=Source
 # zmeta-contains: syntax.attribute-arg export.0 module=syntax span=src/lib.zn:201:1 attr=export index=0 kind=positional value=zeno_surface_add
 # zmeta-contains: syntax.attribute-arg export.1 module=syntax span=src/lib.zn:201:1 attr=export index=1 kind=named name=abi value=C
+# zmeta-contains: syntax.attribute-arg export.0 module=syntax span=src/lib.zn:329:1 attr=export index=0 kind=positional value=zeno_surface_maybe
+# zmeta-contains: syntax.attribute-arg export.1 module=syntax span=src/lib.zn:329:1 attr=export index=1 kind=named name=bridge value=C
 # zmeta-contains: attribute.arg layout.0 module=syntax span=src/lib.zn:19:1 attr=layout kind=positional value=Source
 # zmeta-contains: attribute.arg export.0 module=syntax span=src/lib.zn:201:1 attr=export kind=positional value=zeno_surface_add
 # zmeta-contains: attribute.arg export.abi module=syntax span=src/lib.zn:201:1 attr=export kind=named name=abi value=C
+# zmeta-contains: attribute.arg export.0 module=syntax span=src/lib.zn:329:1 attr=export kind=positional value=zeno_surface_maybe
+# zmeta-contains: attribute.arg export.bridge module=syntax span=src/lib.zn:329:1 attr=export kind=named name=bridge value=C
 # zmeta-contains: hir.attribute-arg layout.0 attr=layout kind=positional name=none value=Source span=src/lib.zn:19:1
 # zmeta-contains: hir.attribute-arg export.abi attr=export kind=named name=abi value=C span=src/lib.zn:201:1
+# zmeta-contains: hir.attribute-arg export.bridge attr=export kind=named name=bridge value=C span=src/lib.zn:329:1
 # zmeta-contains: mir.attribute-arg export.abi attr=export kind=named name=abi value=C
+# zmeta-contains: mir.attribute-arg export.bridge attr=export kind=named name=bridge value=C
 # zmeta-contains: llvm.attribute-preview export.0 attr=export kind=positional name=none value=zeno_surface_add
 # zmeta-contains: llvm.attribute-preview export.abi attr=export kind=named name=abi value=C
+# zmeta-contains: llvm.attribute-preview export.0 attr=export kind=positional name=none value=zeno_surface_maybe
+# zmeta-contains: llvm.attribute-preview export.bridge attr=export kind=named name=bridge value=C
 # zmeta-contains: syntax.path-segment syntax module=syntax span=src/lib.zn:1:1 role=module index=0 segment=syntax path=syntax
 # zmeta-contains: path.segment syntax.module.syntax.0 module=syntax span=src/lib.zn:1:1 role=module index=0 segment=syntax path=syntax
 # zmeta-contains: hir.path-segment syntax.module.syntax.0 role=module index=0 segment=syntax path=syntax span=src/lib.zn:1:1
+# zmeta-contains: hir.module syntax file=src/lib.zn declared=syntax inferred=syntax span=src/lib.zn:1:1
 # zmeta-contains: mir.path-segment syntax.module.syntax.0 role=module index=0 segment=syntax path=syntax
 # zmeta-contains: llvm.path-segment-preview syntax.module.syntax.0 role=module index=0 segment=syntax path=syntax
+# zmeta-contains: llvm.module-metadata-preview syntax file=src/lib.zn
 # zmeta-contains: syntax.import-path core.option module=syntax span=src/lib.zn:3:1 path=core.option
 # zmeta-contains: syntax.import-item core.option.Option module=syntax span=src/lib.zn:3:1 path=core.option item=Option
 # zmeta-contains: syntax.import-item core.option.Some module=syntax span=src/lib.zn:3:1 path=core.option item=Some
@@ -81,16 +113,26 @@
 # zmeta-contains: import.item core.option.Option module=syntax span=src/lib.zn:3:1 path=core.option item=Option
 # zmeta-contains: import.item core.result.Result module=syntax span=src/lib.zn:4:1 path=core.result item=Result
 # zmeta-contains: hir.import-path core.option module=syntax span=src/lib.zn:3:1
+# zmeta-contains: hir.module-resolution syntax import=core.option root=core source=builtin-or-package span=src/lib.zn:3:1
 # zmeta-contains: hir.import-item core.option.Option path=core.option item=Option span=src/lib.zn:3:1
+# zmeta-contains: hir.import-binding Option target=core.option.Option module=syntax visibility=module span=src/lib.zn:3:1
 # zmeta-contains: hir.path-segment syntax.import.core_option.1 role=import index=1 segment=option path=core.option span=src/lib.zn:3:1
 # zmeta-contains: mir.import-path core.option module=syntax
 # zmeta-contains: mir.import-item core.option.Option path=core.option item=Option
+# zmeta-contains: mir.import-binding module=syntax item=Option target=core.option.Option source=hir.import-binding
 # zmeta-contains: mir.path-segment syntax.import.core_option.1 role=import index=1 segment=option path=core.option
 # zmeta-contains: llvm.import-preview module=syntax path=core.option runtime=none
 # zmeta-contains: llvm.import-preview module=syntax path=core.option item=Option runtime=none
+# zmeta-contains: llvm.import-binding-preview module=syntax item=Option target=core.option.Option runtime=none
 # zmeta-contains: llvm.path-segment-preview syntax.import.core_option.1 role=import index=1 segment=option path=core.option
 # zmeta-contains: stmt.const sumValues.LocalLimit module=syntax span=src/lib.zn:58:1 expr=name:LIMIT type=U32
+# zmeta-contains: stmt.order sumValues.stmt.0 module=syntax span=src/lib.zn:58:1 index=0 kind=const subject=LocalLimit expr=name:LIMIT
+# zmeta-contains: stmt.order sumValues.stmt.4 module=syntax span=src/lib.zn:62:1 index=4 kind=for subject=value expr=name:values
+# zmeta-contains: stmt.order sumValues.stmt.7 module=syntax span=src/lib.zn:66:1 index=7 kind=assign subject=total expr=binary:+
+# zmeta-contains: stmt.order sumValues.stmt.11 module=syntax span=src/lib.zn:71:1 index=11 kind=return expr=call:Ok
 # zmeta-contains: expr.name sumValues.LIMIT module=syntax span=src/lib.zn:58:1
+# zmeta-contains: hir.name-resolution sumValues role=value name=LIMIT scope=package target=LIMIT kind=const module=syntax span=src/lib.zn:58:1
+# zmeta-contains: hir.name-resolution sumValues role=value name=values scope=param target=%values kind=param module=sumValues span=src/lib.zn:62:1
 # zmeta-contains: stmt.val sumValues.point module=syntax span=src/lib.zn:60:1 expr=struct-literal:Point
 # zmeta-contains: expr.field-init sumValues.x module=syntax span=src/lib.zn:60:1
 # zmeta-contains: expr.field-init sumValues.y module=syntax span=src/lib.zn:60:1
@@ -101,6 +143,11 @@
 # zmeta-contains: stmt.val sumValues.parsed module=syntax span=src/lib.zn:68:1 expr=try:call:parseDigit
 # zmeta-contains: stmt.try sumValues module=syntax span=src/lib.zn:69:1 expr=try:call:parseDigit
 # zmeta-contains: stmt.val sumValues.adjust module=syntax span=src/lib.zn:70:1 expr=closure
+# zmeta-contains: stmt.order enumPayloadModes.stmt.0 module=syntax span=src/lib.zn:433:1 index=0 kind=if-pattern subject=Some(readValue) expr=name:readMaybe
+# zmeta-contains: stmt.order enumPayloadModes.stmt.4 module=syntax span=src/lib.zn:439:1 index=4 kind=if-pattern subject=Some(movedValue) expr=name:ownedMaybe
+# zmeta-contains: stmt.order enumPayloadModes.stmt.5 module=syntax span=src/lib.zn:440:1 index=5 kind=return expr=name:movedValue
+# zmeta-contains: expr.surface sumValues module=syntax span=src/lib.zn:68:1 expr=try:call:parseDigit
+# zmeta-contains: expr.surface sumValues module=syntax span=src/lib.zn:70:1 expr=closure
 # zmeta-contains: stmt.return classify module=syntax span=src/lib.zn:75:1 expr=match expected=U32
 # zmeta-contains: stmt.match-arm classify.Some(value) module=syntax span=src/lib.zn:76:1 expr=name:value
 # zmeta-contains: stmt.if-pattern optional.Some(value) module=syntax span=src/lib.zn:82:1 condition=name:maybe pattern=Some(value)
@@ -133,9 +180,20 @@
 # zmeta-contains: stmt.for moveIteration.value module=syntax span=src/lib.zn:162:1 iterable=name:counter mode=move
 # zmeta-contains: stmt.val closureModes.moveAdjust module=syntax span=src/lib.zn:169:1 expr=closure:move
 # zmeta-contains: stmt.val closureModes.blockAdjust module=syntax span=src/lib.zn:170:1 expr=closure:block
+# zmeta-contains: decl.fn closureCapabilityModes module=syntax span=src/lib.zn:454:1 params=() return=U32
+# zmeta-contains: stmt.val closureCapabilityModes.readOnly module=syntax span=src/lib.zn:456:1 expr=closure
+# zmeta-contains: stmt.val closureCapabilityModes.mutating module=syntax span=src/lib.zn:457:1 expr=closure:block
+# zmeta-contains: stmt.val closureCapabilityModes.consuming module=syntax span=src/lib.zn:458:1 expr=closure:move
 # zmeta-contains: stmt.expr Consumer<U32> for Counter.consume module=syntax span=src/lib.zn:180:1 expr=call:observe
 # zmeta-contains: stmt.return genericIdentity module=syntax span=src/lib.zn:185:1 expr=name:value expected=T
 # zmeta-contains: stmt.return staticConsumer module=syntax span=src/lib.zn:190:1 expr=name:value expected=U32
+# zmeta-contains: decl.fn staticConsumerDispatch module=syntax span=src/lib.zn:445:1 params=() return=U32
+# zmeta-contains: stmt.var staticConsumerDispatch.counter module=syntax span=src/lib.zn:446:1 expr=struct-literal:Counter
+# zmeta-contains: stmt.return staticConsumerDispatch module=syntax span=src/lib.zn:447:1 expr=call:staticConsumer expected=U32
+# zmeta-contains: expr.call staticConsumerDispatch.staticConsumer module=syntax span=src/lib.zn:447:1
+# zmeta-contains: hir.name-resolution staticConsumerDispatch role=callee name=staticConsumer scope=package target=staticConsumer kind=fn module=syntax span=src/lib.zn:447:1
+# zmeta-contains: mir.symbol-ref staticConsumerDispatch role=callee name=staticConsumer scope=package target=staticConsumer kind=fn
+# zmeta-contains: llvm.symbol-ref-preview @staticConsumerDispatch role=callee name=staticConsumer target=staticConsumer kind=fn
 # zmeta-contains: stmt.return trustedHostRead module=syntax span=src/lib.zn:196:1 expr=trust-block expected=I32
 # zmeta-contains: stmt.expr trustedHostRead module=syntax span=src/lib.zn:197:1 expr=call:hostRead
 # zmeta-contains: expr.trust-block trustedHostRead module=syntax span=src/lib.zn:196:1
@@ -167,6 +225,7 @@
 # zmeta-contains: stmt.var accessModes.total module=syntax span=src/lib.zn:243:1 expr=name:value type=U32
 # zmeta-contains: stmt.assign accessModes.total module=syntax span=src/lib.zn:244:1 expr=call:mutateValue
 # zmeta-contains: expr.call accessModes.mutateValue module=syntax span=src/lib.zn:244:1
+# zmeta-contains: hir.name-resolution accessModes role=callee name=mutateValue scope=package target=mutateValue kind=fn module=syntax span=src/lib.zn:244:1
 # zmeta-contains: stmt.expr accessModes module=syntax span=src/lib.zn:245:1 expr=mut:method-call:consume
 # zmeta-contains: expr.access accessModes module=syntax span=src/lib.zn:245:1 generic=mut
 # zmeta-contains: expr.method-call accessModes.consume module=syntax span=src/lib.zn:245:1 generic=mut
@@ -180,12 +239,16 @@
 # zmeta-contains: decl.type PairTuple module=syntax span=src/lib.zn:255:1 target=(U32, U32)
 # zmeta-contains: decl.type Transform module=syntax span=src/lib.zn:256:1 target=Fn<U32, U32>
 # zmeta-contains: decl.type MutableU32 module=syntax span=src/lib.zn:257:1 target=mut U32
+# zmeta-contains: decl.type MutableTransform module=syntax span=src/lib.zn:462:1 target=MutFn<Unit>
+# zmeta-contains: decl.type OwningTransform module=syntax span=src/lib.zn:463:1 target=OnceFn<U32>
 # zmeta-contains: decl.fn controlExpressions module=syntax span=src/lib.zn:259:1 params=(value: U32) return=U32
 # zmeta-contains: stmt.val controlExpressions.chosen module=syntax span=src/lib.zn:260:1 expr=if-expr
 # zmeta-contains: stmt.val controlExpressions.looped module=syntax span=src/lib.zn:261:1 expr=while-expr
 # zmeta-contains: stmt.break controlExpressions module=syntax span=src/lib.zn:261:1 expr=unit
 # zmeta-contains: stmt.val controlExpressions.iterated module=syntax span=src/lib.zn:262:1 expr=for-expr
 # zmeta-contains: stmt.val controlExpressions.matched module=syntax span=src/lib.zn:263:1 expr=match
+# zmeta-contains: expr.surface controlExpressions module=syntax span=src/lib.zn:260:1 expr=if-expr
+# zmeta-contains: expr.surface controlExpressions module=syntax span=src/lib.zn:263:1 expr=match
 # zmeta-contains: decl.async-fn asyncSyntax module=syntax span=src/lib.zn:270:1 params=(move counter: Counter) return=Result<U32, ParseError>
 # zmeta-contains: stmt.val asyncSyntax.future module=syntax span=src/lib.zn:271:1 expr=async-block
 # zmeta-contains: stmt.return asyncSyntax module=syntax span=src/lib.zn:272:1 expr=call:Ok expected=Result<U32, ParseError>
@@ -205,11 +268,118 @@
 # zmeta-contains: stmt.val parenExpression.grouped module=syntax span=src/lib.zn:299:1 expr=binary:+
 # zmeta-contains: expr.paren parenExpression module=syntax span=src/lib.zn:299:1
 # zmeta-contains: stmt.return parenExpression module=syntax span=src/lib.zn:300:1 expr=name:grouped expected=U32
+# zmeta-contains: decl.struct MoveBox module=syntax span=src/lib.zn:303:1
+# zmeta-contains: decl.field MoveBox.value module=syntax span=src/lib.zn:304:1 type=U32
+# zmeta-contains: decl.impl MoveBox module=syntax span=src/lib.zn:307:1
+# zmeta-contains: decl.impl-method MoveBox.intoValue module=syntax span=src/lib.zn:308:1 params=(move self) return=U32
+# zmeta-contains: stmt.return MoveBox.intoValue module=syntax span=src/lib.zn:309:1 expr=field:self.value expected=U32
+# zmeta-contains: decl.fn moveReceiverCall module=syntax span=src/lib.zn:313:1 params=(move holder: MoveBox) return=U32
+# zmeta-contains: stmt.return moveReceiverCall module=syntax span=src/lib.zn:314:1 expr=move:method-call:intoValue expected=U32
+# zmeta-contains: expr.access moveReceiverCall module=syntax span=src/lib.zn:314:1 generic=move
+# zmeta-contains: expr.method-call moveReceiverCall.intoValue module=syntax span=src/lib.zn:314:1 generic=move
+# zmeta-contains: decl.struct CPacket module=syntax span=src/lib.zn:318:1 attrs=@layout(C)
+# zmeta-contains: decl.field CPacket.tag module=syntax span=src/lib.zn:319:1 type=U8 visibility=pub
+# zmeta-contains: decl.field CPacket.length module=syntax span=src/lib.zn:320:1 type=U16 visibility=pub
+# zmeta-contains: decl.struct PackedHeader module=syntax span=src/lib.zn:324:1 attrs=@layout(Packed(2))
+# zmeta-contains: decl.field PackedHeader.tag module=syntax span=src/lib.zn:325:1 type=U8
+# zmeta-contains: decl.field PackedHeader.length module=syntax span=src/lib.zn:326:1 type=U16
+# zmeta-contains: CPacket:C:fingerprint=
+# zmeta-contains: PackedHeader:Packed(2):fingerprint=
+# zmeta-contains: decl.fn exportedMaybe module=syntax span=src/lib.zn:330:1 attrs=@export("zeno_surface_maybe", bridge: C) params=(value: I32) return=Option<I32>
+# zmeta-contains: stmt.return exportedMaybe module=syntax span=src/lib.zn:331:1 expr=call:Some expected=Option<I32>
+# zmeta-contains: expr.call exportedMaybe.Some module=syntax span=src/lib.zn:331:1
+# zmeta-contains: decl.fn integerLiteralForms module=syntax span=src/lib.zn:334:1 params=() return=U32
+# zmeta-contains: stmt.const integerLiteralForms.HexValue module=syntax span=src/lib.zn:335:1 expr=int-literal:0xff type=U32
+# zmeta-contains: stmt.val integerLiteralForms.binary module=syntax span=src/lib.zn:336:1 expr=int-literal:0b1010
+# zmeta-contains: stmt.val integerLiteralForms.separated module=syntax span=src/lib.zn:337:1 expr=int-literal:1_000_000
+# zmeta-contains: stmt.return integerLiteralForms module=syntax span=src/lib.zn:338:1 expr=binary:+ expected=U32
+# zmeta-contains: struct FileSecret stableNodeId=fnv1a64:
+# zmeta-contains: fn hiddenValue stableNodeId=fnv1a64:
+# zmeta-contains: decl.struct FileSecret module=syntax span=src/lib.zn:341:1
+# zmeta-contains: decl.field FileSecret.value module=syntax span=src/lib.zn:342:1 type=U32
+# zmeta-contains: decl.fn hiddenValue module=syntax span=src/lib.zn:345:1 params=(secret: FileSecret) return=U32
+# zmeta-contains: stmt.return hiddenValue module=syntax span=src/lib.zn:346:1 expr=field:secret.value expected=U32
+# zmeta-contains: expr.field-access hiddenValue.value module=syntax span=src/lib.zn:346:1 generic=read
+# zmeta-contains: struct LocalLayout stableNodeId=fnv1a64:
+# zmeta-contains: decl.struct LocalLayout module=syntax span=src/lib.zn:349:1
+# zmeta-contains: decl.field LocalLayout.size module=syntax span=src/lib.zn:350:1 type=USize
+# zmeta-contains: decl.field LocalLayout.align module=syntax span=src/lib.zn:351:1 type=USize
+# zmeta-contains: LocalLayout:Auto:fingerprint=
+# zmeta-contains: decl.fn guaranteedValue module=syntax span=src/lib.zn:355:1 attrs=@noPanic params=(value: I32) return=I32
+# zmeta-contains: decl.fn stackOnly module=syntax span=src/lib.zn:360:1 attrs=@noAlloc params=(value: U32) return=U32
+# zmeta-contains: decl.fn failFast module=syntax span=src/lib.zn:365:1 params=(message: StringSlice) return=Never
+# zmeta-contains: decl.fn allocationTrap module=syntax span=src/lib.zn:369:1 params=() return=Never
+# zmeta-contains: stmt.expr failFast module=syntax span=src/lib.zn:366:1 expr=call:panic
+# zmeta-contains: stmt.expr allocationTrap module=syntax span=src/lib.zn:370:1 expr=call:oom
+# zmeta-contains: expr.call failFast.panic module=syntax span=src/lib.zn:366:1
+# zmeta-contains: expr.call allocationTrap.oom module=syntax span=src/lib.zn:370:1
+# zmeta-contains: fn selectOverload stableNodeId=fnv1a64:
+# zmeta-contains: fn overloadDispatch stableNodeId=fnv1a64:
+# zmeta-contains: decl.fn selectOverload module=syntax span=src/lib.zn:373:1 params=(value: I32) return=I32
+# zmeta-contains: decl.fn selectOverload module=syntax span=src/lib.zn:377:1 params=(value: U32) return=U32
+# zmeta-contains: decl.fn overloadDispatch module=syntax span=src/lib.zn:381:1 params=() return=U32
+# zmeta-contains: stmt.const overloadDispatch.signed module=syntax span=src/lib.zn:382:1 expr=int-literal:1 type=I32
+# zmeta-contains: stmt.const overloadDispatch.unsigned module=syntax span=src/lib.zn:383:1 expr=int-literal:2 type=U32
+# zmeta-contains: stmt.val overloadDispatch.left module=syntax span=src/lib.zn:384:1 expr=call:selectOverload
+# zmeta-contains: stmt.val overloadDispatch.right module=syntax span=src/lib.zn:385:1 expr=call:selectOverload
+# zmeta-contains: stmt.return overloadDispatch module=syntax span=src/lib.zn:386:1 expr=name:right expected=U32
+# zmeta-contains: expr.call overloadDispatch.selectOverload module=syntax span=src/lib.zn:384:1
+# zmeta-contains: expr.call overloadDispatch.selectOverload module=syntax span=src/lib.zn:385:1
+# zmeta-contains: hir.name-resolution overloadDispatch role=callee name=selectOverload scope=package target=selectOverload kind=overload-set module=syntax span=src/lib.zn:384:1
+# zmeta-contains: hir.overload-resolution overloadDispatch callee=selectOverload args=(I32) selected=selectOverload(I32) return=I32 visibility=package span=src/lib.zn:384:1
+# zmeta-contains: hir.overload-resolution overloadDispatch callee=selectOverload args=(U32) selected=selectOverload(U32) return=U32 visibility=package span=src/lib.zn:385:1
+# zmeta-contains: mir.resolved-call overloadDispatch callee=@selectOverload overloadKey=selectOverload(I32) argTypes=(I32) return=I32
+# zmeta-contains: mir.resolved-call overloadDispatch callee=@selectOverload overloadKey=selectOverload(U32) argTypes=(U32) return=U32
+# zmeta-contains: llvm.call-overload-preview @overloadDispatch callee=@selectOverload overloadKey=selectOverload(I32) return=I32
+# zmeta-contains: llvm.call-overload-preview @overloadDispatch callee=@selectOverload overloadKey=selectOverload(U32) return=U32
+# zmeta-contains: struct WriterSlot stableNodeId=fnv1a64:
+# zmeta-contains: interface Measured stableNodeId=fnv1a64:
+# zmeta-contains: fn moveWriterSlot stableNodeId=fnv1a64:
+# zmeta-contains: fn makeMeasured stableNodeId=fnv1a64:
+# zmeta-contains: fn readMeasured stableNodeId=fnv1a64:
+# zmeta-contains: decl.struct WriterSlot module=syntax span=src/lib.zn:389:1
+# zmeta-contains: decl.field WriterSlot.writer module=syntax span=src/lib.zn:390:1 type=Box<Writer>
+# zmeta-contains: decl.fn moveWriterSlot module=syntax span=src/lib.zn:393:1 params=(move slot: WriterSlot) return=Box<Writer>
+# zmeta-contains: decl.interface Measured module=syntax span=src/lib.zn:397:1
+# zmeta-contains: decl.interface-method Measured.measure module=syntax span=src/lib.zn:398:1 params=(self) return=U32
+# zmeta-contains: decl.impl Measured for Counter module=syntax span=src/lib.zn:401:1
+# zmeta-contains: decl.impl-method Measured for Counter.measure module=syntax span=src/lib.zn:402:1 params=(self) return=U32
+# zmeta-contains: decl.fn makeMeasured module=syntax span=src/lib.zn:407:1 params=() return=Measured
+# zmeta-contains: decl.fn readMeasured module=syntax span=src/lib.zn:411:1 params=() return=U32
+# zmeta-contains: stmt.return moveWriterSlot module=syntax span=src/lib.zn:394:1 expr=field:slot.writer expected=Box<Writer>
+# zmeta-contains: stmt.return makeMeasured module=syntax span=src/lib.zn:408:1 expr=struct-literal:Counter expected=Measured
+# zmeta-contains: stmt.val readMeasured.measured module=syntax span=src/lib.zn:412:1 expr=call:makeMeasured
+# zmeta-contains: stmt.return readMeasured module=syntax span=src/lib.zn:413:1 expr=method-call:measure expected=U32
+# zmeta-contains: fn raiiScopeDrop stableNodeId=fnv1a64:
+# zmeta-contains: fn returnResource stableNodeId=fnv1a64:
+# zmeta-contains: fn tryCleanupResource stableNodeId=fnv1a64:
+# zmeta-contains: fn enumPayloadModes stableNodeId=fnv1a64:
+# zmeta-contains: decl.fn raiiScopeDrop module=syntax span=src/lib.zn:416:1 params=() return=U32
+# zmeta-contains: decl.fn returnResource module=syntax span=src/lib.zn:421:1 params=() return=Counter
+# zmeta-contains: decl.fn tryCleanupResource module=syntax span=src/lib.zn:426:1 params=() return=Result<U32, ParseError>
+# zmeta-contains: decl.fn enumPayloadModes module=syntax span=src/lib.zn:432:1 params=(readMaybe: Option<U32>, mut writeMaybe: Option<U32>, move ownedMaybe: Option<U32>) return=U32
+# zmeta-contains: stmt.val raiiScopeDrop.counter module=syntax span=src/lib.zn:417:1 expr=struct-literal:Counter
+# zmeta-contains: stmt.return raiiScopeDrop module=syntax span=src/lib.zn:418:1 expr=field:counter.current expected=U32
+# zmeta-contains: stmt.val returnResource.counter module=syntax span=src/lib.zn:422:1 expr=struct-literal:Counter
+# zmeta-contains: stmt.return returnResource module=syntax span=src/lib.zn:423:1 expr=name:counter expected=Counter
+# zmeta-contains: stmt.val tryCleanupResource.counter module=syntax span=src/lib.zn:427:1 expr=struct-literal:Counter
+# zmeta-contains: stmt.val tryCleanupResource.parsed module=syntax span=src/lib.zn:428:1 expr=try:call:parseDigit
+# zmeta-contains: stmt.return tryCleanupResource module=syntax span=src/lib.zn:429:1 expr=call:Ok expected=Result<U32, ParseError>
+# zmeta-contains: stmt.if-pattern enumPayloadModes.Some(readValue) module=syntax span=src/lib.zn:433:1 condition=name:readMaybe pattern=Some(readValue)
+# zmeta-contains: stmt.if-pattern enumPayloadModes.Some(writeValue) module=syntax span=src/lib.zn:436:1 mode=mut condition=name:writeMaybe pattern=Some(writeValue)
+# zmeta-contains: stmt.if-pattern enumPayloadModes.Some(movedValue) module=syntax span=src/lib.zn:439:1 mode=move condition=name:ownedMaybe pattern=Some(movedValue)
+# zmeta-contains: stmt.return enumPayloadModes module=syntax span=src/lib.zn:440:1 expr=name:movedValue expected=U32
 # zmeta-contains: syntax.item sumValues module=syntax span=src/lib.zn:57:1 kind=fn
 # zmeta-contains: syntax.block sumValues module=syntax span=src/lib.zn:57:1 kind=body role=body
+# zmeta-contains: block.order sumValues.block.0 module=syntax span=src/lib.zn:57:1 index=0 kind=body role=body endLine=72
+# zmeta-contains: block.order sumValues.block.1 module=syntax span=src/lib.zn:62:1 index=1 kind=body role=for-body endLine=67
+# zmeta-contains: block.order sumValues.block.2 module=syntax span=src/lib.zn:63:1 index=2 kind=body role=if-then endLine=65
 # zmeta-contains: block.body sumValues.body module=syntax span=src/lib.zn:57:1 kind=body role=body
 # zmeta-contains: block.body sumValues.for-body module=syntax span=src/lib.zn:62:1 kind=body role=for-body
 # zmeta-contains: block.body sumValues.if-then module=syntax span=src/lib.zn:63:1 kind=body role=if-then
+# zmeta-contains: block.order enumPayloadModes.block.1 module=syntax span=src/lib.zn:433:1 index=1 kind=body role=if-then endLine=435
+# zmeta-contains: block.order enumPayloadModes.block.2 module=syntax span=src/lib.zn:436:1 index=2 kind=body role=if-then endLine=438
+# zmeta-contains: block.order enumPayloadModes.block.3 module=syntax span=src/lib.zn:439:1 index=3 kind=body role=if-then endLine=441
 # zmeta-contains: block.body optional.if-then module=syntax span=src/lib.zn:82:1 kind=body role=if-then
 # zmeta-contains: block.body optional.if-else module=syntax span=src/lib.zn:84:1 kind=body role=if-else
 # zmeta-contains: block.body drain.while-body module=syntax span=src/lib.zn:91:1 kind=body role=while-body
@@ -242,20 +412,31 @@
 # zmeta-contains: syntax.param moveIteration module=syntax span=src/lib.zn:160:1 kind=value mode=move name=counter
 # zmeta-contains: syntax.param mutateValue module=syntax span=src/lib.zn:237:1 kind=value mode=mut name=value
 # zmeta-contains: syntax.param accessModes module=syntax span=src/lib.zn:242:1 kind=value mode=move name=counter
+# zmeta-contains: syntax.param Writer.write module=syntax span=src/lib.zn:28:1 kind=value mode=read name=bytes index=1 type=ArraySlice<U8>
+# zmeta-contains: syntax.param accessModes module=syntax span=src/lib.zn:242:1 kind=value mode=read name=value index=1 type=U32
 # zmeta-contains: param.receiver Writer.write.self module=syntax span=src/lib.zn:28:1 mode=mut name=self
 # zmeta-contains: param.value accessModes.counter module=syntax span=src/lib.zn:242:1 mode=move name=counter
+# zmeta-contains: param.receiver Writer.write.self module=syntax span=src/lib.zn:28:1 mode=mut name=self index=0 type=Self
+# zmeta-contains: param.value accessModes.value module=syntax span=src/lib.zn:242:1 mode=read name=value index=1 type=U32
 # zmeta-contains: syntax.closure-param sumValues module=syntax span=src/lib.zn:70:1 pattern=x type=U32
 # zmeta-contains: syntax.closure-param closureModes module=syntax span=src/lib.zn:169:1 pattern=x type=U32
 # zmeta-contains: syntax.closure-param closureModes module=syntax span=src/lib.zn:170:1 pattern=x type=U32
+# zmeta-contains: closure-param sumValues.x module=syntax span=src/lib.zn:70:1 pattern=x type=U32
+# zmeta-contains: closure-param closureModes.x module=syntax span=src/lib.zn:169:1 pattern=x type=U32
 # zmeta-contains: syntax.closure-expr sumValues module=syntax span=src/lib.zn:70:1 capture=read form=expr body=binary:+
 # zmeta-contains: syntax.closure-expr closureModes module=syntax span=src/lib.zn:169:1 capture=move form=expr body=binary:+
 # zmeta-contains: syntax.closure-expr closureModes module=syntax span=src/lib.zn:170:1 capture=read form=block body=block returnType=U32
+# zmeta-contains: syntax.closure-expr closureCapabilityModes module=syntax span=src/lib.zn:456:1 capture=read form=expr body=binary:+ capability=Fn
+# zmeta-contains: syntax.closure-expr closureCapabilityModes module=syntax span=src/lib.zn:457:1 capture=read form=block body=block returnType=U32 capability=MutFn
+# zmeta-contains: syntax.closure-expr closureCapabilityModes module=syntax span=src/lib.zn:458:1 capture=move form=block body=block returnType=U32 capability=OnceFn
 # zmeta-contains: syntax.type staticConsumer module=syntax span=src/lib.zn:188:1 role=generic-bound kind=path-generic text=Consumer<U32>
 # zmeta-contains: syntax.type Writer for Buffer<U8, 4> module=syntax span=src/lib.zn:31:1 role=impl-for kind=path-generic text=Buffer<U8, 4>
 # zmeta-contains: syntax.type Send for Counter module=syntax span=src/lib.zn:152:1 role=impl-interface kind=path text=Send
 # zmeta-contains: syntax.type Send for Counter module=syntax span=src/lib.zn:152:1 role=impl-for kind=path text=Counter
 # zmeta-contains: syntax.type PairTuple module=syntax span=src/lib.zn:255:1 role=alias-target kind=tuple text=(U32, U32)
 # zmeta-contains: syntax.type Transform module=syntax span=src/lib.zn:256:1 role=alias-target kind=fn text=Fn<U32, U32>
+# zmeta-contains: syntax.type MutableTransform module=syntax span=src/lib.zn:462:1 role=alias-target kind=fn text=MutFn<Unit>
+# zmeta-contains: syntax.type OwningTransform module=syntax span=src/lib.zn:463:1 role=alias-target kind=fn text=OnceFn<U32>
 # zmeta-contains: syntax.type MutableU32 module=syntax span=src/lib.zn:257:1 role=alias-target kind=access:mut text=mut U32
 # zmeta-contains: syntax.interface-parent Writer.Send module=syntax span=src/lib.zn:27:1 owner=Writer index=0 parent=Send
 # zmeta-contains: syntax.interface-parent Writer.Sync module=syntax span=src/lib.zn:27:1 owner=Writer index=1 parent=Sync
@@ -267,10 +448,13 @@
 # zmeta-contains: syntax.path-segment Send for Counter module=syntax span=src/lib.zn:152:1 role=impl-interface index=0 segment=Send path=Send
 # zmeta-contains: syntax.path-segment Send for Counter module=syntax span=src/lib.zn:152:1 role=impl-for index=0 segment=Counter path=Counter
 # zmeta-contains: path.segment ByteBuffer.alias-target.Buffer_U8_4.0 module=syntax span=src/lib.zn:25:1 role=alias-target index=0 segment=Buffer path=Buffer<U8, 4>
+# zmeta-contains: hir.path-resolution ByteBuffer.alias-target.Buffer_U8_4.0 role=alias-target path=Buffer<U8, 4> root=Buffer scope=package target=Buffer kind=struct module=syntax span=src/lib.zn:25:1
 # zmeta-contains: path.segment Writer.interface-parent.Send.0 module=syntax span=src/lib.zn:27:1 role=interface-parent index=0 segment=Send path=Send
 # zmeta-contains: path.segment Writer for Buffer<U8, 4>.impl-interface.Writer.0 module=syntax span=src/lib.zn:31:1 role=impl-interface index=0 segment=Writer path=Writer
 # zmeta-contains: path.segment Send for Counter.impl-interface.Send.0 module=syntax span=src/lib.zn:152:1 role=impl-interface index=0 segment=Send path=Send
 # zmeta-contains: path.segment Send for Counter.impl-for.Counter.0 module=syntax span=src/lib.zn:152:1 role=impl-for index=0 segment=Counter path=Counter
+# zmeta-contains: hir.path-resolution staticConsumer.generic-bound.Consumer_U32.0 role=generic-bound path=Consumer<U32> root=Consumer scope=package target=Consumer kind=interface module=syntax span=src/lib.zn:188:1
+# zmeta-contains: hir.path-resolution nextMaybe.return.Option_U32.0 role=return path=Option<U32> root=Option scope=import target=core.option.Option kind=import-item module=core.option span=src/lib.zn:46:1
 # zmeta-contains: syntax.generic-arg Transform module=syntax span=src/lib.zn:256:1 role=alias-target index=0 kind=type text=U32 parent=Fn<U32, U32>
 # zmeta-contains: syntax.type-component PairTuple module=syntax span=src/lib.zn:255:1 role=alias-target component=tuple-element index=0 kind=primitive text=U32 parent=(U32, U32)
 # zmeta-contains: syntax.type-component Transform module=syntax span=src/lib.zn:256:1 role=alias-target component=fn-return index=1 kind=primitive text=U32 parent=Fn<U32, U32>
@@ -282,6 +466,8 @@
 # zmeta-contains: type.path Send for Counter.impl-for module=syntax span=src/lib.zn:152:1 role=impl-for text=Counter
 # zmeta-contains: type.tuple PairTuple.alias-target module=syntax span=src/lib.zn:255:1 role=alias-target text=(U32, U32)
 # zmeta-contains: type.fn Transform.alias-target module=syntax span=src/lib.zn:256:1 role=alias-target text=Fn<U32, U32>
+# zmeta-contains: type.fn MutableTransform.alias-target module=syntax span=src/lib.zn:462:1 role=alias-target text=MutFn<Unit>
+# zmeta-contains: type.fn OwningTransform.alias-target module=syntax span=src/lib.zn:463:1 role=alias-target text=OnceFn<U32>
 # zmeta-contains: type.access:mut MutableU32.alias-target module=syntax span=src/lib.zn:257:1 role=alias-target text=mut U32
 # zmeta-contains: type-component.tuple-element PairTuple.alias-target.tuple-element.0 module=syntax span=src/lib.zn:255:1 role=alias-target kind=primitive text=U32 parent=(U32, U32)
 # zmeta-contains: type-component.fn-return Transform.alias-target.fn-return.1 module=syntax span=src/lib.zn:256:1 role=alias-target kind=primitive text=U32 parent=Fn<U32, U32>
@@ -402,14 +588,163 @@
 # zmeta-contains: syntax.binary-expr parenExpression module=syntax span=src/lib.zn:299:1 op=+ left=name:value right=int-literal:1
 # zmeta-contains: syntax.stmt parenExpression module=syntax span=src/lib.zn:299:1 kind=val name=grouped expr=binary:+
 # zmeta-contains: syntax.stmt parenExpression module=syntax span=src/lib.zn:300:1 kind=return expr=name:grouped
+# zmeta-contains: syntax.item MoveBox module=syntax span=src/lib.zn:303:1 kind=struct
+# zmeta-contains: syntax.field MoveBox.value module=syntax span=src/lib.zn:304:1 owner=MoveBox kind=struct-field
+# zmeta-contains: syntax.item MoveBox module=syntax span=src/lib.zn:307:1 kind=impl
+# zmeta-contains: syntax.type MoveBox module=syntax span=src/lib.zn:307:1 role=impl-target kind=path text=MoveBox
+# zmeta-contains: syntax.path-segment MoveBox module=syntax span=src/lib.zn:307:1 role=impl-target index=0 segment=MoveBox path=MoveBox
+# zmeta-contains: syntax.item MoveBox.intoValue module=syntax span=src/lib.zn:308:1 owner=MoveBox kind=fn signature=(move self) -> U32
+# zmeta-contains: syntax.param MoveBox.intoValue module=syntax span=src/lib.zn:308:1 kind=receiver mode=move name=self
+# zmeta-contains: syntax.type MoveBox.intoValue module=syntax span=src/lib.zn:308:1 role=return kind=primitive text=U32
+# zmeta-contains: syntax.stmt MoveBox.intoValue module=syntax span=src/lib.zn:309:1 kind=return expr=field:self.value
+# zmeta-contains: syntax.field-access MoveBox.intoValue.value module=syntax span=src/lib.zn:309:1 owner=MoveBox.intoValue base=self field=value mode=read
+# zmeta-contains: syntax.item moveReceiverCall module=syntax span=src/lib.zn:313:1 kind=fn signature=(move holder : MoveBox) -> U32
+# zmeta-contains: syntax.param moveReceiverCall module=syntax span=src/lib.zn:313:1 kind=value mode=move name=holder
+# zmeta-contains: syntax.type moveReceiverCall module=syntax span=src/lib.zn:313:1 role=param kind=path text=MoveBox
+# zmeta-contains: syntax.path-segment moveReceiverCall module=syntax span=src/lib.zn:313:1 role=param index=0 segment=MoveBox path=MoveBox
+# zmeta-contains: syntax.stmt moveReceiverCall module=syntax span=src/lib.zn:314:1 kind=return expr=move:method-call:intoValue
+# zmeta-contains: syntax.access-expr moveReceiverCall module=syntax span=src/lib.zn:314:1 mode=move operand=method-call:intoValue
+# zmeta-contains: syntax.method-call moveReceiverCall.intoValue module=syntax span=src/lib.zn:314:1 owner=moveReceiverCall receiver=holder method=intoValue mode=move
+# zmeta-contains: syntax.name-expr moveReceiverCall.holder module=syntax span=src/lib.zn:314:1 owner=moveReceiverCall name=holder
+# zmeta-contains: syntax.attribute-arg layout.0 module=syntax span=src/lib.zn:317:1 attr=layout index=0 kind=positional value=C
+# zmeta-contains: attribute.arg layout.0 module=syntax span=src/lib.zn:317:1 attr=layout kind=positional value=C
+# zmeta-contains: syntax.item CPacket module=syntax span=src/lib.zn:318:1 kind=struct visibility=pub attrs=@layout(C) layout=C
+# zmeta-contains: syntax.field CPacket.tag module=syntax span=src/lib.zn:319:1 owner=CPacket kind=struct-field visibility=pub
+# zmeta-contains: syntax.field CPacket.length module=syntax span=src/lib.zn:320:1 owner=CPacket kind=struct-field visibility=pub
+# zmeta-contains: syntax.attribute-arg layout.0 module=syntax span=src/lib.zn:323:1 attr=layout index=0 kind=positional value=Packed(2)
+# zmeta-contains: attribute.arg layout.0 module=syntax span=src/lib.zn:323:1 attr=layout kind=positional value=Packed(2)
+# zmeta-contains: syntax.item PackedHeader module=syntax span=src/lib.zn:324:1 kind=struct attrs=@layout(Packed(2)) layout=Packed(2)
+# zmeta-contains: syntax.field PackedHeader.tag module=syntax span=src/lib.zn:325:1 owner=PackedHeader kind=struct-field
+# zmeta-contains: syntax.field PackedHeader.length module=syntax span=src/lib.zn:326:1 owner=PackedHeader kind=struct-field
+# zmeta-contains: syntax.item exportedMaybe module=syntax span=src/lib.zn:330:1 kind=fn visibility=pub attrs=@export("zeno_surface_maybe", bridge : C) signature=(value : I32) -> Option<I32>
+# zmeta-contains: syntax.param exportedMaybe module=syntax span=src/lib.zn:330:1 kind=value mode=read name=value
+# zmeta-contains: syntax.type exportedMaybe module=syntax span=src/lib.zn:330:1 role=param kind=primitive text=I32
+# zmeta-contains: syntax.type exportedMaybe module=syntax span=src/lib.zn:330:1 role=return kind=path-generic text=Option<I32>
+# zmeta-contains: syntax.generic-arg exportedMaybe module=syntax span=src/lib.zn:330:1 role=return index=0 kind=type text=I32 parent=Option<I32>
+# zmeta-contains: syntax.stmt exportedMaybe module=syntax span=src/lib.zn:331:1 kind=return expr=call:Some
+# zmeta-contains: syntax.call exportedMaybe.Some module=syntax span=src/lib.zn:331:1 owner=exportedMaybe callee=Some
+# zmeta-contains: syntax.arg exportedMaybe module=syntax span=src/lib.zn:331:1 mode=read expr=name:value index=0
+# zmeta-contains: syntax.item integerLiteralForms module=syntax span=src/lib.zn:334:1 kind=fn signature=() -> U32
+# zmeta-contains: syntax.stmt integerLiteralForms module=syntax span=src/lib.zn:335:1 kind=const name=HexValue pattern=HexValue : U32 expr=int-literal:0xff
+# zmeta-contains: syntax.stmt integerLiteralForms module=syntax span=src/lib.zn:336:1 kind=val name=binary expr=int-literal:0b1010
+# zmeta-contains: syntax.stmt integerLiteralForms module=syntax span=src/lib.zn:337:1 kind=val name=separated expr=int-literal:1_000_000
+# zmeta-contains: syntax.literal-expr integerLiteralForms module=syntax span=src/lib.zn:335:1 literalKind=int expr=int-literal:0xff
+# zmeta-contains: syntax.literal-expr integerLiteralForms module=syntax span=src/lib.zn:336:1 literalKind=int expr=int-literal:0b1010
+# zmeta-contains: syntax.literal-expr integerLiteralForms module=syntax span=src/lib.zn:337:1 literalKind=int expr=int-literal:1_000_000
+# zmeta-contains: syntax.binary-expr integerLiteralForms module=syntax span=src/lib.zn:338:1 op=+ left=name:HexValue right=name:binary
+# zmeta-contains: syntax.binary-expr integerLiteralForms module=syntax span=src/lib.zn:338:1 op=+ left=binary:+ right=name:separated
+# zmeta-contains: syntax.item FileSecret module=syntax span=src/lib.zn:341:1 kind=struct visibility=private
+# zmeta-contains: syntax.block FileSecret module=syntax span=src/lib.zn:341:1 kind=struct role=struct
+# zmeta-contains: syntax.field FileSecret.value module=syntax span=src/lib.zn:342:1 owner=FileSecret kind=struct-field
+# zmeta-contains: syntax.type FileSecret.value module=syntax span=src/lib.zn:342:1 role=field kind=primitive text=U32
+# zmeta-contains: syntax.item hiddenValue module=syntax span=src/lib.zn:345:1 kind=fn visibility=private signature=(secret : FileSecret) -> U32
+# zmeta-contains: syntax.block hiddenValue module=syntax span=src/lib.zn:345:1 kind=body role=body
+# zmeta-contains: syntax.param hiddenValue module=syntax span=src/lib.zn:345:1 kind=value mode=read name=secret
+# zmeta-contains: syntax.type hiddenValue module=syntax span=src/lib.zn:345:1 role=param kind=path text=FileSecret
+# zmeta-contains: syntax.type hiddenValue module=syntax span=src/lib.zn:345:1 role=return kind=primitive text=U32
+# zmeta-contains: syntax.path-segment hiddenValue module=syntax span=src/lib.zn:345:1 role=param index=0 segment=FileSecret path=FileSecret
+# zmeta-contains: syntax.stmt hiddenValue module=syntax span=src/lib.zn:346:1 kind=return expr=field:secret.value
+# zmeta-contains: syntax.field-access hiddenValue.value module=syntax span=src/lib.zn:346:1 owner=hiddenValue base=secret field=value mode=read
+# zmeta-contains: syntax.name-expr hiddenValue.secret module=syntax span=src/lib.zn:346:1 owner=hiddenValue name=secret
+# zmeta-contains: hir.visibility-scope FileSecret visibility=private scope=file fileId=fnv1a64:2462ef970fd568f1 module=syntax span=src/lib.zn:341:1
+# zmeta-contains: hir.visibility-scope hiddenValue visibility=private scope=file fileId=fnv1a64:2462ef970fd568f1 module=syntax span=src/lib.zn:345:1
+# zmeta-contains: hir.visibility-check hiddenValue role=path:param name=FileSecret target=FileSecret visibility=private scope=file access=allowed reason=same-file fileId=fnv1a64:2462ef970fd568f1 span=src/lib.zn:345:1
+# zmeta-contains: mir.visibility-gate FileSecret visibility=private scope=file access=file fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: mir.visibility-gate hiddenValue visibility=private scope=file access=file fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: mir.visibility-check hiddenValue role=path:param target=FileSecret visibility=private scope=file access=allowed reason=same-file
+# zmeta-contains: llvm.visibility-metadata-preview FileSecret visibility=private scope=file fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: llvm.visibility-metadata-preview hiddenValue visibility=private scope=file fileId=fnv1a64:2462ef970fd568f1
+# zmeta-contains: llvm.visibility-check-preview @hiddenValue role=path:param target=FileSecret visibility=private scope=file access=allowed source=mir.visibility-check
+# zmeta-contains: syntax.attribute @noPanic module=syntax span=src/lib.zn:354:1 kind=attribute
+# zmeta-contains: syntax.attribute @noAlloc module=syntax span=src/lib.zn:359:1 kind=attribute
+# zmeta-contains: syntax.item LocalLayout module=syntax span=src/lib.zn:349:1 kind=struct visibility=private
+# zmeta-contains: syntax.field LocalLayout.size module=syntax span=src/lib.zn:350:1 owner=LocalLayout kind=struct-field
+# zmeta-contains: syntax.field LocalLayout.align module=syntax span=src/lib.zn:351:1 owner=LocalLayout kind=struct-field
+# zmeta-contains: syntax.item guaranteedValue module=syntax span=src/lib.zn:355:1 kind=fn attrs=@noPanic signature=(value : I32) -> I32
+# zmeta-contains: syntax.item stackOnly module=syntax span=src/lib.zn:360:1 kind=fn attrs=@noAlloc signature=(value : U32) -> U32
+# zmeta-contains: syntax.item failFast module=syntax span=src/lib.zn:365:1 kind=fn signature=(message : StringSlice) -> Never
+# zmeta-contains: syntax.item allocationTrap module=syntax span=src/lib.zn:369:1 kind=fn signature=() -> Never
+# zmeta-contains: syntax.type failFast module=syntax span=src/lib.zn:365:1 role=return kind=primitive text=Never
+# zmeta-contains: syntax.type allocationTrap module=syntax span=src/lib.zn:369:1 role=return kind=primitive text=Never
+# zmeta-contains: syntax.call failFast.panic module=syntax span=src/lib.zn:366:1 owner=failFast callee=panic
+# zmeta-contains: syntax.call allocationTrap.oom module=syntax span=src/lib.zn:370:1 owner=allocationTrap callee=oom
+# zmeta-contains: syntax.arg allocationTrap module=syntax span=src/lib.zn:370:1 mode=read expr=struct-literal:LocalLayout index=0
+# zmeta-contains: syntax.field-init allocationTrap.size module=syntax span=src/lib.zn:370:1 owner=allocationTrap field=size expr=int-literal:1
+# zmeta-contains: syntax.field-init allocationTrap.align module=syntax span=src/lib.zn:370:1 owner=allocationTrap field=align expr=int-literal:1
+# zmeta-contains: syntax.stmt stackOnly module=syntax span=src/lib.zn:361:1 kind=val name=next expr=binary:+
+# zmeta-contains: syntax.stmt failFast module=syntax span=src/lib.zn:366:1 kind=expr expr=call:panic
+# zmeta-contains: syntax.stmt allocationTrap module=syntax span=src/lib.zn:370:1 kind=expr expr=call:oom
+# zmeta-contains: syntax.item selectOverload module=syntax span=src/lib.zn:373:1 kind=fn signature=(value : I32) -> I32
+# zmeta-contains: syntax.item selectOverload module=syntax span=src/lib.zn:377:1 kind=fn signature=(value : U32) -> U32
+# zmeta-contains: syntax.item overloadDispatch module=syntax span=src/lib.zn:381:1 kind=fn signature=() -> U32
+# zmeta-contains: syntax.type selectOverload module=syntax span=src/lib.zn:373:1 role=param kind=primitive text=I32
+# zmeta-contains: syntax.type selectOverload module=syntax span=src/lib.zn:377:1 role=param kind=primitive text=U32
+# zmeta-contains: syntax.type overloadDispatch module=syntax span=src/lib.zn:382:1 role=local kind=primitive text=I32
+# zmeta-contains: syntax.type overloadDispatch module=syntax span=src/lib.zn:383:1 role=local kind=primitive text=U32
+# zmeta-contains: syntax.call overloadDispatch.selectOverload module=syntax span=src/lib.zn:384:1 owner=overloadDispatch callee=selectOverload
+# zmeta-contains: syntax.call overloadDispatch.selectOverload module=syntax span=src/lib.zn:385:1 owner=overloadDispatch callee=selectOverload
+# zmeta-contains: syntax.arg overloadDispatch module=syntax span=src/lib.zn:384:1 mode=read expr=name:signed index=0
+# zmeta-contains: syntax.arg overloadDispatch module=syntax span=src/lib.zn:385:1 mode=read expr=name:unsigned index=0
+# zmeta-contains: syntax.stmt overloadDispatch module=syntax span=src/lib.zn:384:1 kind=val name=left expr=call:selectOverload
+# zmeta-contains: syntax.stmt overloadDispatch module=syntax span=src/lib.zn:385:1 kind=val name=right expr=call:selectOverload
+# zmeta-contains: syntax.item WriterSlot module=syntax span=src/lib.zn:389:1 kind=struct
+# zmeta-contains: syntax.field WriterSlot.writer module=syntax span=src/lib.zn:390:1 owner=WriterSlot kind=struct-field
+# zmeta-contains: syntax.type WriterSlot.writer module=syntax span=src/lib.zn:390:1 role=field kind=path-generic text=Box<Writer>
+# zmeta-contains: syntax.generic-arg WriterSlot.writer module=syntax span=src/lib.zn:390:1 role=field index=0 kind=type text=Writer parent=Box<Writer>
+# zmeta-contains: syntax.item moveWriterSlot module=syntax span=src/lib.zn:393:1 kind=fn signature=(move slot : WriterSlot) -> Box<Writer>
+# zmeta-contains: syntax.type moveWriterSlot module=syntax span=src/lib.zn:393:1 role=return kind=path-generic text=Box<Writer>
+# zmeta-contains: syntax.item Measured module=syntax span=src/lib.zn:397:1 kind=interface
+# zmeta-contains: syntax.item Measured.measure module=syntax span=src/lib.zn:398:1 owner=Measured kind=fn signature=(self) -> U32
+# zmeta-contains: syntax.item Measured for Counter module=syntax span=src/lib.zn:401:1 kind=impl
+# zmeta-contains: syntax.item Measured for Counter.measure module=syntax span=src/lib.zn:402:1 owner=Measured for Counter kind=fn signature=(self) -> U32
+# zmeta-contains: syntax.item makeMeasured module=syntax span=src/lib.zn:407:1 kind=fn signature=() -> Measured
+# zmeta-contains: syntax.type makeMeasured module=syntax span=src/lib.zn:407:1 role=return kind=path text=Measured
+# zmeta-contains: syntax.item readMeasured module=syntax span=src/lib.zn:411:1 kind=fn signature=() -> U32
+# zmeta-contains: syntax.call readMeasured.makeMeasured module=syntax span=src/lib.zn:412:1 owner=readMeasured callee=makeMeasured
+# zmeta-contains: syntax.method-call readMeasured.measure module=syntax span=src/lib.zn:413:1 owner=readMeasured receiver=measured method=measure mode=read
+# zmeta-contains: syntax.stmt makeMeasured module=syntax span=src/lib.zn:408:1 kind=return expr=struct-literal:Counter
+# zmeta-contains: syntax.stmt readMeasured module=syntax span=src/lib.zn:413:1 kind=return expr=method-call:measure
+# zmeta-contains: syntax.item raiiScopeDrop module=syntax span=src/lib.zn:416:1 kind=fn signature=() -> U32
+# zmeta-contains: syntax.stmt raiiScopeDrop module=syntax span=src/lib.zn:417:1 kind=val name=counter expr=struct-literal:Counter
+# zmeta-contains: syntax.field-init raiiScopeDrop.current module=syntax span=src/lib.zn:417:1 owner=raiiScopeDrop field=current expr=int-literal:3
+# zmeta-contains: syntax.field-init raiiScopeDrop.end module=syntax span=src/lib.zn:417:1 owner=raiiScopeDrop field=end expr=int-literal:4
+# zmeta-contains: syntax.stmt raiiScopeDrop module=syntax span=src/lib.zn:418:1 kind=return expr=field:counter.current
+# zmeta-contains: syntax.item returnResource module=syntax span=src/lib.zn:421:1 kind=fn signature=() -> Counter
+# zmeta-contains: syntax.type returnResource module=syntax span=src/lib.zn:421:1 role=return kind=path text=Counter
+# zmeta-contains: syntax.stmt returnResource module=syntax span=src/lib.zn:422:1 kind=val name=counter expr=struct-literal:Counter
+# zmeta-contains: syntax.stmt returnResource module=syntax span=src/lib.zn:423:1 kind=return expr=name:counter
+# zmeta-contains: syntax.item tryCleanupResource module=syntax span=src/lib.zn:426:1 kind=fn signature=() -> Result<U32, ParseError>
+# zmeta-contains: syntax.type tryCleanupResource module=syntax span=src/lib.zn:426:1 role=return kind=path-generic text=Result<U32, ParseError>
+# zmeta-contains: syntax.stmt tryCleanupResource module=syntax span=src/lib.zn:427:1 kind=val name=counter expr=struct-literal:Counter
+# zmeta-contains: syntax.stmt tryCleanupResource module=syntax span=src/lib.zn:428:1 kind=val name=parsed expr=try:call:parseDigit
+# zmeta-contains: syntax.try-expr tryCleanupResource module=syntax span=src/lib.zn:428:1 expr=call:parseDigit
+# zmeta-contains: syntax.stmt tryCleanupResource module=syntax span=src/lib.zn:429:1 kind=return expr=call:Ok
+# zmeta-contains: syntax.item enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=fn signature=(readMaybe : Option<U32>, mut writeMaybe : Option<U32>, move ownedMaybe : Option<U32>) -> U32
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=read name=readMaybe
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=mut name=writeMaybe
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=move name=ownedMaybe
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=read name=readMaybe index=0 type=Option<U32>
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=mut name=writeMaybe index=1 type=Option<U32>
+# zmeta-contains: syntax.param enumPayloadModes module=syntax span=src/lib.zn:432:1 kind=value mode=move name=ownedMaybe index=2 type=Option<U32>
+# zmeta-contains: syntax.stmt enumPayloadModes module=syntax span=src/lib.zn:433:1 kind=if-pattern scrutinee=name:readMaybe pattern=Some(readValue) mode=read
+# zmeta-contains: syntax.stmt enumPayloadModes module=syntax span=src/lib.zn:436:1 kind=if-pattern scrutinee=name:writeMaybe pattern=Some(writeValue) mode=mut
+# zmeta-contains: syntax.stmt enumPayloadModes module=syntax span=src/lib.zn:439:1 kind=if-pattern scrutinee=name:ownedMaybe pattern=Some(movedValue) mode=move
+# zmeta-contains: syntax.pattern-element enumPayloadModes module=syntax span=src/lib.zn:439:1 role=if-condition index=0 kind=binding text=movedValue parent=Some(movedValue)
 # zmeta-contains: expr.closure sumValues module=syntax span=src/lib.zn:70:1 capture=read form=expr body=binary:+
 # zmeta-contains: expr.closure closureModes module=syntax span=src/lib.zn:169:1 capture=move form=expr body=binary:+
 # zmeta-contains: expr.closure closureModes module=syntax span=src/lib.zn:170:1 capture=read form=block body=block returnType=U32
+# zmeta-contains: expr.closure closureCapabilityModes module=syntax span=src/lib.zn:456:1 capture=read form=expr body=binary:+ capability=Fn
+# zmeta-contains: expr.closure closureCapabilityModes module=syntax span=src/lib.zn:457:1 capture=read form=block body=block returnType=U32 capability=MutFn
+# zmeta-contains: expr.closure closureCapabilityModes module=syntax span=src/lib.zn:458:1 capture=move form=block body=block returnType=U32 capability=OnceFn
 # zmeta-contains: syntax.type closureModes module=syntax span=src/lib.zn:169:1 role=closure-param kind=primitive text=U32
 # zmeta-contains: syntax.type closureModes module=syntax span=src/lib.zn:170:1 role=closure-param kind=primitive text=U32
 # zmeta-contains: syntax.type closureModes module=syntax span=src/lib.zn:170:1 role=closure-return kind=primitive text=U32
 # zmeta-contains: hir.const LIMIT expr=int-literal:4 type=U32 span=src/lib.zn:6:1
+# zmeta-contains: hir.ctfe-input LIMIT role=const subject=LIMIT expr=int-literal:4 kind=literal type=U32 evaluator=required span=src/lib.zn:6:1
+# zmeta-contains: hir.ctfe-safety LIMIT role=const subject=LIMIT result=accepted reason=ctfe-materialized span=src/lib.zn:6:1
 # zmeta-contains: hir.static Seed expr=int-literal:1 type=U32 span=src/lib.zn:7:1
+# zmeta-contains: hir.ctfe-input Seed role=static subject=Seed expr=int-literal:1 kind=literal type=U32 evaluator=required span=src/lib.zn:7:1
+# zmeta-contains: hir.ctfe-safety Seed role=static subject=Seed result=accepted reason=ctfe-materialized span=src/lib.zn:7:1
 # zmeta-contains: hir.enum-variant Code payload=(U32) span=src/lib.zn:11:1
 # zmeta-contains: hir.variant-payload ParseError.Code.0 variant=Code index=0 type=U32 span=src/lib.zn:11:1
 # zmeta-contains: hir.enum-variant Located payload={ line: U32, column: U32 } span=src/lib.zn:11:1
@@ -417,11 +752,18 @@
 # zmeta-contains: hir.variant-field ParseError.Located.column variant=Located field=column type=U32 visibility=package span=src/lib.zn:11:1
 # zmeta-contains: hir.layout-input Point layout=Auto
 # zmeta-contains: hir.layout-input Buffer layout=Source
+# zmeta-contains: hir.ctfe-layout-query Buffer layout=Source fields=2 key=fnv1a64:
 # zmeta-contains: hir.generic-params Buffer params=<T, const Capacity: USize> span=src/lib.zn:20:1
 # zmeta-contains: hir.generic-param Buffer.const Capacity: USize kind=const text=const Capacity: USize constraint=none span=src/lib.zn:20:1
 # zmeta-contains: hir.field Buffer.data type=USize span=src/lib.zn:21:1
 # zmeta-contains: hir.field Buffer.data type=USize span=src/lib.zn:21:1 visibility=pub
+# zmeta-contains: hir.ctfe-layout-field Buffer.data owner=Buffer index=0 type=USize layout=Source span=src/lib.zn:21:1
 # zmeta-contains: hir.type-alias ByteBuffer target=Buffer<U8, 4> span=src/lib.zn:25:1
+# zmeta-contains: hir.type-binding ByteBuffer.alias-target owner=ByteBuffer role=alias-target text=Buffer<U8, 4> root=Buffer scope=package target=Buffer kind=struct module=syntax span=src/lib.zn:25:1
+# zmeta-contains: hir.type-binding ByteBuffer.alias-target.0 owner=ByteBuffer.alias-target role=generic-arg:alias-target text=U8 root=U8 scope=primitive target=U8 kind=primitive module=builtin span=src/lib.zn:25:1
+# zmeta-contains: hir.const-generic-arg ByteBuffer.alias-target.1 role=alias-target value=4 parent=Buffer<U8, 4> span=src/lib.zn:25:1
+# zmeta-contains: hir.ctfe-input ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 expr=4 kind=literal type=const evaluator=required span=src/lib.zn:25:1
+# zmeta-contains: hir.ctfe-safety ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 result=accepted reason=ctfe-materialized span=src/lib.zn:25:1
 # zmeta-contains: hir.path-segment ByteBuffer.alias-target.Buffer_U8_4.0 role=alias-target index=0 segment=Buffer path=Buffer<U8, 4> span=src/lib.zn:25:1
 # zmeta-contains: hir.interface-parents Writer parents=Send, Sync
 # zmeta-contains: hir.interface-parent Writer.Send index=0 parent=Send span=src/lib.zn:27:1
@@ -429,8 +771,14 @@
 # zmeta-contains: hir.path-segment Writer.interface-parent.Send.0 role=interface-parent index=0 segment=Send path=Send span=src/lib.zn:27:1
 # zmeta-contains: hir.interface-method Writer.write params=(mut self, bytes: ArraySlice<U8>) return=Result<USize, ParseError> span=src/lib.zn:28:1
 # zmeta-contains: hir.param Writer.write.self kind=receiver mode=mut name=self span=src/lib.zn:28:1
+# zmeta-contains: hir.param Writer.write.self kind=receiver mode=mut name=self span=src/lib.zn:28:1 index=0 type=Self
+# zmeta-contains: hir.param Writer.write.bytes kind=value mode=read name=bytes span=src/lib.zn:28:1 index=1 type=ArraySlice<U8>
 # zmeta-contains: hir.type-ref Writer.write.param role=param kind=path-generic text=ArraySlice<U8> span=src/lib.zn:28:1
+# zmeta-contains: hir.type-binding Writer.write.param owner=Writer.write role=param text=ArraySlice<U8> root=ArraySlice scope=builtin target=ArraySlice kind=builtin-type module=core span=src/lib.zn:28:1
+# zmeta-contains: hir.type-binding Writer.write.return.1 owner=Writer.write.return role=generic-arg:return text=ParseError root=ParseError scope=package target=ParseError kind=enum module=syntax span=src/lib.zn:28:1
 # zmeta-contains: hir.impl-const Writer for Buffer<U8, 4>.Chunk expr=int-literal:4 type=USize span=src/lib.zn:32:1
+# zmeta-contains: hir.ctfe-input Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk expr=int-literal:4 kind=literal type=USize evaluator=required span=src/lib.zn:32:1
+# zmeta-contains: hir.ctfe-safety Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk result=accepted reason=ctfe-materialized span=src/lib.zn:32:1
 # zmeta-contains: hir.impl-method Writer for Buffer<U8, 4>.write params=(mut self, bytes: ArraySlice<U8>) return=Result<USize, ParseError> span=src/lib.zn:34:1
 # zmeta-contains: hir.type-ref Writer for Buffer<U8, 4>.impl-for role=impl-for kind=path-generic text=Buffer<U8, 4> span=src/lib.zn:31:1
 # zmeta-contains: hir.impl-detail Send for Counter module=syntax span=src/lib.zn:152:1 trusted=true
@@ -438,13 +786,22 @@
 # zmeta-contains: hir.type-ref Send for Counter.impl-for role=impl-for kind=path text=Counter span=src/lib.zn:152:1
 # zmeta-contains: hir.path-segment Send for Counter.impl-interface.Send.0 role=impl-interface index=0 segment=Send path=Send span=src/lib.zn:152:1
 # zmeta-contains: hir.path-segment Send for Counter.impl-for.Counter.0 role=impl-for index=0 segment=Counter path=Counter span=src/lib.zn:152:1
+# zmeta-contains: hir.send-sync-candidate Counter auto=false reason=destroy span=src/lib.zn:143:1
+# zmeta-contains: hir.send-sync Counter capability=Send source=trusted impl=Send for Counter span=src/lib.zn:152:1
 # zmeta-contains: hir.generic-arg ByteBuffer.alias-target.0 kind=type role=alias-target text=U8 parent=Buffer<U8, 4> span=src/lib.zn:25:1
 # zmeta-contains: hir.generic-arg ByteBuffer.alias-target.1 kind=expr role=alias-target text=4 parent=Buffer<U8, 4> span=src/lib.zn:25:1
 # zmeta-contains: hir.generic-arg sumValues.return.1 kind=type role=return text=ParseError parent=Result<U32, ParseError> span=src/lib.zn:57:1
 # zmeta-contains: hir.generic-arg staticConsumer.generic-bound.0 kind=type role=generic-bound text=U32 parent=Consumer<U32> span=src/lib.zn:188:1
+# zmeta-contains: hir.type-binding staticConsumer.T: Consumer<U32>.constraint owner=staticConsumer role=generic-constraint text=Consumer<U32> root=Consumer scope=package target=Consumer kind=interface module=syntax span=src/lib.zn:188:1
+# zmeta-contains: hir.type-binding staticConsumer.param owner=staticConsumer role=param text=T root=T scope=generic target=%T kind=generic-param module=staticConsumer span=src/lib.zn:188:1
 # zmeta-contains: hir.type-ref PairTuple.alias-target role=alias-target kind=tuple text=(U32, U32) span=src/lib.zn:255:1
 # zmeta-contains: hir.type-ref Transform.alias-target role=alias-target kind=fn text=Fn<U32, U32> span=src/lib.zn:256:1
 # zmeta-contains: hir.type-ref MutableU32.alias-target role=alias-target kind=access:mut text=mut U32 span=src/lib.zn:257:1
+# zmeta-contains: hir.type-binding PairTuple.alias-target owner=PairTuple role=alias-target text=(U32, U32) root=tuple scope=structural target=(U32, U32) kind=tuple module=PairTuple span=src/lib.zn:255:1
+# zmeta-contains: hir.type-binding Transform.alias-target owner=Transform role=alias-target text=Fn<U32, U32> root=Fn scope=builtin target=Fn kind=fn-type module=core span=src/lib.zn:256:1
+# zmeta-contains: hir.type-binding MutableTransform.alias-target owner=MutableTransform role=alias-target text=MutFn<Unit> root=MutFn scope=builtin target=MutFn kind=fn-type module=core span=src/lib.zn:462:1
+# zmeta-contains: hir.type-binding OwningTransform.alias-target owner=OwningTransform role=alias-target text=OnceFn<U32> root=OnceFn scope=builtin target=OnceFn kind=fn-type module=core span=src/lib.zn:463:1
+# zmeta-contains: hir.type-binding MutableU32.alias-target owner=MutableU32 role=alias-target text=mut U32 root=U32 scope=primitive target=U32 kind=primitive module=builtin span=src/lib.zn:257:1
 # zmeta-contains: hir.generic-arg Transform.alias-target.0 kind=type role=alias-target text=U32 parent=Fn<U32, U32> span=src/lib.zn:256:1
 # zmeta-contains: hir.type-component PairTuple.alias-target.tuple-element.0 component=tuple-element role=alias-target kind=primitive text=U32 parent=(U32, U32) span=src/lib.zn:255:1
 # zmeta-contains: hir.type-component Transform.alias-target.fn-return.1 component=fn-return role=alias-target kind=primitive text=U32 parent=Fn<U32, U32> span=src/lib.zn:256:1
@@ -453,9 +810,20 @@
 # zmeta-contains: hir.field Counter.current type=U32 span=src/lib.zn:144:1
 # zmeta-contains: hir.impl-method Iterator<U32> for Counter.next params=(mut self) return=Option<U32> span=src/lib.zn:155:1
 # zmeta-contains: hir.local-const sumValues.LocalLimit expr=name:LIMIT type=U32 span=src/lib.zn:58:1
+# zmeta-contains: hir.ctfe-input sumValues.LocalLimit role=local-const subject=LocalLimit expr=name:LIMIT kind=name-ref type=U32 evaluator=required span=src/lib.zn:58:1
+# zmeta-contains: hir.stmt-order sumValues index=0 kind=const subject=LocalLimit expr=name:LIMIT span=src/lib.zn:58:1
+# zmeta-contains: hir.stmt-order sumValues index=4 kind=for subject=value expr=name:values span=src/lib.zn:62:1
+# zmeta-contains: hir.stmt-order sumValues index=7 kind=assign subject=total expr=binary:+ span=src/lib.zn:66:1
+# zmeta-contains: hir.stmt-order sumValues index=11 kind=return expr=call:Ok span=src/lib.zn:71:1
+# zmeta-contains: hir.block-order sumValues index=0 kind=body role=body span=src/lib.zn:57:1 endLine=72
+# zmeta-contains: hir.block-order sumValues index=1 kind=body role=for-body span=src/lib.zn:62:1 endLine=67
+# zmeta-contains: hir.block-order sumValues index=2 kind=body role=if-then span=src/lib.zn:63:1 endLine=65
 # zmeta-contains: hir.block sumValues.body kind=body role=body owner=sumValues span=src/lib.zn:57:1
 # zmeta-contains: hir.block sumValues.for-body kind=body role=for-body owner=sumValues span=src/lib.zn:62:1
 # zmeta-contains: hir.block sumValues.if-then kind=body role=if-then owner=sumValues span=src/lib.zn:63:1
+# zmeta-contains: hir.ctfe-body sumValues features=call,function-body,loop return=Result<U32, ParseError> evaluator=available span=src/lib.zn:57:1
+# zmeta-contains: hir.ctfe-step sumValues kind=loop subject=for item=value mode=read iterable=name:values span=src/lib.zn:62:1
+# zmeta-contains: hir.ctfe-step sumValues kind=call subject=parseDigit callee=@parseDigit span=src/lib.zn:68:1
 # zmeta-contains: hir.name sumValues name=LIMIT span=src/lib.zn:58:1
 # zmeta-contains: hir.local sumValues.point mode=val expr=struct-literal:Point type=inferred span=src/lib.zn:60:1
 # zmeta-contains: hir.field-init sumValues.x field=x expr=int-literal:1 span=src/lib.zn:60:1
@@ -469,8 +837,13 @@
 # zmeta-contains: hir.try-expr sumValues expr=call:parseDigit span=src/lib.zn:68:1
 # zmeta-contains: hir.try sumValues expr=try:call:parseDigit span=src/lib.zn:69:1
 # zmeta-contains: hir.local sumValues.adjust mode=val expr=closure type=inferred span=src/lib.zn:70:1
+# zmeta-contains: hir.expr-surface sumValues expr=try:call:parseDigit span=src/lib.zn:68:1
+# zmeta-contains: hir.expr-surface sumValues expr=closure span=src/lib.zn:70:1
 # zmeta-contains: hir.closure-expr sumValues capture=read form=expr body=binary:+ return=inferred span=src/lib.zn:70:1
 # zmeta-contains: hir.match-arm classify pattern=Some(value) guard=none expr=name:value span=src/lib.zn:76:1
+# zmeta-contains: hir.ctfe-body classify features=function-body,match return=U32 evaluator=available span=src/lib.zn:74:1
+# zmeta-contains: hir.ctfe-step classify kind=match subject=match mode=read scrutinee=name:maybe span=src/lib.zn:75:1
+# zmeta-contains: hir.ctfe-step classify kind=match-arm subject=Some(value) guard=none body=name:value span=src/lib.zn:76:1
 # zmeta-contains: hir.block classify.match kind=match role=match owner=classify span=src/lib.zn:75:1
 # zmeta-contains: hir.block optional.if-then kind=body role=if-then owner=optional span=src/lib.zn:82:1
 # zmeta-contains: hir.block optional.if-else kind=body role=if-else owner=optional span=src/lib.zn:84:1
@@ -483,6 +856,8 @@
 # zmeta-contains: hir.return optional expr=method-call:unwrapOr expected=U32 span=src/lib.zn:85:1
 # zmeta-contains: hir.method-call optional.unwrapOr receiver=maybe method=unwrapOr mode=read span=src/lib.zn:85:1
 # zmeta-contains: hir.while-pattern drain pattern=Some(value) mode=read scrutinee=call:nextMaybe span=src/lib.zn:91:1
+# zmeta-contains: hir.ctfe-body drain features=call,function-body,loop return=U32 evaluator=available span=src/lib.zn:89:1
+# zmeta-contains: hir.ctfe-step drain kind=loop subject=while-pattern pattern=Some(value) mode=read scrutinee=call:nextMaybe span=src/lib.zn:91:1
 # zmeta-contains: hir.break drain expr=name:total span=src/lib.zn:93:1
 # zmeta-contains: hir.unit expressions span=src/lib.zn:101:1
 # zmeta-contains: hir.local expressions.pair mode=val expr=tuple type=inferred span=src/lib.zn:102:1
@@ -492,6 +867,8 @@
 # zmeta-contains: hir.local expressions.first mode=val expr=index:values type=inferred span=src/lib.zn:105:1
 # zmeta-contains: hir.index-access expressions base=values index=int-literal:0 span=src/lib.zn:105:1
 # zmeta-contains: hir.type-static-call expressions.withCapacity target=Buffer<U8, 4> method=withCapacity span=src/lib.zn:106:1
+# zmeta-contains: hir.ctfe-body expressions features=function-body,type-static-call return=U32 evaluator=available span=src/lib.zn:100:1
+# zmeta-contains: hir.ctfe-step expressions kind=type-static-call subject=withCapacity target=Buffer<U8, 4> method=withCapacity span=src/lib.zn:106:1
 # zmeta-contains: hir.arg expressions.arg.106.0 index=0 mode=read expr=int-literal:4 owner=expressions span=src/lib.zn:106:1
 # zmeta-contains: hir.if-pattern patternModes pattern=Some(value) mode=move scrutinee=name:maybe span=src/lib.zn:111:1
 # zmeta-contains: hir.return patternModes expr=match:move expected=U32 span=src/lib.zn:114:1
@@ -509,8 +886,16 @@
 # zmeta-contains: hir.for moveIteration item=value mode=move iterable=name:counter span=src/lib.zn:162:1
 # zmeta-contains: hir.local closureModes.moveAdjust mode=val expr=closure:move type=inferred span=src/lib.zn:169:1
 # zmeta-contains: hir.local closureModes.blockAdjust mode=val expr=closure:block type=inferred span=src/lib.zn:170:1
+# zmeta-contains: hir.local closureCapabilityModes.readOnly mode=val expr=closure type=inferred span=src/lib.zn:456:1
+# zmeta-contains: hir.local closureCapabilityModes.mutating mode=val expr=closure:block type=inferred span=src/lib.zn:457:1
+# zmeta-contains: hir.local closureCapabilityModes.consuming mode=val expr=closure:move type=inferred span=src/lib.zn:458:1
+# zmeta-contains: hir.closure-param sumValues pattern=x type=U32 span=src/lib.zn:70:1
+# zmeta-contains: hir.closure-param closureModes pattern=x type=U32 span=src/lib.zn:169:1
 # zmeta-contains: hir.closure-expr closureModes capture=move form=expr body=binary:+ return=inferred span=src/lib.zn:169:1
 # zmeta-contains: hir.closure-expr closureModes capture=read form=block body=block return=U32 span=src/lib.zn:170:1
+# zmeta-contains: hir.callable-capability closureCapabilityModes capture=read form=expr body=binary:+ capability=Fn span=src/lib.zn:456:1
+# zmeta-contains: hir.callable-capability closureCapabilityModes capture=read form=block body=block capability=MutFn span=src/lib.zn:457:1
+# zmeta-contains: hir.callable-capability closureCapabilityModes capture=move form=block body=block capability=OnceFn span=src/lib.zn:458:1
 # zmeta-contains: hir.generic-params Consumer params=<T> span=src/lib.zn:174:1
 # zmeta-contains: hir.interface-method Consumer.consume params=(mut self, value: T) return=Unit span=src/lib.zn:175:1
 # zmeta-contains: hir.impl-method Consumer<U32> for Counter.consume params=(mut self, value: U32) return=Unit span=src/lib.zn:179:1
@@ -523,6 +908,9 @@
 # zmeta-contains: hir.type-ref staticConsumer.generic-bound role=generic-bound kind=path-generic text=Consumer<U32> span=src/lib.zn:188:1
 # zmeta-contains: hir.param staticConsumer.consumer kind=value mode=mut name=consumer span=src/lib.zn:188:1
 # zmeta-contains: hir.fn-signature staticConsumer params=(mut consumer: T, value: U32) return=U32 span=src/lib.zn:188:1
+# zmeta-contains: hir.ctfe-body staticConsumer features=function-body,generic,method-call,static-interface return=U32 evaluator=available span=src/lib.zn:188:1
+# zmeta-contains: hir.ctfe-step staticConsumer kind=method-call subject=consume receiver=consumer mode=mut span=src/lib.zn:189:1
+# zmeta-contains: hir.ctfe-step staticConsumer kind=static-interface-dispatch subject=consume receiver=consumer generic=T interface=Consumer<U32> dispatch=direct span=src/lib.zn:189:1
 # zmeta-contains: hir.return staticConsumer expr=name:value expected=U32 span=src/lib.zn:190:1
 # zmeta-contains: hir.extern hostRead abi=C
 # zmeta-contains: hir.extern hostRead module=syntax span=src/lib.zn:193:1
@@ -536,6 +924,8 @@
 # zmeta-contains: hir.const NativeOffset expr=int-literal:5 type=I32 span=src/lib.zn:206:1
 # zmeta-contains: hir.fn-signature nativeConstAdd params=(value: I32) return=I32 span=src/lib.zn:208:1
 # zmeta-contains: hir.local-const nativeConstAdd.LocalOffset expr=binary:+ type=I32 span=src/lib.zn:209:1
+# zmeta-contains: hir.ctfe-input nativeConstAdd.LocalOffset role=local-const subject=LocalOffset expr=binary:+ kind=binary type=I32 evaluator=required span=src/lib.zn:209:1
+# zmeta-contains: hir.ctfe-safety nativeConstAdd.LocalOffset role=local-const subject=LocalOffset result=accepted reason=ctfe-materialized span=src/lib.zn:209:1
 # zmeta-contains: hir.return nativeConstAdd expr=binary:+ expected=I32 span=src/lib.zn:210:1
 # zmeta-contains: hir.static NativeSeed expr=int-literal:9 type=I32 span=src/lib.zn:213:1
 # zmeta-contains: hir.fn-signature nativeStaticAdd params=(value: I32) return=I32 span=src/lib.zn:215:1
@@ -558,7 +948,12 @@
 # zmeta-contains: hir.return mutateValue expr=name:value expected=U32 span=src/lib.zn:239:1
 # zmeta-contains: hir.fn-signature accessModes params=(move counter: Counter, value: U32) return=U32 span=src/lib.zn:242:1
 # zmeta-contains: hir.param accessModes.counter kind=value mode=move name=counter span=src/lib.zn:242:1
+# zmeta-contains: hir.param accessModes.counter kind=value mode=move name=counter span=src/lib.zn:242:1 index=0 type=Counter
+# zmeta-contains: hir.param accessModes.value kind=value mode=read name=value span=src/lib.zn:242:1 index=1 type=U32
+# zmeta-contains: hir.ownership-state accessModes subject=counter type=Counter state=owned reason=move-param span=src/lib.zn:242:1
 # zmeta-contains: hir.local accessModes.total mode=var expr=name:value type=U32 span=src/lib.zn:243:1
+# zmeta-contains: hir.initialization-state accessModes subject=total type=U32 state=initialized reason=var-binding span=src/lib.zn:243:1
+# zmeta-contains: hir.ownership-state accessModes subject=total type=U32 state=available reason=local-binding span=src/lib.zn:243:1
 # zmeta-contains: hir.assign accessModes.total expr=call:mutateValue span=src/lib.zn:244:1
 # zmeta-contains: hir.call accessModes.mutateValue callee=mutateValue span=src/lib.zn:244:1
 # zmeta-contains: hir.arg accessModes.arg.244.0 index=0 mode=mut expr=name:total owner=accessModes span=src/lib.zn:244:1
@@ -566,6 +961,7 @@
 # zmeta-contains: hir.access-expr accessModes mode=mut operand=method-call:consume span=src/lib.zn:245:1
 # zmeta-contains: hir.method-call accessModes.consume receiver=counter method=consume mode=mut span=src/lib.zn:245:1
 # zmeta-contains: hir.arg accessModes.arg.245.0 index=0 mode=move expr=name:total owner=accessModes span=src/lib.zn:245:1
+# zmeta-contains: hir.ownership-state accessModes subject=total type=U32 state=moved reason=move-arg span=src/lib.zn:245:1
 # zmeta-contains: hir.assign accessModes.counter.current expr=name:value span=src/lib.zn:246:1
 # zmeta-contains: hir.field-access accessModes.current base=counter field=current mode=write span=src/lib.zn:246:1
 # zmeta-contains: hir.return accessModes expr=field:counter.current expected=U32 span=src/lib.zn:247:1
@@ -573,6 +969,7 @@
 # zmeta-contains: hir.local rangeExpressions.window mode=val expr=range:closed type=inferred span=src/lib.zn:251:1
 # zmeta-contains: hir.range rangeExpressions op=..= left=int-literal:1 right=int-literal:10 span=src/lib.zn:251:1
 # zmeta-contains: hir.if-expr controlExpressions conditionKind=condition condition=compare:== span=src/lib.zn:260:1
+# zmeta-contains: hir.expr-surface controlExpressions expr=if-expr span=src/lib.zn:260:1
 # zmeta-contains: hir.while-expr controlExpressions conditionKind=condition condition=compare:== span=src/lib.zn:261:1
 # zmeta-contains: hir.break controlExpressions expr=unit span=src/lib.zn:261:1
 # zmeta-contains: hir.for-expr controlExpressions item=i mode=read iterable=range:half-open span=src/lib.zn:262:1
@@ -581,6 +978,11 @@
 # zmeta-contains: hir.control-body-expr controlExpressions control=while role=body expr=block span=src/lib.zn:261:1
 # zmeta-contains: hir.control-body-expr controlExpressions control=for role=body expr=unit span=src/lib.zn:262:1
 # zmeta-contains: hir.match-expr controlExpressions mode=read scrutinee=call:Some span=src/lib.zn:263:1
+# zmeta-contains: hir.ctfe-body controlExpressions features=call,function-body,loop,match return=U32 evaluator=available span=src/lib.zn:259:1
+# zmeta-contains: hir.ctfe-step controlExpressions kind=loop subject=while conditionKind=condition condition=compare:== span=src/lib.zn:261:1
+# zmeta-contains: hir.ctfe-step controlExpressions kind=loop subject=for-expr item=i mode=read iterable=range:half-open span=src/lib.zn:262:1
+# zmeta-contains: hir.ctfe-step controlExpressions kind=match subject=match-expr mode=read scrutinee=call:Some span=src/lib.zn:263:1
+# zmeta-contains: hir.expr-surface controlExpressions expr=match span=src/lib.zn:263:1
 # zmeta-contains: hir.match-expr-arm controlExpressions index=0 pattern=Some(found) guard=none expr=name:found span=src/lib.zn:264:1
 # zmeta-contains: hir.match-expr-arm controlExpressions index=1 pattern=None guard=none expr=int-literal:0 span=src/lib.zn:265:1
 # zmeta-contains: hir.async-fn asyncSyntax module=syntax span=src/lib.zn:270:1
@@ -607,8 +1009,168 @@
 # zmeta-contains: hir.paren-expr parenExpression expr=binary:+ span=src/lib.zn:299:1
 # zmeta-contains: hir.binary parenExpression op=+ left=name:value right=int-literal:1 span=src/lib.zn:299:1
 # zmeta-contains: hir.return parenExpression expr=name:grouped expected=U32 span=src/lib.zn:300:1
+# zmeta-contains: hir.struct MoveBox module=syntax span=src/lib.zn:303:1
+# zmeta-contains: hir.field MoveBox.value type=U32 span=src/lib.zn:304:1 visibility=package
+# zmeta-contains: hir.impl-detail MoveBox module=syntax span=src/lib.zn:307:1
+# zmeta-contains: hir.impl-method MoveBox.intoValue params=(move self) return=U32 span=src/lib.zn:308:1
+# zmeta-contains: hir.param MoveBox.intoValue.self kind=receiver mode=move name=self span=src/lib.zn:308:1
+# zmeta-contains: hir.return MoveBox.intoValue expr=field:self.value expected=U32 span=src/lib.zn:309:1
+# zmeta-contains: hir.field-access MoveBox.intoValue.value base=self field=value mode=read span=src/lib.zn:309:1
+# zmeta-contains: hir.fn-signature moveReceiverCall params=(move holder: MoveBox) return=U32 span=src/lib.zn:313:1
+# zmeta-contains: hir.param moveReceiverCall.holder kind=value mode=move name=holder span=src/lib.zn:313:1
+# zmeta-contains: hir.ownership-state moveReceiverCall subject=holder type=MoveBox state=owned reason=move-param span=src/lib.zn:313:1
+# zmeta-contains: hir.return moveReceiverCall expr=move:method-call:intoValue expected=U32 span=src/lib.zn:314:1
+# zmeta-contains: hir.access-expr moveReceiverCall mode=move operand=method-call:intoValue span=src/lib.zn:314:1
+# zmeta-contains: hir.method-call moveReceiverCall.intoValue receiver=holder method=intoValue mode=move span=src/lib.zn:314:1
+# zmeta-contains: hir.ownership-state moveReceiverCall subject=holder type=MoveBox state=moved reason=move-receiver span=src/lib.zn:314:1
+# zmeta-contains: hir.attribute-arg layout.0 attr=layout kind=positional name=none value=C span=src/lib.zn:317:1
+# zmeta-contains: hir.struct CPacket module=syntax span=src/lib.zn:318:1
+# zmeta-contains: hir.layout-input CPacket layout=C
+# zmeta-contains: hir.ctfe-layout-query CPacket layout=C fields=2 key=fnv1a64:
+# zmeta-contains: hir.field CPacket.tag type=U8 span=src/lib.zn:319:1 visibility=pub
+# zmeta-contains: hir.ctfe-layout-field CPacket.tag owner=CPacket index=0 type=U8 layout=C span=src/lib.zn:319:1
+# zmeta-contains: hir.field CPacket.length type=U16 span=src/lib.zn:320:1 visibility=pub
+# zmeta-contains: hir.attribute-arg layout.0 attr=layout kind=positional name=none value=Packed(2) span=src/lib.zn:323:1
+# zmeta-contains: hir.struct PackedHeader module=syntax span=src/lib.zn:324:1
+# zmeta-contains: hir.layout-input PackedHeader layout=Packed(2)
+# zmeta-contains: hir.ctfe-layout-query PackedHeader layout=Packed(2) fields=2 key=fnv1a64:
+# zmeta-contains: hir.field PackedHeader.tag type=U8 span=src/lib.zn:325:1 visibility=package
+# zmeta-contains: hir.ctfe-layout-field PackedHeader.tag owner=PackedHeader index=0 type=U8 layout=Packed(2) span=src/lib.zn:325:1
+# zmeta-contains: hir.field PackedHeader.length type=U16 span=src/lib.zn:326:1 visibility=package
+# zmeta-contains: hir.fn-signature exportedMaybe params=(value: I32) return=Option<I32> span=src/lib.zn:330:1
+# zmeta-contains: hir.param exportedMaybe.value kind=value mode=read name=value span=src/lib.zn:330:1
+# zmeta-contains: hir.type-ref exportedMaybe.return role=return kind=path-generic text=Option<I32> span=src/lib.zn:330:1
+# zmeta-contains: hir.generic-arg exportedMaybe.return.0 kind=type role=return text=I32 parent=Option<I32> span=src/lib.zn:330:1
+# zmeta-contains: hir.return exportedMaybe expr=call:Some expected=Option<I32> span=src/lib.zn:331:1
+# zmeta-contains: hir.call exportedMaybe.Some callee=Some span=src/lib.zn:331:1
+# zmeta-contains: hir.arg exportedMaybe.arg.331.0 index=0 mode=read expr=name:value owner=exportedMaybe span=src/lib.zn:331:1
+# zmeta-contains: hir.fn-signature integerLiteralForms params=() return=U32 span=src/lib.zn:334:1
+# zmeta-contains: hir.local-const integerLiteralForms.HexValue expr=int-literal:0xff type=U32 span=src/lib.zn:335:1
+# zmeta-contains: hir.ctfe-input integerLiteralForms.HexValue role=local-const subject=HexValue expr=int-literal:0xff kind=literal type=U32 evaluator=required span=src/lib.zn:335:1
+# zmeta-contains: hir.local integerLiteralForms.binary mode=val expr=int-literal:0b1010 type=inferred span=src/lib.zn:336:1
+# zmeta-contains: hir.local integerLiteralForms.separated mode=val expr=int-literal:1_000_000 type=inferred span=src/lib.zn:337:1
+# zmeta-contains: hir.literal integerLiteralForms kind=int expr=int-literal:0xff span=src/lib.zn:335:1
+# zmeta-contains: hir.literal integerLiteralForms kind=int expr=int-literal:0b1010 span=src/lib.zn:336:1
+# zmeta-contains: hir.literal integerLiteralForms kind=int expr=int-literal:1_000_000 span=src/lib.zn:337:1
+# zmeta-contains: hir.binary integerLiteralForms op=+ left=name:HexValue right=name:binary span=src/lib.zn:338:1
+# zmeta-contains: hir.binary integerLiteralForms op=+ left=binary:+ right=name:separated span=src/lib.zn:338:1
+# zmeta-contains: hir.return integerLiteralForms expr=binary:+ expected=U32 span=src/lib.zn:338:1
+# zmeta-contains: hir.struct FileSecret module=syntax span=src/lib.zn:341:1
+# zmeta-contains: hir.block FileSecret.struct kind=struct role=struct owner=FileSecret span=src/lib.zn:341:1
+# zmeta-contains: hir.layout-input FileSecret layout=Auto
+# zmeta-contains: hir.field FileSecret.value type=U32 span=src/lib.zn:342:1 visibility=package
+# zmeta-contains: hir.fn-signature hiddenValue params=(secret: FileSecret) return=U32 span=src/lib.zn:345:1
+# zmeta-contains: hir.block hiddenValue.body kind=body role=body owner=hiddenValue span=src/lib.zn:345:1
+# zmeta-contains: hir.param hiddenValue.secret kind=value mode=read name=secret span=src/lib.zn:345:1
+# zmeta-contains: hir.type-ref hiddenValue.param role=param kind=path text=FileSecret span=src/lib.zn:345:1
+# zmeta-contains: hir.path-segment hiddenValue.param.FileSecret.0 role=param index=0 segment=FileSecret path=FileSecret span=src/lib.zn:345:1
+# zmeta-contains: hir.return hiddenValue expr=field:secret.value expected=U32 span=src/lib.zn:346:1
+# zmeta-contains: hir.field-access hiddenValue.value base=secret field=value mode=read span=src/lib.zn:346:1
+# zmeta-contains: hir.struct LocalLayout module=syntax span=src/lib.zn:349:1
+# zmeta-contains: hir.layout-input LocalLayout layout=Auto
+# zmeta-contains: hir.field LocalLayout.size type=USize span=src/lib.zn:350:1 visibility=package
+# zmeta-contains: hir.field LocalLayout.align type=USize span=src/lib.zn:351:1 visibility=package
+# zmeta-contains: hir.fn-signature guaranteedValue params=(value: I32) return=I32 span=src/lib.zn:355:1
+# zmeta-contains: hir.fn-signature stackOnly params=(value: U32) return=U32 span=src/lib.zn:360:1
+# zmeta-contains: hir.fn-signature failFast params=(message: StringSlice) return=Never span=src/lib.zn:365:1
+# zmeta-contains: hir.fn-signature allocationTrap params=() return=Never span=src/lib.zn:369:1
+# zmeta-contains: hir.type-ref failFast.return role=return kind=primitive text=Never span=src/lib.zn:365:1
+# zmeta-contains: hir.type-ref allocationTrap.return role=return kind=primitive text=Never span=src/lib.zn:369:1
+# zmeta-contains: hir.call failFast.panic callee=panic span=src/lib.zn:366:1
+# zmeta-contains: hir.call allocationTrap.oom callee=oom span=src/lib.zn:370:1
+# zmeta-contains: hir.arg allocationTrap.arg.370.0 index=0 mode=read expr=struct-literal:LocalLayout owner=allocationTrap span=src/lib.zn:370:1
+# zmeta-contains: hir.field-init allocationTrap.size field=size expr=int-literal:1 span=src/lib.zn:370:1
+# zmeta-contains: hir.field-init allocationTrap.align field=align expr=int-literal:1 span=src/lib.zn:370:1
+# zmeta-contains: hir.expr failFast expr=call:panic span=src/lib.zn:366:1
+# zmeta-contains: hir.expr allocationTrap expr=call:oom span=src/lib.zn:370:1
+# zmeta-contains: hir.fn-signature selectOverload params=(value: I32) return=I32 span=src/lib.zn:373:1
+# zmeta-contains: hir.fn-signature selectOverload params=(value: U32) return=U32 span=src/lib.zn:377:1
+# zmeta-contains: hir.fn-signature overloadDispatch params=() return=U32 span=src/lib.zn:381:1
+# zmeta-contains: hir.overload-entry selectOverload key=selectOverload(I32) params=(value: I32) return=I32 span=src/lib.zn:373:1
+# zmeta-contains: hir.overload-entry selectOverload key=selectOverload(U32) params=(value: U32) return=U32 span=src/lib.zn:377:1
+# zmeta-contains: hir.overload-entry overloadDispatch key=overloadDispatch() params=() return=U32 span=src/lib.zn:381:1
+# zmeta-contains: hir.local-const overloadDispatch.signed expr=int-literal:1 type=I32 span=src/lib.zn:382:1
+# zmeta-contains: hir.local-const overloadDispatch.unsigned expr=int-literal:2 type=U32 span=src/lib.zn:383:1
+# zmeta-contains: hir.local overloadDispatch.left mode=val expr=call:selectOverload type=inferred span=src/lib.zn:384:1
+# zmeta-contains: hir.local overloadDispatch.right mode=val expr=call:selectOverload type=inferred span=src/lib.zn:385:1
+# zmeta-contains: hir.call overloadDispatch.selectOverload callee=selectOverload span=src/lib.zn:384:1
+# zmeta-contains: hir.call overloadDispatch.selectOverload callee=selectOverload span=src/lib.zn:385:1
+# zmeta-contains: hir.struct WriterSlot module=syntax span=src/lib.zn:389:1
+# zmeta-contains: hir.layout-input WriterSlot layout=Auto
+# zmeta-contains: hir.field WriterSlot.writer type=Box<Writer> span=src/lib.zn:390:1 visibility=package
+# zmeta-contains: hir.box-interface-type WriterSlot.writer.field interface=Writer role=field span=src/lib.zn:390:1
+# zmeta-contains: hir.box-interface-object WriterSlot.writer.field interface=Writer role=field representation=fat-pointer data=owned-ptr vtable=readonly span=src/lib.zn:390:1
+# zmeta-contains: hir.vtable Writer for Buffer<U8, 4> interface=Writer concrete=Buffer<U8, 4> slots=1 destroy=present
+# zmeta-contains: hir.vtable-slot Writer for Buffer<U8, 4>.write interface=Writer slot=0 method=write target=Writer for Buffer<U8, 4>.write implemented=true
+# zmeta-contains: hir.fn-signature moveWriterSlot params=(move slot: WriterSlot) return=Box<Writer> span=src/lib.zn:393:1
+# zmeta-contains: hir.box-interface-type moveWriterSlot.return interface=Writer role=return span=src/lib.zn:393:1
+# zmeta-contains: hir.box-interface-object moveWriterSlot.return interface=Writer role=return representation=fat-pointer data=owned-ptr vtable=readonly span=src/lib.zn:393:1
+# zmeta-contains: hir.return moveWriterSlot expr=field:slot.writer expected=Box<Writer> span=src/lib.zn:394:1
+# zmeta-contains: hir.interface Measured module=syntax span=src/lib.zn:397:1
+# zmeta-contains: hir.interface-method Measured.measure params=(self) return=U32 span=src/lib.zn:398:1
+# zmeta-contains: hir.impl-detail Measured for Counter module=syntax span=src/lib.zn:401:1
+# zmeta-contains: hir.impl-method Measured for Counter.measure params=(self) return=U32 span=src/lib.zn:402:1
+# zmeta-contains: hir.fn-signature makeMeasured params=() return=Measured span=src/lib.zn:407:1
+# zmeta-contains: hir.static-interface-return makeMeasured interface=Measured span=src/lib.zn:407:1
+# zmeta-contains: hir.return makeMeasured expr=struct-literal:Counter expected=Measured span=src/lib.zn:408:1
+# zmeta-contains: hir.fn-signature readMeasured params=() return=U32 span=src/lib.zn:411:1
+# zmeta-contains: hir.call readMeasured.makeMeasured callee=makeMeasured span=src/lib.zn:412:1
+# zmeta-contains: hir.method-call readMeasured.measure receiver=measured method=measure mode=read span=src/lib.zn:413:1
+# zmeta-contains: hir.fn-signature raiiScopeDrop params=() return=U32 span=src/lib.zn:416:1
+# zmeta-contains: hir.local raiiScopeDrop.counter mode=val expr=struct-literal:Counter type=inferred span=src/lib.zn:417:1
+# zmeta-contains: hir.initialization-state raiiScopeDrop subject=counter type=Counter state=initialized reason=val-binding span=src/lib.zn:417:1
+# zmeta-contains: hir.initialization-state raiiScopeDrop subject=raiiScopeDrop.current type=field state=initialized reason=aggregate-field-init span=src/lib.zn:417:1
+# zmeta-contains: hir.ownership-state raiiScopeDrop subject=counter type=Counter state=available reason=local-binding span=src/lib.zn:417:1
+# zmeta-contains: hir.drop-scope raiiScopeDrop local=counter type=Counter span=src/lib.zn:417:1
+# zmeta-contains: hir.return raiiScopeDrop expr=field:counter.current expected=U32 span=src/lib.zn:418:1
+# zmeta-contains: hir.fn-signature returnResource params=() return=Counter span=src/lib.zn:421:1
+# zmeta-contains: hir.local returnResource.counter mode=val expr=struct-literal:Counter type=inferred span=src/lib.zn:422:1
+# zmeta-contains: hir.initialization-state returnResource subject=counter type=Counter state=initialized reason=val-binding span=src/lib.zn:422:1
+# zmeta-contains: hir.ownership-state returnResource subject=counter type=Counter state=available reason=local-binding span=src/lib.zn:422:1
+# zmeta-contains: hir.ownership-state returnResource subject=counter type=Counter state=moved reason=return span=src/lib.zn:423:1
+# zmeta-contains: hir.drop-scope returnResource local=counter type=Counter span=src/lib.zn:422:1
+# zmeta-contains: hir.return returnResource expr=name:counter expected=Counter span=src/lib.zn:423:1
+# zmeta-contains: hir.fn-signature tryCleanupResource params=() return=Result<U32, ParseError> span=src/lib.zn:426:1
+# zmeta-contains: hir.local tryCleanupResource.counter mode=val expr=struct-literal:Counter type=inferred span=src/lib.zn:427:1
+# zmeta-contains: hir.drop-scope tryCleanupResource local=counter type=Counter span=src/lib.zn:427:1
+# zmeta-contains: hir.local tryCleanupResource.parsed mode=val expr=try:call:parseDigit type=inferred span=src/lib.zn:428:1
+# zmeta-contains: hir.try-expr tryCleanupResource expr=call:parseDigit span=src/lib.zn:428:1
+# zmeta-contains: hir.return tryCleanupResource expr=call:Ok expected=Result<U32, ParseError> span=src/lib.zn:429:1
+# zmeta-contains: hir.fn-signature enumPayloadModes params=(readMaybe: Option<U32>, mut writeMaybe: Option<U32>, move ownedMaybe: Option<U32>) return=U32 span=src/lib.zn:432:1
+# zmeta-contains: hir.param enumPayloadModes.readMaybe kind=value mode=read name=readMaybe span=src/lib.zn:432:1
+# zmeta-contains: hir.param enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe span=src/lib.zn:432:1
+# zmeta-contains: hir.param enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe span=src/lib.zn:432:1
+# zmeta-contains: hir.ownership-state enumPayloadModes subject=ownedMaybe type=Option<U32> state=owned reason=move-param span=src/lib.zn:432:1
+# zmeta-contains: hir.ownership-state enumPayloadModes subject=ownedMaybe type=Option<U32> state=moved reason=move-if-pattern span=src/lib.zn:439:1
+# zmeta-contains: hir.fn-signature callBoxWriter params=(mut writer: Box<Writer>, bytes: ArraySlice<U8>) return=Result<USize, ParseError> span=src/lib.zn:450:1
+# zmeta-contains: hir.box-interface-type callBoxWriter.param interface=Writer role=param span=src/lib.zn:450:1
+# zmeta-contains: hir.box-interface-object callBoxWriter.param interface=Writer role=param representation=fat-pointer data=owned-ptr vtable=readonly span=src/lib.zn:450:1
+# zmeta-contains: hir.method-call callBoxWriter.write receiver=writer method=write mode=read span=src/lib.zn:451:1
+# zmeta-contains: hir.dynamic-dispatch callBoxWriter receiver=writer interface=Writer method=write slot=0 span=src/lib.zn:451:1
+# zmeta-contains: hir.param enumPayloadModes.readMaybe kind=value mode=read name=readMaybe span=src/lib.zn:432:1 index=0 type=Option<U32>
+# zmeta-contains: hir.param enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe span=src/lib.zn:432:1 index=1 type=Option<U32>
+# zmeta-contains: hir.param enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe span=src/lib.zn:432:1 index=2 type=Option<U32>
+# zmeta-contains: hir.enum-payload-access enumPayloadModes role=if-condition pattern=Some(readValue) binding=readValue mode=read source=name:readMaybe span=src/lib.zn:433:1
+# zmeta-contains: hir.enum-payload-access enumPayloadModes role=if-condition pattern=Some(writeValue) binding=writeValue mode=mut source=name:writeMaybe span=src/lib.zn:436:1
+# zmeta-contains: hir.enum-payload-access enumPayloadModes role=if-condition pattern=Some(movedValue) binding=movedValue mode=move source=name:ownedMaybe span=src/lib.zn:439:1
+# zmeta-contains: hir.enum-payload-access classify role=match-arm pattern=Some(value) binding=value mode=read source=name:maybe span=src/lib.zn:76:1
+# zmeta-contains: hir.enum-payload-access patternModes role=match-arm pattern=Some(value) binding=value mode=move source=name:maybe span=src/lib.zn:115:1
+# zmeta-contains: hir.enum-payload-access controlExpressions role=match-expr-arm pattern=Some(found) binding=found mode=read source=call:Some span=src/lib.zn:264:1
+# zmeta-contains: hir.stmt-order enumPayloadModes index=0 kind=if-pattern subject=Some(readValue) expr=name:readMaybe span=src/lib.zn:433:1
+# zmeta-contains: hir.stmt-order enumPayloadModes index=4 kind=if-pattern subject=Some(movedValue) expr=name:ownedMaybe span=src/lib.zn:439:1
+# zmeta-contains: hir.stmt-order enumPayloadModes index=5 kind=return expr=name:movedValue span=src/lib.zn:440:1
+# zmeta-contains: hir.block-order enumPayloadModes index=1 kind=body role=if-then span=src/lib.zn:433:1 endLine=435
+# zmeta-contains: hir.block-order enumPayloadModes index=2 kind=body role=if-then span=src/lib.zn:436:1 endLine=438
+# zmeta-contains: hir.block-order enumPayloadModes index=3 kind=body role=if-then span=src/lib.zn:439:1 endLine=441
+# zmeta-contains: hir.return enumPayloadModes expr=name:movedValue expected=U32 span=src/lib.zn:440:1
 # zmeta-contains: mir.const LIMIT value=int-literal:4 type=U32
+# zmeta-contains: mir.ctfe-eval LIMIT role=const subject=LIMIT expr=int-literal:4 kind=literal type=U32
+# zmeta-contains: mir.verifier-ctfe LIMIT role=const subject=LIMIT result=materialized reason=literal span=src/lib.zn:6:1
+# zmeta-contains: mir.verifier-ctfe-safety LIMIT role=const subject=LIMIT result=accepted reason=ctfe-materialized span=src/lib.zn:6:1
 # zmeta-contains: mir.static Seed init=int-literal:1 type=U32
+# zmeta-contains: mir.ctfe-eval Seed role=static subject=Seed expr=int-literal:1 kind=literal type=U32
+# zmeta-contains: mir.verifier-ctfe Seed role=static subject=Seed result=materialized reason=literal span=src/lib.zn:7:1
+# zmeta-contains: mir.verifier-ctfe-safety Seed role=static subject=Seed result=accepted reason=ctfe-materialized span=src/lib.zn:7:1
 # zmeta-contains: mir.enum-variant Code payload=(U32)
 # zmeta-contains: mir.variant-payload ParseError.Code.0 variant=Code index=0 type=U32
 # zmeta-contains: mir.enum-variant Located payload={ line: U32, column: U32 }
@@ -624,7 +1186,14 @@
 # zmeta-contains: mir.path-segment Writer.interface-parent.Send.0 role=interface-parent index=0 segment=Send path=Send
 # zmeta-contains: mir.interface-slot Writer.write params=(mut self, bytes: ArraySlice<U8>) return=Result<USize, ParseError>
 # zmeta-contains: mir.param Writer.write.self kind=receiver mode=mut name=self
+# zmeta-contains: mir.param Writer.write.self kind=receiver mode=mut name=self index=0 type=Self
+# zmeta-contains: mir.param Writer.write.bytes kind=value mode=read name=bytes index=1 type=ArraySlice<U8>
 # zmeta-contains: mir.type-ref Writer.write.param role=param kind=path-generic text=ArraySlice<U8>
+# zmeta-contains: mir.type-binding Writer.write.param owner=Writer.write role=param root=ArraySlice scope=builtin target=ArraySlice kind=builtin-type
+# zmeta-contains: mir.impl-const Writer for Buffer<U8, 4>.Chunk value=int-literal:4 type=USize
+# zmeta-contains: mir.ctfe-eval Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk expr=int-literal:4 kind=literal type=USize
+# zmeta-contains: mir.verifier-ctfe Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk result=materialized reason=literal span=src/lib.zn:32:1
+# zmeta-contains: mir.verifier-ctfe-safety Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk result=accepted reason=ctfe-materialized span=src/lib.zn:32:1
 # zmeta-contains: mir.impl-method Writer for Buffer<U8, 4>.write params=(mut self, bytes: ArraySlice<U8>) return=Result<USize, ParseError>
 # zmeta-contains: mir.type-ref Writer for Buffer<U8, 4>.impl-for role=impl-for kind=path-generic text=Buffer<U8, 4>
 # zmeta-contains: mir.impl Send for Counter trusted=true
@@ -632,13 +1201,28 @@
 # zmeta-contains: mir.type-ref Send for Counter.impl-for role=impl-for kind=path text=Counter
 # zmeta-contains: mir.path-segment Send for Counter.impl-interface.Send.0 role=impl-interface index=0 segment=Send path=Send
 # zmeta-contains: mir.path-segment Send for Counter.impl-for.Counter.0 role=impl-for index=0 segment=Counter path=Counter
+# zmeta-contains: mir.verifier-send-sync Counter capability=Send result=rejected reason=destroy span=src/lib.zn:143:1
+# zmeta-contains: mir.verifier-send-sync Counter capability=Sync result=rejected reason=destroy span=src/lib.zn:143:1
+# zmeta-contains: mir.verifier-send-sync Counter capability=Send result=accepted reason=trusted-impl span=src/lib.zn:152:1
 # zmeta-contains: mir.generic-arg ByteBuffer.alias-target.0 kind=type role=alias-target text=U8 parent=Buffer<U8, 4>
 # zmeta-contains: mir.generic-arg ByteBuffer.alias-target.1 kind=expr role=alias-target text=4 parent=Buffer<U8, 4>
+# zmeta-contains: mir.type-binding ByteBuffer.alias-target owner=ByteBuffer role=alias-target root=Buffer scope=package target=Buffer kind=struct
+# zmeta-contains: mir.const-generic-arg ByteBuffer.alias-target.1 role=alias-target value=4 parent=Buffer<U8, 4> constEval=required
+# zmeta-contains: mir.ctfe-eval ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 expr=4 kind=literal type=const
+# zmeta-contains: mir.verifier-ctfe ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 result=materialized reason=literal span=src/lib.zn:25:1
+# zmeta-contains: mir.verifier-ctfe-safety ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 result=accepted reason=ctfe-materialized span=src/lib.zn:25:1
+# zmeta-contains: mir.layout-query Buffer layout=Source fields=2 key=fnv1a64:
+# zmeta-contains: mir.verifier-layout-query Buffer result=accepted layout=Source fields=2 key=fnv1a64:
+# zmeta-contains: mir.layout-field-query Buffer.data owner=Buffer index=0 type=USize offset=field-index:0 size=8 align=8 layout=Source
 # zmeta-contains: mir.generic-arg sumValues.return.1 kind=type role=return text=ParseError parent=Result<U32, ParseError>
 # zmeta-contains: mir.generic-arg staticConsumer.generic-bound.0 kind=type role=generic-bound text=U32 parent=Consumer<U32>
+# zmeta-contains: mir.type-binding staticConsumer.param owner=staticConsumer role=param root=T scope=generic target=%T kind=generic-param
 # zmeta-contains: mir.type-ref PairTuple.alias-target role=alias-target kind=tuple text=(U32, U32)
 # zmeta-contains: mir.type-ref Transform.alias-target role=alias-target kind=fn text=Fn<U32, U32>
 # zmeta-contains: mir.type-ref MutableU32.alias-target role=alias-target kind=access:mut text=mut U32
+# zmeta-contains: mir.type-binding Transform.alias-target owner=Transform role=alias-target root=Fn scope=builtin target=Fn kind=fn-type
+# zmeta-contains: mir.type-binding MutableTransform.alias-target owner=MutableTransform role=alias-target root=MutFn scope=builtin target=MutFn kind=fn-type
+# zmeta-contains: mir.type-binding OwningTransform.alias-target owner=OwningTransform role=alias-target root=OnceFn scope=builtin target=OnceFn kind=fn-type
 # zmeta-contains: mir.generic-arg Transform.alias-target.0 kind=type role=alias-target text=U32 parent=Fn<U32, U32>
 # zmeta-contains: mir.type-component PairTuple.alias-target.tuple-element.0 component=tuple-element role=alias-target kind=primitive text=U32 parent=(U32, U32)
 # zmeta-contains: mir.type-component Transform.alias-target.fn-return.1 component=fn-return role=alias-target kind=primitive text=U32 parent=Fn<U32, U32>
@@ -648,6 +1232,26 @@
 # zmeta-contains: mir.impl-method Iterator<U32> for Counter.next params=(mut self) return=Option<U32>
 # zmeta-contains: mir.destroy Counter cleanup=body-then-fields
 # zmeta-contains: mir.local-const sumValues.LocalLimit value=name:LIMIT type=U32
+# zmeta-contains: mir.ctfe-eval sumValues.LocalLimit role=local-const subject=LocalLimit expr=name:LIMIT kind=name-ref type=U32
+# zmeta-contains: mir.verifier-ctfe sumValues.LocalLimit role=local-const subject=LocalLimit result=materialized reason=name-ref span=src/lib.zn:58:1
+# zmeta-contains: mir.stmt-order sumValues index=0 kind=const subject=LocalLimit expr=name:LIMIT
+# zmeta-contains: mir.stmt-order sumValues index=4 kind=for subject=value expr=name:values
+# zmeta-contains: mir.stmt-order sumValues index=7 kind=assign subject=total expr=binary:+
+# zmeta-contains: mir.stmt-order sumValues index=11 kind=return expr=call:Ok
+# zmeta-contains: mir.block-order sumValues index=0 kind=body role=body endLine=72
+# zmeta-contains: mir.block-order sumValues index=1 kind=body role=for-body endLine=67
+# zmeta-contains: mir.block-order sumValues index=2 kind=body role=if-then endLine=65
+# zmeta-contains: mir.cfg sumValues entry=bb0 blocks=bb0,bb1,bb2 cleanup=none
+# zmeta-contains: mir.ctfe-evaluator sumValues entry=bb0 features=call,function-body,loop source=hir.ctfe-body
+# zmeta-contains: mir.verifier-ctfe-body sumValues result=accepted features=call,function-body,loop span=src/lib.zn:57:1
+# zmeta-contains: mir.cfg-block sumValues bb0 index=0 kind=body role=body span=src/lib.zn:57:1 endLine=72
+# zmeta-contains: mir.cfg-block sumValues bb1 index=1 kind=body role=for-body span=src/lib.zn:62:1 endLine=67
+# zmeta-contains: mir.cfg-block sumValues bb2 index=2 kind=body role=if-then span=src/lib.zn:63:1 endLine=65
+# zmeta-contains: mir.cfg-edge sumValues stmt=4 kind=for from=bb0 body=bb1 exit=for.exit iterable=name:values
+# zmeta-contains: mir.cfg-edge sumValues stmt=5 kind=if from=bb1 then=bb2 else=fallthrough condition=compare:==
+# zmeta-contains: mir.cfg-edge sumValues stmt=9 kind=try from=bb0 ok=fallthrough err=try-error expr=call:parseDigit
+# zmeta-contains: mir.cfg-terminator sumValues stmt=11 bb=bb0 kind=return target=return value=call:Ok return=Result<U32, ParseError>
+# zmeta-contains: mir.cfg-terminator sumValues stmt=6 bb=bb2 kind=continue target=loop.header value=unit return=Result<U32, ParseError>
 # zmeta-contains: mir.block sumValues kind=body role=body span=src/lib.zn:57:1
 # zmeta-contains: mir.block sumValues kind=body role=for-body span=src/lib.zn:62:1
 # zmeta-contains: mir.block sumValues kind=body role=if-then span=src/lib.zn:63:1
@@ -659,13 +1263,25 @@
 # zmeta-contains: mir.pattern sumValues role=val kind=struct text=Point { x, y }
 # zmeta-contains: mir.pattern-component sumValues.val.field.x role=val component=field kind=binding text=x field=x parent=Point { x, y }
 # zmeta-contains: mir.loop sumValues kind=for item=%value mode=read iterable=name:values
-# zmeta-contains: mir.terminator sumValues kind=continue target=loop.header
+# zmeta-contains: mir.ctfe-step sumValues kind=loop subject=for item=value mode=read iterable=name:values
+# zmeta-contains: mir.ctfe-step sumValues kind=call subject=parseDigit callee=@parseDigit
+# zmeta-contains: mir.assign sumValues bb=bb1 place=%total rvalue=binary:+ op==
+# zmeta-contains: mir.terminator sumValues bb=bb2 kind=continue target=loop.header
 # zmeta-contains: mir.rvalue sumValues expr=try:call:parseDigit kind=try
 # zmeta-contains: mir.try-expr sumValues expr=call:parseDigit
 # zmeta-contains: mir.try sumValues expr=try:call:parseDigit ok=continue err=return
+# zmeta-contains: mir.verifier-try sumValues expr=try:call:parseDigit ok=continue err=try-error cleanup=none
 # zmeta-contains: mir.rvalue sumValues expr=closure kind=closure mayEscape=false
+# zmeta-contains: mir.expr-surface sumValues expr=try:call:parseDigit
+# zmeta-contains: mir.expr-surface sumValues expr=closure
+# zmeta-contains: mir.expr-surface controlExpressions expr=if-expr
+# zmeta-contains: mir.expr-surface controlExpressions expr=match
 # zmeta-contains: mir.closure sumValues capture=read form=expr body=binary:+ return=inferred mayEscape=false
 # zmeta-contains: mir.rvalue classify expr=match kind=match
+# zmeta-contains: mir.ctfe-evaluator classify entry=bb0 features=function-body,match source=hir.ctfe-body
+# zmeta-contains: mir.verifier-ctfe-body classify result=accepted features=function-body,match span=src/lib.zn:74:1
+# zmeta-contains: mir.ctfe-step classify kind=match subject=match mode=read scrutinee=name:maybe
+# zmeta-contains: mir.ctfe-step classify kind=match-arm subject=Some(value) guard=none body=name:value
 # zmeta-contains: mir.block classify kind=match role=match span=src/lib.zn:75:1
 # zmeta-contains: mir.block optional kind=body role=if-then span=src/lib.zn:82:1
 # zmeta-contains: mir.block optional kind=body role=if-else span=src/lib.zn:84:1
@@ -678,8 +1294,18 @@
 # zmeta-contains: mir.branch optional kind=else target=else.body
 # zmeta-contains: mir.rvalue optional expr=method-call:unwrapOr kind=method-call method=unwrapOr
 # zmeta-contains: mir.method-call optional receiver=maybe method=unwrapOr mode=read
+# zmeta-contains: mir.cfg drain entry=bb0 blocks=bb0,bb1,bb2 cleanup=none
+# zmeta-contains: mir.ctfe-evaluator drain entry=bb0 features=call,function-body,loop source=hir.ctfe-body
+# zmeta-contains: mir.verifier-ctfe-body drain result=accepted features=call,function-body,loop span=src/lib.zn:89:1
+# zmeta-contains: mir.ctfe-step drain kind=loop subject=while-pattern pattern=Some(value) mode=read scrutinee=call:nextMaybe
+# zmeta-contains: mir.cfg-block drain bb1 index=1 kind=body role=while-body span=src/lib.zn:91:1 endLine=96
+# zmeta-contains: mir.cfg-block drain bb2 index=2 kind=body role=if-then span=src/lib.zn:92:1 endLine=94
+# zmeta-contains: mir.cfg-edge drain stmt=1 kind=while-pattern from=bb0 body=bb1 exit=while.exit condition=call:nextMaybe
+# zmeta-contains: mir.cfg-edge drain stmt=2 kind=if from=bb1 then=bb2 else=fallthrough condition=compare:==
+# zmeta-contains: mir.cfg-terminator drain stmt=3 bb=bb2 kind=break target=loop.exit value=name:total return=U32
 # zmeta-contains: mir.loop drain kind=while-pattern pattern=Some(value) mode=read scrutinee=call:nextMaybe header=while.cond body=while.body exit=while.exit
-# zmeta-contains: mir.terminator drain kind=break target=loop.exit value=name:total
+# zmeta-contains: mir.assign drain bb=bb1 place=%total rvalue=name:value op==
+# zmeta-contains: mir.terminator drain bb=bb2 kind=break target=loop.exit value=name:total
 # zmeta-contains: mir.unit expressions
 # zmeta-contains: mir.literal expressions kind=char expr=char-literal
 # zmeta-contains: mir.rvalue expressions expr=tuple kind=tuple
@@ -706,23 +1332,51 @@
 # zmeta-contains: mir.switch inspectMove mode=move scrutinee=name:maybe arms=preview
 # zmeta-contains: mir.switch touch mode=read scrutinee=name:maybe arms=preview
 # zmeta-contains: mir.loop moveIteration kind=for item=%value mode=move iterable=name:counter
+# zmeta-contains: mir.initialization-state moveIteration place=%value type=iterator-item state=initialized reason=for-binding
+# zmeta-contains: mir.ownership-state moveIteration place=%counter type=Counter state=owned reason=move-param
+# zmeta-contains: mir.ownership-state moveIteration place=%counter type=Counter state=moved reason=move-for-iterable
+# zmeta-contains: mir.verifier-initialization moveIteration place=%value state=initialized reason=for-binding span=src/lib.zn:162:1
+# zmeta-contains: mir.verifier-ownership moveIteration place=%counter state=moved reason=move-for-iterable span=src/lib.zn:162:1
 # zmeta-contains: mir.rvalue closureModes expr=closure:move kind=closure mayEscape=false mode=move
 # zmeta-contains: mir.rvalue closureModes expr=closure:block kind=closure mayEscape=false form=block
+# zmeta-contains: mir.closure-param sumValues pattern=x type=U32
+# zmeta-contains: mir.closure-param closureModes pattern=x type=U32
 # zmeta-contains: mir.closure closureModes capture=move form=expr body=binary:+ return=inferred mayEscape=false
 # zmeta-contains: mir.closure closureModes capture=read form=block body=block return=U32 mayEscape=false
+# zmeta-contains: mir.callable-capability closureCapabilityModes capability=Fn receiver=closure mayEscape=false
+# zmeta-contains: mir.callable-capability closureCapabilityModes capability=MutFn receiver=closure mayEscape=false
+# zmeta-contains: mir.callable-capability closureCapabilityModes capability=OnceFn receiver=closure mayEscape=false
+# zmeta-contains: mir.verifier-callable-capability closureCapabilityModes result=accepted capability=Fn
+# zmeta-contains: mir.verifier-callable-capability closureCapabilityModes result=accepted capability=MutFn
+# zmeta-contains: mir.verifier-callable-capability closureCapabilityModes result=accepted capability=OnceFn
 # zmeta-contains: mir.generic-input Consumer params=<T>
 # zmeta-contains: mir.interface-slot Consumer.consume params=(mut self, value: T) return=Unit
 # zmeta-contains: mir.impl-method Consumer<U32> for Counter.consume params=(mut self, value: U32) return=Unit
 # zmeta-contains: mir.rvalue Consumer<U32> for Counter.consume expr=call:observe kind=call callee=@observe
 # zmeta-contains: mir.generic-input genericIdentity params=<T: Copy>
+# zmeta-contains: mir.monomorphization-plan genericIdentity params=<T: Copy> policy=per-concrete-args stage=before-llvm
 # zmeta-contains: mir.fn genericIdentity entry=bb0 return=T
 # zmeta-contains: mir.return genericIdentity value=name:value type=T
 # zmeta-contains: mir.generic-input staticConsumer params=<T: Consumer<U32>>
+# zmeta-contains: mir.monomorphization-plan staticConsumer params=<T: Consumer<U32>> policy=per-concrete-args stage=before-llvm
 # zmeta-contains: mir.generic-param staticConsumer.T: Consumer<U32> kind=type text=T: Consumer<U32> constraint=Consumer<U32>
+# zmeta-contains: mir.static-interface-constraint staticConsumer param=T interface=Consumer<U32> dispatch=static witness=compile-time
+# zmeta-contains: mir.dispatch-proof staticConsumer param=T interface=Consumer<U32> kind=static noVtable=true noBox=true
 # zmeta-contains: mir.type-ref staticConsumer.generic-bound role=generic-bound kind=path-generic text=Consumer<U32>
 # zmeta-contains: mir.param staticConsumer.consumer kind=value mode=mut name=consumer
+# zmeta-contains: mir.static-interface-param staticConsumer param=consumer generic=T interface=Consumer<U32> dispatch=static witness=compile-time
+# zmeta-contains: mir.dispatch-proof staticConsumer param=consumer interface=Consumer<U32> kind=static noVtable=true noBox=true
 # zmeta-contains: mir.fn staticConsumer entry=bb0 return=U32
+# zmeta-contains: mir.ctfe-evaluator staticConsumer entry=bb0 features=function-body,generic,method-call,static-interface source=hir.ctfe-body
+# zmeta-contains: mir.verifier-ctfe-body staticConsumer result=accepted features=function-body,generic,method-call,static-interface span=src/lib.zn:188:1
+# zmeta-contains: mir.static-dispatch staticConsumer receiver=consumer method=consume generic=T interface=Consumer<U32> dispatch=direct noVtable=true noBox=true
+# zmeta-contains: mir.ctfe-step staticConsumer kind=method-call subject=consume receiver=consumer mode=mut
+# zmeta-contains: mir.ctfe-step staticConsumer kind=static-interface-dispatch subject=consume receiver=consumer generic=T interface=Consumer<U32> dispatch=direct
 # zmeta-contains: mir.return staticConsumer value=name:value type=U32
+# zmeta-contains: mir.fn staticConsumerDispatch entry=bb0 return=U32
+# zmeta-contains: mir.call staticConsumerDispatch callee=@staticConsumer
+# zmeta-contains: mir.monomorph-instance staticConsumer<T=Counter> caller=staticConsumerDispatch callee=staticConsumer source=call-site span=src/lib.zn:447:1
+# zmeta-contains: mir.lowering-input staticConsumer<T=Counter> source=mir.monomorph-instance stage=before-llvm
 # zmeta-contains: mir.extern hostRead abi=C
 # zmeta-contains: mir.fn trustedHostRead entry=bb0 return=I32
 # zmeta-contains: mir.operand trustedHostRead expr=trust-block kind=trust
@@ -735,6 +1389,9 @@
 # zmeta-contains: mir.const NativeOffset value=int-literal:5 type=I32
 # zmeta-contains: mir.fn nativeConstAdd entry=bb0 return=I32
 # zmeta-contains: mir.local-const nativeConstAdd.LocalOffset value=binary:+ type=I32
+# zmeta-contains: mir.ctfe-eval nativeConstAdd.LocalOffset role=local-const subject=LocalOffset expr=binary:+ kind=binary type=I32
+# zmeta-contains: mir.verifier-ctfe nativeConstAdd.LocalOffset role=local-const subject=LocalOffset result=materialized reason=binary span=src/lib.zn:209:1
+# zmeta-contains: mir.verifier-ctfe-safety nativeConstAdd.LocalOffset role=local-const subject=LocalOffset result=accepted reason=ctfe-materialized span=src/lib.zn:209:1
 # zmeta-contains: mir.rvalue nativeConstAdd expr=binary:+ kind=binary op=+
 # zmeta-contains: mir.return nativeConstAdd value=binary:+ type=I32
 # zmeta-contains: mir.static NativeSeed init=int-literal:9 type=I32
@@ -756,14 +1413,20 @@
 # zmeta-contains: mir.range rangeExpressions op=..= left=int-literal:1 right=int-literal:10
 # zmeta-contains: mir.rvalue controlExpressions expr=if kind=if conditionKind=condition condition=compare:==
 # zmeta-contains: mir.rvalue controlExpressions expr=while kind=while conditionKind=condition condition=compare:==
-# zmeta-contains: mir.terminator controlExpressions kind=break target=loop.exit value=unit
+# zmeta-contains: mir.ctfe-evaluator controlExpressions entry=bb0 features=call,function-body,loop,match source=hir.ctfe-body
+# zmeta-contains: mir.verifier-ctfe-body controlExpressions result=accepted features=call,function-body,loop,match span=src/lib.zn:259:1
+# zmeta-contains: mir.ctfe-step controlExpressions kind=loop subject=while conditionKind=condition condition=compare:==
+# zmeta-contains: mir.terminator controlExpressions bb=bb0 kind=break target=loop.exit value=unit
 # zmeta-contains: mir.rvalue controlExpressions expr=for kind=for item=i mode=read iterable=range:half-open
+# zmeta-contains: mir.ctfe-step controlExpressions kind=loop subject=for-expr item=i mode=read iterable=range:half-open
 # zmeta-contains: mir.control-body controlExpressions control=if role=then body=int-literal:1
 # zmeta-contains: mir.control-body controlExpressions control=if role=else body=name:value
 # zmeta-contains: mir.control-body controlExpressions control=while role=body body=block
 # zmeta-contains: mir.control-body controlExpressions control=for role=body body=unit
 # zmeta-contains: mir.rvalue controlExpressions expr=match kind=match mode=read scrutinee=call:Some
+# zmeta-contains: mir.ctfe-step controlExpressions kind=match subject=match-expr mode=read scrutinee=call:Some
 # zmeta-contains: mir.match-expr-arm controlExpressions index=0 pattern=Some(found) guard=none body=name:found
+# zmeta-contains: mir.ctfe-step controlExpressions kind=match-arm subject=Some(found) index=0 guard=none body=name:found
 # zmeta-contains: mir.match-expr-arm controlExpressions index=1 pattern=None guard=none body=int-literal:0
 # zmeta-contains: mir.fn asyncSyntax entry=bb0 return=Result<U32, ParseError>
 # zmeta-contains: mir.local asyncSyntax.future init=async-block mutable=false
@@ -778,6 +1441,7 @@
 # zmeta-contains: mir.rvalue blockExpression expr=block kind=block
 # zmeta-contains: mir.local-const blockExpression.inner value=name:value type=U32
 # zmeta-contains: mir.eval blockExpression expr=name:inner
+# zmeta-contains: mir.eval blockExpression bb=bb0 operand=name:inner
 # zmeta-contains: mir.return blockExpression value=name:scoped type=U32
 # zmeta-contains: mir.fn consumeFuture entry=bb0 return=Unit
 # zmeta-contains: mir.fn futureBlockArgument entry=bb0 return=Unit
@@ -793,6 +1457,195 @@
 # zmeta-contains: mir.binary parenExpression op=+ left=name:value right=int-literal:1
 # zmeta-contains: mir.rvalue parenExpression expr=binary:+ kind=binary op=+
 # zmeta-contains: mir.return parenExpression value=name:grouped type=U32
+# zmeta-contains: mir.field MoveBox.value type=U32 visibility=package
+# zmeta-contains: mir.impl MoveBox
+# zmeta-contains: mir.impl-method MoveBox.intoValue params=(move self) return=U32
+# zmeta-contains: mir.param MoveBox.intoValue.self kind=receiver mode=move name=self
+# zmeta-contains: mir.return MoveBox.intoValue value=field:self.value type=U32
+# zmeta-contains: mir.field-access MoveBox.intoValue base=self field=value mode=read
+# zmeta-contains: mir.fn moveReceiverCall entry=bb0 return=U32
+# zmeta-contains: mir.param moveReceiverCall.holder kind=value mode=move name=holder
+# zmeta-contains: mir.return moveReceiverCall value=move:method-call:intoValue type=U32
+# zmeta-contains: mir.access moveReceiverCall mode=move operand=method-call:intoValue
+# zmeta-contains: mir.access-expr moveReceiverCall mode=move operand=method-call:intoValue
+# zmeta-contains: mir.method-call moveReceiverCall receiver=holder method=intoValue mode=move
+# zmeta-contains: mir.attribute-arg layout.0 attr=layout kind=positional name=none value=C
+# zmeta-contains: mir.type CPacket layout=C
+# zmeta-contains: mir.layout-query CPacket layout=C fields=2 key=fnv1a64:
+# zmeta-contains: mir.field CPacket.tag type=U8 visibility=pub
+# zmeta-contains: mir.layout-field-query CPacket.tag owner=CPacket index=0 type=U8 offset=field-index:0 size=1 align=1 layout=C
+# zmeta-contains: mir.field CPacket.length type=U16 visibility=pub
+# zmeta-contains: mir.attribute-arg layout.0 attr=layout kind=positional name=none value=Packed(2)
+# zmeta-contains: mir.type PackedHeader layout=Packed(2)
+# zmeta-contains: mir.layout-query PackedHeader layout=Packed(2) fields=2 key=fnv1a64:
+# zmeta-contains: mir.field PackedHeader.tag type=U8 visibility=package
+# zmeta-contains: mir.layout-field-query PackedHeader.tag owner=PackedHeader index=0 type=U8 offset=field-index:0 size=1 align=1 layout=Packed(2)
+# zmeta-contains: mir.field PackedHeader.length type=U16 visibility=package
+# zmeta-contains: mir.fn exportedMaybe entry=bb0 return=Option<I32>
+# zmeta-contains: mir.param exportedMaybe.value kind=value mode=read name=value
+# zmeta-contains: mir.type-ref exportedMaybe.return role=return kind=path-generic text=Option<I32>
+# zmeta-contains: mir.generic-arg exportedMaybe.return.0 kind=type role=return text=I32 parent=Option<I32>
+# zmeta-contains: mir.return exportedMaybe value=call:Some type=Option<I32>
+# zmeta-contains: mir.call exportedMaybe callee=@Some
+# zmeta-contains: mir.arg exportedMaybe index=0 mode=read operand=name:value
+# zmeta-contains: mir.fn integerLiteralForms entry=bb0 return=U32
+# zmeta-contains: mir.local-const integerLiteralForms.HexValue value=int-literal:0xff type=U32
+# zmeta-contains: mir.ctfe-eval integerLiteralForms.HexValue role=local-const subject=HexValue expr=int-literal:0xff kind=literal type=U32
+# zmeta-contains: mir.verifier-ctfe integerLiteralForms.HexValue role=local-const subject=HexValue result=materialized reason=literal span=src/lib.zn:335:1
+# zmeta-contains: mir.local integerLiteralForms.binary init=int-literal:0b1010 mutable=false
+# zmeta-contains: mir.local integerLiteralForms.separated init=int-literal:1_000_000 mutable=false
+# zmeta-contains: mir.literal integerLiteralForms kind=int expr=int-literal:0xff
+# zmeta-contains: mir.literal integerLiteralForms kind=int expr=int-literal:0b1010
+# zmeta-contains: mir.literal integerLiteralForms kind=int expr=int-literal:1_000_000
+# zmeta-contains: mir.binary integerLiteralForms op=+ left=name:HexValue right=name:binary
+# zmeta-contains: mir.binary integerLiteralForms op=+ left=binary:+ right=name:separated
+# zmeta-contains: mir.return integerLiteralForms value=binary:+ type=U32
+# zmeta-contains: mir.type FileSecret layout=Auto
+# zmeta-contains: mir.block FileSecret kind=struct role=struct span=src/lib.zn:341:1
+# zmeta-contains: mir.field FileSecret.value type=U32 visibility=package
+# zmeta-contains: mir.fn hiddenValue entry=bb0 return=U32
+# zmeta-contains: mir.block hiddenValue kind=body role=body span=src/lib.zn:345:1
+# zmeta-contains: mir.param hiddenValue.secret kind=value mode=read name=secret
+# zmeta-contains: mir.type-ref hiddenValue.param role=param kind=path text=FileSecret
+# zmeta-contains: mir.path-segment hiddenValue.param.FileSecret.0 role=param index=0 segment=FileSecret path=FileSecret
+# zmeta-contains: mir.return hiddenValue value=field:secret.value type=U32
+# zmeta-contains: mir.field-access hiddenValue base=secret field=value mode=read
+# zmeta-contains: mir.operand hiddenValue expr=field:secret.value kind=place place=secret.value
+# zmeta-contains: mir.type LocalLayout layout=Auto
+# zmeta-contains: mir.field LocalLayout.size type=USize visibility=package
+# zmeta-contains: mir.field LocalLayout.align type=USize visibility=package
+# zmeta-contains: mir.fn guaranteedValue entry=bb0 return=I32
+# zmeta-contains: mir.fn stackOnly entry=bb0 return=U32
+# zmeta-contains: mir.fn failFast entry=bb0 return=Never
+# zmeta-contains: mir.fn allocationTrap entry=bb0 return=Never
+# zmeta-contains: mir.call failFast callee=@panic
+# zmeta-contains: mir.call allocationTrap callee=@oom
+# zmeta-contains: mir.rvalue failFast expr=call:panic kind=call callee=@panic
+# zmeta-contains: mir.rvalue allocationTrap expr=call:oom kind=call callee=@oom
+# zmeta-contains: mir.rvalue allocationTrap expr=struct-literal:LocalLayout kind=struct-literal type=LocalLayout
+# zmeta-contains: mir.aggregate-field-init allocationTrap field=size value=int-literal:1
+# zmeta-contains: mir.aggregate-field-init allocationTrap field=align value=int-literal:1
+# zmeta-contains: mir.cfg-terminator failFast stmt=0 bb=bb0 kind=panic target=panic.trap value=call:panic return=Never
+# zmeta-contains: mir.cfg-terminator allocationTrap stmt=0 bb=bb0 kind=oom target=oom.trap value=call:oom return=Never
+# zmeta-contains: mir.eval failFast expr=call:panic
+# zmeta-contains: mir.eval failFast bb=bb0 operand=call:panic
+# zmeta-contains: mir.terminator failFast bb=bb0 kind=panic target=panic.trap value=call:panic
+# zmeta-contains: mir.verifier-terminal failFast bb=bb0 kind=panic strategy=trap operand=call:panic span=src/lib.zn:366:1
+# zmeta-contains: mir.eval allocationTrap expr=call:oom
+# zmeta-contains: mir.eval allocationTrap bb=bb0 operand=call:oom
+# zmeta-contains: mir.terminator allocationTrap bb=bb0 kind=oom target=oom.trap value=call:oom
+# zmeta-contains: mir.verifier-terminal allocationTrap bb=bb0 kind=oom strategy=trap operand=call:oom span=src/lib.zn:370:1
+# zmeta-contains: mir.fn selectOverload entry=bb0 return=I32
+# zmeta-contains: mir.fn selectOverload entry=bb0 return=U32
+# zmeta-contains: mir.fn overloadDispatch entry=bb0 return=U32
+# zmeta-contains: mir.overload-entry selectOverload key=selectOverload(I32) return=I32
+# zmeta-contains: mir.overload-entry selectOverload key=selectOverload(U32) return=U32
+# zmeta-contains: mir.overload-entry overloadDispatch key=overloadDispatch() return=U32
+# zmeta-contains: mir.local-const overloadDispatch.signed value=int-literal:1 type=I32
+# zmeta-contains: mir.local-const overloadDispatch.unsigned value=int-literal:2 type=U32
+# zmeta-contains: mir.local overloadDispatch.left init=call:selectOverload mutable=false
+# zmeta-contains: mir.local overloadDispatch.right init=call:selectOverload mutable=false
+# zmeta-contains: mir.call overloadDispatch callee=@selectOverload
+# zmeta-contains: mir.arg overloadDispatch index=0 mode=read operand=name:signed
+# zmeta-contains: mir.arg overloadDispatch index=0 mode=read operand=name:unsigned
+# zmeta-contains: mir.return overloadDispatch value=name:right type=U32
+# zmeta-contains: mir.type WriterSlot layout=Auto
+# zmeta-contains: mir.field WriterSlot.writer type=Box<Writer> visibility=package
+# zmeta-contains: mir.box-interface-type WriterSlot.writer.field interface=Writer role=field
+# zmeta-contains: mir.box-interface-object WriterSlot.writer.field interface=Writer role=field layout=data*,vtable* allocation=reused noRealloc=true
+# zmeta-contains: mir.vtable Writer for Buffer<U8, 4> interface=Writer concrete=Buffer<U8, 4> symbol=vtable.Writer.Buffer_U8_4 slots=1 destroy=present
+# zmeta-contains: mir.vtable-slot Writer for Buffer<U8, 4>.write interface=Writer slot=0 method=write target=Writer for Buffer<U8, 4>.write dispatch=dynamic implemented=true
+# zmeta-contains: mir.box-destroy-lowering Writer for Buffer<U8, 4> interface=Writer concrete=Buffer<U8, 4> drop=destroy source=vtable
+# zmeta-contains: mir.fn moveWriterSlot entry=bb0 return=Box<Writer>
+# zmeta-contains: mir.box-interface-type moveWriterSlot.return interface=Writer role=return
+# zmeta-contains: mir.box-interface-object moveWriterSlot.return interface=Writer role=return layout=data*,vtable* allocation=reused noRealloc=true
+# zmeta-contains: mir.return moveWriterSlot value=field:slot.writer type=Box<Writer>
+# zmeta-contains: mir.interface-slot Measured.measure params=(self) return=U32
+# zmeta-contains: mir.impl Measured for Counter
+# zmeta-contains: mir.impl-method Measured for Counter.measure params=(self) return=U32
+# zmeta-contains: mir.fn makeMeasured entry=bb0 return=Measured
+# zmeta-contains: mir.static-interface-return makeMeasured interface=Measured
+# zmeta-contains: mir.static-interface-return-proof makeMeasured interface=Measured representation=concrete noBox=true noAllocator=true
+# zmeta-contains: mir.return makeMeasured value=struct-literal:Counter type=Measured
+# zmeta-contains: mir.fn readMeasured entry=bb0 return=U32
+# zmeta-contains: mir.call readMeasured callee=@makeMeasured
+# zmeta-contains: mir.method-call readMeasured receiver=measured method=measure mode=read
+# zmeta-contains: mir.return readMeasured value=method-call:measure type=U32
+# zmeta-contains: mir.fn raiiScopeDrop entry=bb0 return=U32
+# zmeta-contains: mir.drop-flags raiiScopeDrop state=tracked
+# zmeta-contains: mir.drop-flag raiiScopeDrop local=%counter type=Counter state=initialized
+# zmeta-contains: mir.cleanup-drop raiiScopeDrop local=%counter type=Counter target=scope-exit
+# zmeta-contains: mir.cleanup-edge raiiScopeDrop scope-exit drop=%counter
+# zmeta-contains: mir.verifier-cleanup raiiScopeDrop target=scope-exit local=%counter type=Counter reason=scope-exit
+# zmeta-contains: mir.return raiiScopeDrop value=field:counter.current type=U32
+# zmeta-contains: mir.fn returnResource entry=bb0 return=Counter
+# zmeta-contains: mir.drop-flags returnResource state=tracked
+# zmeta-contains: mir.initialization-state returnResource place=%counter type=Counter state=initialized reason=val-binding
+# zmeta-contains: mir.ownership-state returnResource place=%counter type=Counter state=available reason=local-binding
+# zmeta-contains: mir.ownership-state returnResource place=%counter type=Counter state=moved reason=return
+# zmeta-contains: mir.verifier-initialization returnResource place=%counter state=initialized reason=val-binding span=src/lib.zn:422:1
+# zmeta-contains: mir.verifier-ownership returnResource place=%counter state=moved reason=return span=src/lib.zn:423:1
+# zmeta-contains: mir.drop-flag returnResource local=%counter type=Counter state=initialized
+# zmeta-contains: mir.drop-flag returnResource local=%counter type=Counter state=moved
+# zmeta-contains: mir.cleanup-drop returnResource local=%counter type=Counter target=scope-exit
+# zmeta-contains: mir.verifier-cleanup returnResource target=scope-exit local=%counter type=Counter reason=scope-exit
+# zmeta-contains: mir.move-clear-drop-flag returnResource local=%counter reason=return
+# zmeta-contains: mir.verifier-drop-flag returnResource local=%counter type=Counter state=moved reason=return
+# zmeta-contains: mir.return returnResource value=name:counter type=Counter
+# zmeta-contains: mir.fn tryCleanupResource entry=bb0 return=Result<U32, ParseError>
+# zmeta-contains: mir.drop-flags tryCleanupResource state=tracked
+# zmeta-contains: mir.drop-flag tryCleanupResource local=%counter type=Counter state=initialized
+# zmeta-contains: mir.local tryCleanupResource.parsed init=try:call:parseDigit mutable=false
+# zmeta-contains: mir.rvalue tryCleanupResource expr=try:call:parseDigit kind=try
+# zmeta-contains: mir.try-expr tryCleanupResource expr=call:parseDigit
+# zmeta-contains: mir.cleanup-drop tryCleanupResource local=%counter type=Counter target=scope-exit
+# zmeta-contains: mir.cleanup-drop tryCleanupResource local=%counter type=Counter target=try-error
+# zmeta-contains: mir.cleanup-edge tryCleanupResource try-error drop=%counter
+# zmeta-contains: mir.verifier-cleanup tryCleanupResource target=scope-exit local=%counter type=Counter reason=scope-exit
+# zmeta-contains: mir.fn callBoxWriter entry=bb0 return=Result<USize, ParseError>
+# zmeta-contains: mir.box-interface-object callBoxWriter.param interface=Writer role=param layout=data*,vtable* allocation=reused noRealloc=true
+# zmeta-contains: mir.dynamic-dispatch callBoxWriter receiver=%writer interface=Writer method=write slot=0 dispatch=vtable source=hir.dynamic-dispatch
+# zmeta-contains: mir.vtable-load callBoxWriter receiver=%writer interface=Writer slot=0
+# zmeta-contains: mir.verifier-cleanup tryCleanupResource target=try-error local=%counter type=Counter reason=try-error
+# zmeta-contains: mir.verifier-try tryCleanupResource expr=try:call:parseDigit ok=continue err=try-error cleanup=tracked
+# zmeta-contains: mir.return tryCleanupResource value=call:Ok type=Result<U32, ParseError>
+# zmeta-contains: mir.fn enumPayloadModes entry=bb0 return=U32
+# zmeta-contains: mir.param enumPayloadModes.readMaybe kind=value mode=read name=readMaybe
+# zmeta-contains: mir.param enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe
+# zmeta-contains: mir.param enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe
+# zmeta-contains: mir.param enumPayloadModes.readMaybe kind=value mode=read name=readMaybe index=0 type=Option<U32>
+# zmeta-contains: mir.param enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe index=1 type=Option<U32>
+# zmeta-contains: mir.param enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe index=2 type=Option<U32>
+# zmeta-contains: mir.enum-payload-access enumPayloadModes role=if-condition binding=%readValue mode=read access=borrow-read source=name:readMaybe
+# zmeta-contains: mir.enum-payload-access enumPayloadModes role=if-condition binding=%writeValue mode=mut access=borrow-mut source=name:writeMaybe
+# zmeta-contains: mir.enum-payload-access enumPayloadModes role=if-condition binding=%movedValue mode=move access=move source=name:ownedMaybe
+# zmeta-contains: mir.verifier-access enumPayloadModes role=enum-payload:if-condition mode=read operand=%readValue proof=shared-read span=src/lib.zn:433:1
+# zmeta-contains: mir.verifier-access enumPayloadModes role=enum-payload:if-condition mode=mut operand=%writeValue proof=unique-mut span=src/lib.zn:436:1
+# zmeta-contains: mir.verifier-access enumPayloadModes role=enum-payload:if-condition mode=move operand=%movedValue proof=owned-move span=src/lib.zn:439:1
+# zmeta-contains: mir.alias-proof enumPayloadModes role=enum-payload:if-condition mode=mut operand=%writeValue attrs=noalias,nocapture source=mir.verifier-access
+# zmeta-contains: mir.enum-payload-move enumPayloadModes binding=%movedValue source=name:ownedMaybe clearsPayloadDropFlag=true
+# zmeta-contains: mir.enum-payload-access classify role=match-arm binding=%value mode=read access=borrow-read source=name:maybe
+# zmeta-contains: mir.enum-payload-access patternModes role=match-arm binding=%value mode=move access=move source=name:maybe
+# zmeta-contains: mir.enum-payload-move patternModes binding=%value source=name:maybe clearsPayloadDropFlag=true
+# zmeta-contains: mir.enum-payload-access controlExpressions role=match-expr-arm binding=%found mode=read access=borrow-read source=call:Some
+# zmeta-contains: mir.stmt-order enumPayloadModes index=0 kind=if-pattern subject=Some(readValue) expr=name:readMaybe
+# zmeta-contains: mir.stmt-order enumPayloadModes index=4 kind=if-pattern subject=Some(movedValue) expr=name:ownedMaybe
+# zmeta-contains: mir.stmt-order enumPayloadModes index=5 kind=return expr=name:movedValue
+# zmeta-contains: mir.block-order enumPayloadModes index=1 kind=body role=if-then endLine=435
+# zmeta-contains: mir.block-order enumPayloadModes index=2 kind=body role=if-then endLine=438
+# zmeta-contains: mir.block-order enumPayloadModes index=3 kind=body role=if-then endLine=441
+# zmeta-contains: mir.cfg enumPayloadModes entry=bb0 blocks=bb0,bb1,bb2,bb3 cleanup=none
+# zmeta-contains: mir.cfg-block enumPayloadModes bb1 index=1 kind=body role=if-then span=src/lib.zn:433:1 endLine=435
+# zmeta-contains: mir.cfg-block enumPayloadModes bb2 index=2 kind=body role=if-then span=src/lib.zn:436:1 endLine=438
+# zmeta-contains: mir.cfg-block enumPayloadModes bb3 index=3 kind=body role=if-then span=src/lib.zn:439:1 endLine=441
+# zmeta-contains: mir.cfg-edge enumPayloadModes stmt=0 kind=if-pattern from=bb0 then=bb1 else=fallthrough condition=name:readMaybe
+# zmeta-contains: mir.cfg-edge enumPayloadModes stmt=2 kind=if-pattern from=bb0 then=bb2 else=fallthrough condition=name:writeMaybe
+# zmeta-contains: mir.cfg-edge enumPayloadModes stmt=4 kind=if-pattern from=bb0 then=bb3 else=fallthrough condition=name:ownedMaybe
+# zmeta-contains: mir.cfg-terminator enumPayloadModes stmt=5 bb=bb3 kind=return target=return value=name:movedValue return=U32
+# zmeta-contains: mir.eval enumPayloadModes bb=bb1 operand=call:observe
+# zmeta-contains: mir.eval enumPayloadModes bb=bb2 operand=call:observe
+# zmeta-contains: mir.terminator enumPayloadModes bb=bb3 kind=return value=name:movedValue
+# zmeta-contains: mir.return enumPayloadModes value=name:movedValue type=U32
 # zmeta-contains: mir.store-preview operatorExpressions place=%total value=name:shiftedRight
 # zmeta-contains: mir.assign operatorExpressions bb=bb0 place=%total rvalue=name:shiftedRight op=+=
 # zmeta-contains: mir.store-preview operatorExpressions place=%total value=name:shiftedRight op=+=
@@ -803,20 +1656,33 @@
 # zmeta-contains: mir.return mutateValue value=name:value type=U32
 # zmeta-contains: mir.fn accessModes entry=bb0 return=U32
 # zmeta-contains: mir.param accessModes.counter kind=value mode=move name=counter
+# zmeta-contains: mir.param accessModes.counter kind=value mode=move name=counter index=0 type=Counter
+# zmeta-contains: mir.param accessModes.value kind=value mode=read name=value index=1 type=U32
+# zmeta-contains: mir.verifier-access accessModes role=param:0 mode=move operand=%counter proof=owned-move span=src/lib.zn:242:1
+# zmeta-contains: mir.alias-proof accessModes role=param:0 mode=move operand=%counter attrs=noalias,nocapture source=mir.verifier-access
 # zmeta-contains: mir.local accessModes.total init=name:value mutable=true
 # zmeta-contains: mir.rvalue accessModes expr=call:mutateValue kind=call callee=@mutateValue
 # zmeta-contains: mir.call accessModes callee=@mutateValue
 # zmeta-contains: mir.arg accessModes index=0 mode=mut operand=name:total
+# zmeta-contains: mir.verifier-access accessModes role=arg:0 mode=mut operand=name:total proof=unique-mut span=src/lib.zn:244:1
+# zmeta-contains: mir.alias-proof accessModes role=arg:0 mode=mut operand=name:total attrs=noalias,nocapture source=mir.verifier-access
 # zmeta-contains: mir.access accessModes mode=mut operand=method-call:consume
 # zmeta-contains: mir.access-expr accessModes mode=mut operand=method-call:consume
+# zmeta-contains: mir.verifier-access accessModes role=access-expr mode=mut operand=method-call:consume proof=unique-mut span=src/lib.zn:245:1
 # zmeta-contains: mir.method-call accessModes receiver=counter method=consume mode=mut
 # zmeta-contains: mir.arg accessModes index=0 mode=move operand=name:total
+# zmeta-contains: mir.verifier-access accessModes role=arg:0 mode=move operand=name:total proof=owned-move span=src/lib.zn:245:1
+# zmeta-contains: mir.alias-proof accessModes role=arg:0 mode=move operand=name:total attrs=noalias,nocapture source=mir.verifier-access
 # zmeta-contains: mir.store-preview accessModes place=%counter.current value=name:value
 # zmeta-contains: mir.field-access accessModes base=counter field=current mode=write
 # zmeta-contains: mir.return accessModes value=field:counter.current type=U32
 # zmeta-contains: mir.field-access accessModes base=counter field=current mode=read
 # zmeta-contains: llvm.const-preview @LIMIT value=int-literal:4 type=U32
+# zmeta-contains: llvm.ctfe-materialized-preview @LIMIT role=const subject=LIMIT type=U32 materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.ctfe-safety-preview @LIMIT role=const subject=LIMIT result=accepted source=mir.verifier-ctfe-safety
 # zmeta-contains: llvm.global-preview @Seed init=int-literal:1 type=U32
+# zmeta-contains: llvm.ctfe-materialized-preview @Seed role=static subject=Seed type=U32 materialization=global-init source=mir.verifier-ctfe
+# zmeta-contains: llvm.ctfe-safety-preview @Seed role=static subject=Seed result=accepted source=mir.verifier-ctfe-safety
 # zmeta-contains: llvm.field-preview Buffer.data type=USize
 # zmeta-contains: llvm.field-preview Buffer.data type=USize visibility=pub
 # zmeta-contains: llvm.variant-payload-preview ParseError.Code.0 variant=Code index=0 type=U32
@@ -832,11 +1698,16 @@
 # zmeta-contains: llvm.generic-param-preview staticConsumer.T: Consumer<U32> kind=type text=T: Consumer<U32> constraint=Consumer<U32> name=T type=none
 # zmeta-contains: llvm.interface-method-preview Writer.write return=Result<USize, ParseError>
 # zmeta-contains: llvm.param-preview Writer.write.self kind=receiver mode=mut name=self
+# zmeta-contains: llvm.param-preview Writer.write.self kind=receiver mode=mut name=self index=0 type=Self
+# zmeta-contains: llvm.param-preview Writer.write.bytes kind=value mode=read name=bytes index=1 type=ArraySlice<U8>
 # zmeta-contains: llvm.type-ref-preview Writer.write.param role=param kind=path-generic text=ArraySlice<U8>
+# zmeta-contains: llvm.type-binding-preview Writer.write.param owner=Writer.write role=param target=ArraySlice kind=builtin-type scope=builtin
 # zmeta-contains: llvm.interface-parent-preview Writer.Send index=0 parent=Send
 # zmeta-contains: llvm.interface-parent-preview Writer.Sync index=1 parent=Sync
 # zmeta-contains: llvm.path-segment-preview Writer.interface-parent.Send.0 role=interface-parent index=0 segment=Send path=Send
 # zmeta-contains: llvm.path-segment-preview ByteBuffer.alias-target.Buffer_U8_4.0 role=alias-target index=0 segment=Buffer path=Buffer<U8, 4>
+# zmeta-contains: llvm.ctfe-materialized-preview @Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk type=USize materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.ctfe-safety-preview @Writer for Buffer<U8, 4>.Chunk role=impl-const subject=Chunk result=accepted source=mir.verifier-ctfe-safety
 # zmeta-contains: llvm.impl-method-preview Writer for Buffer<U8, 4>.write return=Result<USize, ParseError>
 # zmeta-contains: llvm.type-ref-preview Writer for Buffer<U8, 4>.impl-for role=impl-for kind=path-generic text=Buffer<U8, 4>
 # zmeta-contains: llvm.impl-preview Send for Counter trusted=true
@@ -844,17 +1715,29 @@
 # zmeta-contains: llvm.type-ref-preview Send for Counter.impl-for role=impl-for kind=path text=Counter
 # zmeta-contains: llvm.path-segment-preview Send for Counter.impl-interface.Send.0 role=impl-interface index=0 segment=Send path=Send
 # zmeta-contains: llvm.path-segment-preview Send for Counter.impl-for.Counter.0 role=impl-for index=0 segment=Counter path=Counter
+# zmeta-contains: llvm.send-sync-preview Counter capability=auto source=rejected reason=destroy
+# zmeta-contains: llvm.send-sync-preview Counter capability=Send source=trusted
 # zmeta-contains: llvm.destroy-preview Writer for Buffer<U8, 4> cleanup=body-then-fields
 # zmeta-contains: llvm.impl-method-preview Iterator<U32> for Counter.next return=Option<U32>
 # zmeta-contains: llvm.destroy-preview Counter cleanup=body-then-fields
 # zmeta-contains: llvm.variant-preview Code payload=(U32)
 # zmeta-contains: llvm.generic-arg-preview ByteBuffer.alias-target.0 kind=type role=alias-target text=U8 parent=Buffer<U8, 4>
 # zmeta-contains: llvm.generic-arg-preview ByteBuffer.alias-target.1 kind=expr role=alias-target text=4 parent=Buffer<U8, 4>
+# zmeta-contains: llvm.type-binding-preview ByteBuffer.alias-target owner=ByteBuffer role=alias-target target=Buffer kind=struct scope=package
+# zmeta-contains: llvm.const-generic-arg-preview ByteBuffer.alias-target.1 role=alias-target value=4 parent=Buffer<U8, 4>
+# zmeta-contains: llvm.ctfe-materialized-preview @ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 type=const materialization=generic-argument source=mir.verifier-ctfe
+# zmeta-contains: llvm.ctfe-safety-preview @ByteBuffer.alias-target.1 role=const-generic subject=ByteBuffer.alias-target.1 result=accepted source=mir.verifier-ctfe-safety
+# zmeta-contains: llvm.layout-constant-preview %Buffer layout=Source fields=2 key=fnv1a64:
+# zmeta-contains: llvm.layout-field-preview %Buffer.data index=0 offset=field-index:0 size=8 align=8 layout=Source
 # zmeta-contains: llvm.generic-arg-preview sumValues.return.1 kind=type role=return text=ParseError parent=Result<U32, ParseError>
 # zmeta-contains: llvm.generic-arg-preview staticConsumer.generic-bound.0 kind=type role=generic-bound text=U32 parent=Consumer<U32>
+# zmeta-contains: llvm.type-binding-preview staticConsumer.param owner=staticConsumer role=param target=%T kind=generic-param scope=generic
 # zmeta-contains: llvm.type-ref-preview PairTuple.alias-target role=alias-target kind=tuple text=(U32, U32)
 # zmeta-contains: llvm.type-ref-preview Transform.alias-target role=alias-target kind=fn text=Fn<U32, U32>
 # zmeta-contains: llvm.type-ref-preview MutableU32.alias-target role=alias-target kind=access:mut text=mut U32
+# zmeta-contains: llvm.type-binding-preview Transform.alias-target owner=Transform role=alias-target target=Fn kind=fn-type scope=builtin
+# zmeta-contains: llvm.type-binding-preview MutableTransform.alias-target owner=MutableTransform role=alias-target target=MutFn kind=fn-type scope=builtin
+# zmeta-contains: llvm.type-binding-preview OwningTransform.alias-target owner=OwningTransform role=alias-target target=OnceFn kind=fn-type scope=builtin
 # zmeta-contains: llvm.generic-arg-preview Transform.alias-target.0 kind=type role=alias-target text=U32 parent=Fn<U32, U32>
 # zmeta-contains: llvm.type-component-preview PairTuple.alias-target.tuple-element.0 component=tuple-element role=alias-target kind=primitive text=U32 parent=(U32, U32)
 # zmeta-contains: llvm.type-component-preview Transform.alias-target.fn-return.1 component=fn-return role=alias-target kind=primitive text=U32 parent=Fn<U32, U32>
@@ -866,6 +1749,7 @@
 # zmeta-contains: llvm.aggregate-field-preview @sumValues field=x value=int-literal:1
 # zmeta-contains: llvm.aggregate-field-preview @sumValues field=y value=int-literal:2
 # zmeta-contains: llvm.name-detail-preview @sumValues name=LIMIT
+# zmeta-contains: llvm.ctfe-materialized-preview @sumValues.LocalLimit role=local-const subject=LocalLimit type=U32 materialization=constant-value source=mir.verifier-ctfe
 # zmeta-contains: llvm.try-detail-preview @sumValues expr=call:parseDigit
 # zmeta-contains: llvm.unit-detail-preview @expressions
 # zmeta-contains: llvm.literal-detail-preview @expressions kind=char expr=char-literal
@@ -887,6 +1771,9 @@
 # zmeta-contains: llvm.closure-preview @sumValues mayEscape=false
 # zmeta-contains: llvm.closure-detail-preview @sumValues capture=read form=expr body=binary:+ return=inferred
 # zmeta-contains: llvm.switch-preview @classify expr=match
+# zmeta-contains: llvm.ctfe-body-preview @classify features=function-body,match source=mir.verifier-ctfe-body
+# zmeta-contains: llvm.ctfe-step-preview @classify kind=match subject=match source=mir.ctfe-step
+# zmeta-contains: llvm.ctfe-step-preview @classify kind=match-arm subject=Some(value) source=mir.ctfe-step
 # zmeta-contains: llvm.block-preview @classify kind=match role=match
 # zmeta-contains: llvm.block-preview @optional kind=body role=if-then
 # zmeta-contains: llvm.block-preview @optional kind=body role=if-else
@@ -897,6 +1784,8 @@
 # zmeta-contains: llvm.call-preview @optional method=unwrapOr
 # zmeta-contains: llvm.method-call-preview @optional receiver=maybe method=unwrapOr mode=read
 # zmeta-contains: llvm.loop-preview @drain kind=while-pattern pattern=Some(value) mode=read scrutinee=call:nextMaybe
+# zmeta-contains: llvm.ctfe-body-preview @drain features=call,function-body,loop source=mir.verifier-ctfe-body
+# zmeta-contains: llvm.ctfe-step-preview @drain kind=loop subject=while-pattern source=mir.ctfe-step
 # zmeta-contains: llvm.branch-preview @drain kind=break target=loop.exit
 # zmeta-contains: llvm.branch-preview @patternModes kind=if-pattern pattern=Some(value) mode=move scrutinee=name:maybe
 # zmeta-contains: llvm.ret-preview @patternModes type=U32 value=match:move
@@ -907,23 +1796,63 @@
 # zmeta-contains: llvm.pattern-component-preview @patternModes.match-arm.bound.upper role=match-arm component=bound kind=upper text=10 op=..= parent=1..=10
 # zmeta-contains: llvm.pattern-detail-preview @controlExpressions role=match-expr-arm kind=enum text=Some(found)
 # zmeta-contains: llvm.pattern-component-preview @controlExpressions.match-expr-arm.element.0 role=match-expr-arm component=element kind=binding text=found parent=Some(found)
+# zmeta-contains: llvm.ctfe-body-preview @controlExpressions features=call,function-body,loop,match source=mir.verifier-ctfe-body
+# zmeta-contains: llvm.ctfe-step-preview @controlExpressions kind=loop subject=while source=mir.ctfe-step
+# zmeta-contains: llvm.ctfe-step-preview @controlExpressions kind=match subject=match-expr source=mir.ctfe-step
 # zmeta-contains: llvm.switch-preview @inspectMove mode=move scrutinee=name:maybe
 # zmeta-contains: llvm.switch-preview @touch mode=read scrutinee=name:maybe
 # zmeta-contains: llvm.loop-preview @moveIteration kind=for mode=move iterable=name:counter
 # zmeta-contains: llvm.closure-preview @closureModes mayEscape=false mode=move
 # zmeta-contains: llvm.closure-preview @closureModes mayEscape=false form=block
+# zmeta-contains: llvm.expr-surface-preview @sumValues expr=try:call:parseDigit
+# zmeta-contains: llvm.expr-surface-preview @sumValues expr=closure
+# zmeta-contains: llvm.expr-surface-preview @controlExpressions expr=if-expr
+# zmeta-contains: llvm.expr-surface-preview @controlExpressions expr=match
+# zmeta-contains: llvm.closure-param-preview @sumValues pattern=x type=U32
+# zmeta-contains: llvm.closure-param-preview @closureModes pattern=x type=U32
+# zmeta-contains: llvm.stmt-order-preview @sumValues index=0 kind=const subject=LocalLimit expr=name:LIMIT
+# zmeta-contains: llvm.stmt-order-preview @sumValues index=4 kind=for subject=value expr=name:values
+# zmeta-contains: llvm.stmt-order-preview @sumValues index=7 kind=assign subject=total expr=binary:+
+# zmeta-contains: llvm.stmt-order-preview @sumValues index=11 kind=return expr=call:Ok
+# zmeta-contains: llvm.block-order-preview @sumValues index=0 kind=body role=body endLine=72
+# zmeta-contains: llvm.block-order-preview @sumValues index=1 kind=body role=for-body endLine=67
+# zmeta-contains: llvm.block-order-preview @sumValues index=2 kind=body role=if-then endLine=65
+# zmeta-contains: llvm.lowering-input @sumValues from=mir.cfg entry=bb0 blocks=bb0,bb1,bb2
+# zmeta-contains: llvm.ctfe-body-preview @sumValues features=call,function-body,loop source=mir.verifier-ctfe-body
+# zmeta-contains: llvm.ctfe-step-preview @sumValues kind=loop subject=for source=mir.ctfe-step
+# zmeta-contains: llvm.ctfe-step-preview @sumValues kind=call subject=parseDigit source=mir.ctfe-step
+# zmeta-contains: llvm.cfg-block-preview @sumValues bb0 kind=body role=body endLine=72
+# zmeta-contains: llvm.cfg-block-preview @sumValues bb1 kind=body role=for-body endLine=67
+# zmeta-contains: llvm.cfg-block-preview @sumValues bb2 kind=body role=if-then endLine=65
+# zmeta-contains: llvm.cfg-edge-preview @sumValues stmt=4 kind=for from=bb0 body=bb1 exit=for.exit iterable=name:values
+# zmeta-contains: llvm.cfg-edge-preview @sumValues stmt=5 kind=if from=bb1 then=bb2 else=fallthrough condition=compare:==
+# zmeta-contains: llvm.cfg-edge-preview @sumValues stmt=9 kind=try from=bb0 ok=fallthrough err=try-error expr=call:parseDigit
+# zmeta-contains: llvm.cfg-terminator-preview @sumValues stmt=11 kind=return target=return
 # zmeta-contains: llvm.closure-detail-preview @closureModes capture=move form=expr body=binary:+ return=inferred
 # zmeta-contains: llvm.closure-detail-preview @closureModes capture=read form=block body=block return=U32
+# zmeta-contains: llvm.callable-capability-preview @closureCapabilityModes capability=Fn mayEscape=false
+# zmeta-contains: llvm.callable-capability-preview @closureCapabilityModes capability=MutFn mayEscape=false
+# zmeta-contains: llvm.callable-capability-preview @closureCapabilityModes capability=OnceFn mayEscape=false
 # zmeta-contains: llvm.interface-method-preview Consumer.consume return=Unit
 # zmeta-contains: llvm.impl-method-preview Consumer<U32> for Counter.consume return=Unit
 # zmeta-contains: llvm.call-preview @observe in @Consumer<U32> for Counter.consume
 # zmeta-contains: llvm.define-preview @genericIdentity return=T
+# zmeta-contains: llvm.lowering-gate @genericIdentity requires=monomorphized-input source=mir.monomorphization-plan
 # zmeta-contains: llvm.ret-preview @genericIdentity type=T value=name:value
 # zmeta-contains: llvm.define-preview @staticConsumer return=U32
+# zmeta-contains: llvm.lowering-gate @staticConsumer requires=monomorphized-input source=mir.monomorphization-plan
 # zmeta-contains: llvm.generic-param-preview staticConsumer.T: Consumer<U32> kind=type text=T: Consumer<U32> constraint=Consumer<U32>
+# zmeta-contains: llvm.static-dispatch-preview @staticConsumer interface=Consumer<U32> dispatch=direct noVtable=true noAlloc=true
+# zmeta-contains: llvm.static-interface-param-preview @staticConsumer param=consumer generic=T interface=Consumer<U32> dispatch=direct noVtable=true noAlloc=true
+# zmeta-contains: llvm.direct-call-preview @staticConsumer receiver=consumer method=consume interface=Consumer<U32> noVtable=true noAlloc=true
+# zmeta-contains: llvm.ctfe-body-preview @staticConsumer features=function-body,generic,method-call,static-interface source=mir.verifier-ctfe-body
+# zmeta-contains: llvm.ctfe-step-preview @staticConsumer kind=method-call subject=consume source=mir.ctfe-step
+# zmeta-contains: llvm.ctfe-step-preview @staticConsumer kind=static-interface-dispatch subject=consume source=mir.ctfe-step
 # zmeta-contains: llvm.type-ref-preview staticConsumer.generic-bound role=generic-bound kind=path-generic text=Consumer<U32>
 # zmeta-contains: llvm.param-preview staticConsumer.consumer kind=value mode=mut name=consumer
 # zmeta-contains: llvm.lowering-input @staticConsumer from=mir.cfg entry=bb0
+# zmeta-contains: llvm.define-preview @staticConsumerDispatch return=U32
+# zmeta-contains: llvm.monomorphized-call-preview @staticConsumerDispatch callee=@staticConsumer instance=<T=Counter> source=mir.lowering-input
 # zmeta-contains: llvm.ret-preview @staticConsumer type=U32 value=name:value
 # zmeta-contains: llvm.declare @hostRead abi=C
 # zmeta-contains: llvm.call-preview @hostRead in @trustedHostRead
@@ -936,6 +1865,8 @@
 # zmeta-contains: llvm.const-preview @NativeOffset value=int-literal:5 type=I32
 # zmeta-contains: llvm.define-preview @nativeConstAdd return=I32
 # zmeta-contains: llvm.binary-preview @nativeConstAdd op=+
+# zmeta-contains: llvm.ctfe-materialized-preview @nativeConstAdd.LocalOffset role=local-const subject=LocalOffset type=I32 materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.ctfe-safety-preview @nativeConstAdd.LocalOffset role=local-const subject=LocalOffset result=accepted source=mir.verifier-ctfe-safety
 # zmeta-contains: llvm.ret-preview @nativeConstAdd type=I32 value=binary:+
 # zmeta-contains: llvm.global-preview @NativeSeed init=int-literal:9 type=I32
 # zmeta-contains: llvm.define-preview @nativeStaticAdd return=I32
@@ -987,19 +1918,174 @@
 # zmeta-contains: llvm.paren-expr-preview @parenExpression expr=binary:+
 # zmeta-contains: llvm.binary-detail-preview @parenExpression op=+ left=name:value right=int-literal:1
 # zmeta-contains: llvm.ret-preview @parenExpression type=U32 value=name:grouped
+# zmeta-contains: llvm.field-preview MoveBox.value type=U32 visibility=package
+# zmeta-contains: llvm.impl-preview MoveBox
+# zmeta-contains: llvm.impl-method-preview MoveBox.intoValue return=U32
+# zmeta-contains: llvm.param-preview MoveBox.intoValue.self kind=receiver mode=move name=self
+# zmeta-contains: llvm.ret-preview @MoveBox.intoValue type=U32 value=field:self.value
+# zmeta-contains: llvm.field-access-preview @MoveBox.intoValue base=self field=value mode=read
+# zmeta-contains: llvm.define-preview @moveReceiverCall return=U32
+# zmeta-contains: llvm.param-preview moveReceiverCall.holder kind=value mode=move name=holder
+# zmeta-contains: llvm.ret-preview @moveReceiverCall type=U32 value=move:method-call:intoValue
+# zmeta-contains: llvm.access-preview @moveReceiverCall mode=move operand=method-call:intoValue
+# zmeta-contains: llvm.access-detail-preview @moveReceiverCall mode=move operand=method-call:intoValue
+# zmeta-contains: llvm.method-call-preview @moveReceiverCall receiver=holder method=intoValue mode=move
+# zmeta-contains: llvm.attribute-preview layout.0 attr=layout kind=positional name=none value=C
+# zmeta-contains: llvm.type %CPacket layout=C
+# zmeta-contains: llvm.layout-constant-preview %CPacket layout=C fields=2 key=fnv1a64:
+# zmeta-contains: llvm.field-preview CPacket.tag type=U8 visibility=pub
+# zmeta-contains: llvm.layout-field-preview %CPacket.tag index=0 offset=field-index:0 size=1 align=1 layout=C
+# zmeta-contains: llvm.field-preview CPacket.length type=U16 visibility=pub
+# zmeta-contains: llvm.attribute-preview layout.0 attr=layout kind=positional name=none value=Packed(2)
+# zmeta-contains: llvm.type %PackedHeader layout=Packed(2)
+# zmeta-contains: llvm.layout-constant-preview %PackedHeader layout=Packed(2) fields=2 key=fnv1a64:
+# zmeta-contains: llvm.field-preview PackedHeader.tag type=U8 visibility=package
+# zmeta-contains: llvm.layout-field-preview %PackedHeader.tag index=0 offset=field-index:0 size=1 align=1 layout=Packed(2)
+# zmeta-contains: llvm.field-preview PackedHeader.length type=U16 visibility=package
+# zmeta-contains: llvm.define-preview @exportedMaybe return=Option<I32>
+# zmeta-contains: llvm.param-preview exportedMaybe.value kind=value mode=read name=value
+# zmeta-contains: llvm.type-ref-preview exportedMaybe.return role=return kind=path-generic text=Option<I32>
+# zmeta-contains: llvm.generic-arg-preview exportedMaybe.return.0 kind=type role=return text=I32 parent=Option<I32>
+# zmeta-contains: llvm.ret-preview @exportedMaybe type=Option<I32> value=call:Some
+# zmeta-contains: llvm.call-detail-preview @exportedMaybe callee=@Some
+# zmeta-contains: llvm.arg-preview @exportedMaybe index=0 mode=read operand=name:value
+# zmeta-contains: llvm.define-preview @integerLiteralForms return=U32
+# zmeta-contains: llvm.literal-detail-preview @integerLiteralForms kind=int expr=int-literal:0xff
+# zmeta-contains: llvm.ctfe-materialized-preview @integerLiteralForms.HexValue role=local-const subject=HexValue type=U32 materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.literal-detail-preview @integerLiteralForms kind=int expr=int-literal:0b1010
+# zmeta-contains: llvm.literal-detail-preview @integerLiteralForms kind=int expr=int-literal:1_000_000
+# zmeta-contains: llvm.binary-detail-preview @integerLiteralForms op=+ left=name:HexValue right=name:binary
+# zmeta-contains: llvm.binary-detail-preview @integerLiteralForms op=+ left=binary:+ right=name:separated
+# zmeta-contains: llvm.ret-preview @integerLiteralForms type=U32 value=binary:+
+# zmeta-contains: llvm.type %FileSecret layout=Auto
+# zmeta-contains: llvm.block-preview @FileSecret kind=struct role=struct
+# zmeta-contains: llvm.field-preview FileSecret.value type=U32 visibility=package
+# zmeta-contains: llvm.define-preview @hiddenValue return=U32
+# zmeta-contains: llvm.block-preview @hiddenValue kind=body role=body
+# zmeta-contains: llvm.param-preview hiddenValue.secret kind=value mode=read name=secret
+# zmeta-contains: llvm.type-ref-preview hiddenValue.param role=param kind=path text=FileSecret
+# zmeta-contains: llvm.path-segment-preview hiddenValue.param.FileSecret.0 role=param index=0 segment=FileSecret path=FileSecret
+# zmeta-contains: llvm.ret-preview @hiddenValue type=U32 value=field:secret.value
+# zmeta-contains: llvm.field-access-preview @hiddenValue base=secret field=value mode=read
+# zmeta-contains: llvm.type %LocalLayout layout=Auto
+# zmeta-contains: llvm.field-preview LocalLayout.size type=USize visibility=package
+# zmeta-contains: llvm.field-preview LocalLayout.align type=USize visibility=package
+# zmeta-contains: llvm.define-preview @guaranteedValue return=I32
+# zmeta-contains: llvm.define-preview @stackOnly return=U32
+# zmeta-contains: llvm.define-preview @failFast return=Never
+# zmeta-contains: llvm.define-preview @allocationTrap return=Never
+# zmeta-contains: llvm.call-preview @panic in @failFast
+# zmeta-contains: llvm.call-preview @oom in @allocationTrap
+# zmeta-contains: llvm.call-detail-preview @failFast callee=@panic
+# zmeta-contains: llvm.call-detail-preview @allocationTrap callee=@oom
+# zmeta-contains: llvm.aggregate-preview @allocationTrap type=LocalLayout
+# zmeta-contains: llvm.aggregate-field-preview @allocationTrap field=size value=int-literal:1
+# zmeta-contains: llvm.aggregate-field-preview @allocationTrap field=align value=int-literal:1
+# zmeta-contains: llvm.terminal-preview @failFast bb=bb0 kind=panic target=panic.trap
+# zmeta-contains: llvm.terminal-preview @allocationTrap bb=bb0 kind=oom target=oom.trap
+# zmeta-contains: llvm.type-ref-preview failFast.return role=return kind=primitive text=Never
+# zmeta-contains: llvm.type-ref-preview allocationTrap.return role=return kind=primitive text=Never
+# zmeta-contains: llvm.define-preview @selectOverload return=I32
+# zmeta-contains: llvm.define-preview @selectOverload return=U32
+# zmeta-contains: llvm.define-preview @overloadDispatch return=U32
+# zmeta-contains: llvm.overload-entry-preview @selectOverload key=selectOverload(I32) return=I32
+# zmeta-contains: llvm.overload-entry-preview @selectOverload key=selectOverload(U32) return=U32
+# zmeta-contains: llvm.overload-entry-preview @overloadDispatch key=overloadDispatch() return=U32
+# zmeta-contains: llvm.call-preview @selectOverload in @overloadDispatch
+# zmeta-contains: llvm.call-detail-preview @overloadDispatch callee=@selectOverload
+# zmeta-contains: llvm.arg-preview @overloadDispatch index=0 mode=read operand=name:signed
+# zmeta-contains: llvm.arg-preview @overloadDispatch index=0 mode=read operand=name:unsigned
+# zmeta-contains: llvm.ret-preview @overloadDispatch type=U32 value=name:right
+# zmeta-contains: llvm.type %WriterSlot layout=Auto
+# zmeta-contains: llvm.field-preview WriterSlot.writer type=Box<Writer> visibility=package
+# zmeta-contains: llvm.box-interface-type-preview WriterSlot.writer.field interface=Writer role=field
+# zmeta-contains: llvm.box-interface-lowering-preview WriterSlot.writer.field interface=Writer layout=data*,vtable* noRealloc=true
+# zmeta-contains: llvm.vtable-preview @vtable.Writer.Buffer_U8_4 interface=Writer concrete=Buffer<U8, 4> slots=1
+# zmeta-contains: llvm.vtable-slot-preview @vtable.Writer.Buffer_U8_4 slot=0 method=write target=@Writer_for_Buffer_U8_4_write
+# zmeta-contains: llvm.box-destroy-preview @vtable.Writer.Buffer_U8_4 concrete=Buffer<U8, 4> drop=destroy
+# zmeta-contains: llvm.define-preview @moveWriterSlot return=Box<Writer>
+# zmeta-contains: llvm.box-interface-type-preview moveWriterSlot.return interface=Writer role=return
+# zmeta-contains: llvm.box-interface-lowering-preview moveWriterSlot.return interface=Writer layout=data*,vtable* noRealloc=true
+# zmeta-contains: llvm.ret-preview @moveWriterSlot type=Box<Writer> value=field:slot.writer
+# zmeta-contains: llvm.interface-method-preview Measured.measure return=U32
+# zmeta-contains: llvm.impl-preview Measured for Counter
+# zmeta-contains: llvm.impl-method-preview Measured for Counter.measure return=U32
+# zmeta-contains: llvm.define-preview @makeMeasured return=Measured
+# zmeta-contains: llvm.static-interface-return-preview @makeMeasured interface=Measured
+# zmeta-contains: llvm.static-interface-return-lowering @makeMeasured interface=Measured dispatch=direct noBox=true noAllocator=true
+# zmeta-contains: llvm.ret-preview @makeMeasured type=Measured value=struct-literal:Counter
+# zmeta-contains: llvm.define-preview @readMeasured return=U32
+# zmeta-contains: llvm.call-preview @makeMeasured in @readMeasured
+# zmeta-contains: llvm.method-call-preview @readMeasured receiver=measured method=measure mode=read
+# zmeta-contains: llvm.ret-preview @readMeasured type=U32 value=method-call:measure
+# zmeta-contains: llvm.define-preview @raiiScopeDrop return=U32
+# zmeta-contains: llvm.cleanup-drop-preview @raiiScopeDrop local=%counter type=Counter
+# zmeta-contains: llvm.ret-preview @raiiScopeDrop type=U32 value=field:counter.current
+# zmeta-contains: llvm.define-preview @returnResource return=Counter
+# zmeta-contains: llvm.cleanup-drop-preview @returnResource local=%counter type=Counter
+# zmeta-contains: llvm.drop-flag-clear-preview @returnResource local=%counter reason=return
+# zmeta-contains: llvm.initialization-preview @returnResource place=%counter type=Counter state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.ownership-preview @returnResource place=%counter type=Counter state=moved source=mir.verifier-ownership
+# zmeta-contains: llvm.ret-preview @returnResource type=Counter value=name:counter
+# zmeta-contains: llvm.define-preview @tryCleanupResource return=Result<U32, ParseError>
+# zmeta-contains: llvm.branch-preview @tryCleanupResource kind=try expr=try:call:parseDigit
+# zmeta-contains: llvm.cleanup-drop-preview @tryCleanupResource local=%counter type=Counter target=try-error
+# zmeta-contains: llvm.ret-preview @tryCleanupResource type=Result<U32, ParseError> value=call:Ok
+# zmeta-contains: llvm.define-preview @enumPayloadModes return=U32
+# zmeta-contains: llvm.param-preview enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe
+# zmeta-contains: llvm.param-preview enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe
+# zmeta-contains: llvm.param-preview enumPayloadModes.readMaybe kind=value mode=read name=readMaybe index=0 type=Option<U32>
+# zmeta-contains: llvm.param-preview enumPayloadModes.writeMaybe kind=value mode=mut name=writeMaybe index=1 type=Option<U32>
+# zmeta-contains: llvm.param-preview enumPayloadModes.ownedMaybe kind=value mode=move name=ownedMaybe index=2 type=Option<U32>
+# zmeta-contains: llvm.ownership-preview @enumPayloadModes place=%ownedMaybe type=Option<U32> state=owned source=mir.verifier-ownership
+# zmeta-contains: llvm.ownership-preview @enumPayloadModes place=%ownedMaybe type=Option<U32> state=moved source=mir.verifier-ownership
+# zmeta-contains: llvm.define-preview @callBoxWriter return=Result<USize, ParseError>
+# zmeta-contains: llvm.box-interface-lowering-preview callBoxWriter.param interface=Writer layout=data*,vtable* noRealloc=true
+# zmeta-contains: llvm.virtual-call-preview @callBoxWriter receiver=%writer interface=Writer method=write slot=0 source=mir.dynamic-dispatch
+# zmeta-contains: llvm.enum-payload-access-preview @enumPayloadModes role=if-condition binding=readValue mode=read alias=readonly
+# zmeta-contains: llvm.enum-payload-access-preview @enumPayloadModes role=if-condition binding=writeValue mode=mut alias=noalias
+# zmeta-contains: llvm.enum-payload-access-preview @enumPayloadModes role=if-condition binding=movedValue mode=move alias=owned
+# zmeta-contains: llvm.alias-attr-preview @enumPayloadModes role=enum-payload:if-condition mode=mut operand=%writeValue attrs=noalias,nocapture source=mir.alias-proof
+# zmeta-contains: llvm.alias-attr-preview @enumPayloadModes role=enum-payload:if-condition mode=read operand=%readValue attrs=readonly source=mir.alias-proof
+# zmeta-contains: llvm.enum-payload-move-preview @enumPayloadModes binding=movedValue source=name:ownedMaybe
+# zmeta-contains: llvm.enum-payload-access-preview @classify role=match-arm binding=value mode=read alias=readonly
+# zmeta-contains: llvm.enum-payload-access-preview @patternModes role=match-arm binding=value mode=move alias=owned
+# zmeta-contains: llvm.enum-payload-move-preview @patternModes binding=value source=name:maybe
+# zmeta-contains: llvm.enum-payload-access-preview @controlExpressions role=match-expr-arm binding=found mode=read alias=readonly
+# zmeta-contains: llvm.stmt-order-preview @enumPayloadModes index=0 kind=if-pattern subject=Some(readValue) expr=name:readMaybe
+# zmeta-contains: llvm.stmt-order-preview @enumPayloadModes index=4 kind=if-pattern subject=Some(movedValue) expr=name:ownedMaybe
+# zmeta-contains: llvm.stmt-order-preview @enumPayloadModes index=5 kind=return expr=name:movedValue
+# zmeta-contains: llvm.block-order-preview @enumPayloadModes index=1 kind=body role=if-then endLine=435
+# zmeta-contains: llvm.block-order-preview @enumPayloadModes index=2 kind=body role=if-then endLine=438
+# zmeta-contains: llvm.block-order-preview @enumPayloadModes index=3 kind=body role=if-then endLine=441
+# zmeta-contains: llvm.lowering-input @enumPayloadModes from=mir.cfg entry=bb0 blocks=bb0,bb1,bb2,bb3
+# zmeta-contains: llvm.cfg-block-preview @enumPayloadModes bb1 kind=body role=if-then endLine=435
+# zmeta-contains: llvm.cfg-block-preview @enumPayloadModes bb2 kind=body role=if-then endLine=438
+# zmeta-contains: llvm.cfg-block-preview @enumPayloadModes bb3 kind=body role=if-then endLine=441
+# zmeta-contains: llvm.cfg-edge-preview @enumPayloadModes stmt=0 kind=if-pattern from=bb0 then=bb1 else=fallthrough condition=name:readMaybe
+# zmeta-contains: llvm.cfg-edge-preview @enumPayloadModes stmt=2 kind=if-pattern from=bb0 then=bb2 else=fallthrough condition=name:writeMaybe
+# zmeta-contains: llvm.cfg-edge-preview @enumPayloadModes stmt=4 kind=if-pattern from=bb0 then=bb3 else=fallthrough condition=name:ownedMaybe
+# zmeta-contains: llvm.cfg-terminator-preview @enumPayloadModes stmt=5 kind=return target=return
 # zmeta-contains: llvm.define-preview @mutateValue return=U32
 # zmeta-contains: llvm.store-preview @mutateValue %value value=int-literal:1
 # zmeta-contains: llvm.store-preview @mutateValue %value value=int-literal:1 op=+=
 # zmeta-contains: llvm.store-preview @operatorExpressions %total value=name:shiftedRight op=+=
 # zmeta-contains: llvm.define-preview @accessModes return=U32
 # zmeta-contains: llvm.param-preview accessModes.counter kind=value mode=move name=counter
+# zmeta-contains: llvm.param-preview accessModes.counter kind=value mode=move name=counter index=0 type=Counter
+# zmeta-contains: llvm.param-preview accessModes.value kind=value mode=read name=value index=1 type=U32
+# zmeta-contains: llvm.alias-attr-preview @accessModes role=param:0 mode=move operand=%counter attrs=noalias,nocapture source=mir.alias-proof
+# zmeta-contains: llvm.alias-attr-preview @accessModes role=param:1 mode=read operand=%value attrs=readonly source=mir.alias-proof
 # zmeta-contains: llvm.call-preview @mutateValue in @accessModes
 # zmeta-contains: llvm.call-detail-preview @accessModes callee=@mutateValue
 # zmeta-contains: llvm.arg-preview @accessModes index=0 mode=mut operand=name:total
+# zmeta-contains: llvm.alias-attr-preview @accessModes role=arg:0 mode=mut operand=name:total attrs=noalias,nocapture source=mir.alias-proof
 # zmeta-contains: llvm.access-preview @accessModes mode=mut operand=method-call:consume
 # zmeta-contains: llvm.access-detail-preview @accessModes mode=mut operand=method-call:consume
+# zmeta-contains: llvm.alias-attr-preview @accessModes role=access-expr mode=mut operand=method-call:consume attrs=noalias,nocapture source=mir.alias-proof
 # zmeta-contains: llvm.method-call-preview @accessModes receiver=counter method=consume mode=mut
 # zmeta-contains: llvm.arg-preview @accessModes index=0 mode=move operand=name:total
+# zmeta-contains: llvm.alias-attr-preview @accessModes role=arg:0 mode=move operand=name:total attrs=noalias,nocapture source=mir.alias-proof
 # zmeta-contains: llvm.store-preview @accessModes %counter.current value=name:value
 # zmeta-contains: llvm.field-access-preview @accessModes base=counter field=current mode=write
 # zmeta-contains: llvm.ret-preview @accessModes type=U32 value=field:counter.current

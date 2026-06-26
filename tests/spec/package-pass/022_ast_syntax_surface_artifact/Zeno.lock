@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "astSyntaxSurface"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:e4be2e154910a768"
-contentHash = "fnv1a64:d7f32a41411b1617"
+manifestHash = "fnv1a64:cc614ca7729eeecb"
+contentHash = "fnv1a64:8ee02cdba170c64c"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

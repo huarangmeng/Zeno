@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "autoSendSync"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:0970fe600ee1358c"
-contentHash = "fnv1a64:8521b9d43315c457"
+manifestHash = "fnv1a64:f04cc84a1911ed5c"
+contentHash = "fnv1a64:abd2aa9f7061c00b"
 trust = []
 dependencies = [
 ]

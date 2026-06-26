@@ -4,6 +4,13 @@
 # profile: freestanding
 # build-artifact: library
 # zmeta-contains: sendSync = ["Job:Send:auto", "Job:Sync:auto"]
+# zmeta-contains: hir.send-sync-candidate Job auto=true reason=plain-data span=src/lib.zn:1:1
+# zmeta-contains: hir.send-sync Job capability=Send source=auto span=src/lib.zn:1:1
+# zmeta-contains: hir.send-sync Job capability=Sync source=auto span=src/lib.zn:1:1
+# zmeta-contains: mir.verifier-send-sync Job capability=Send result=accepted reason=auto-plain-data span=src/lib.zn:1:1
+# zmeta-contains: mir.verifier-send-sync Job capability=Sync result=accepted reason=auto-plain-data span=src/lib.zn:1:1
+# zmeta-contains: llvm.send-sync-preview Job capability=Send source=auto
+# zmeta-contains: llvm.send-sync-preview Job capability=Sync source=auto
 # zmeta-contains: linkRuntimeNeeds = []
 # purpose: plain data structs record automatic Send/Sync facts without runtime linkage
 

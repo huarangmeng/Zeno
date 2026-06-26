@@ -5,6 +5,13 @@
 # build-artifact: application
 # zmeta-contains: runtimeNeeds = ["thread"]
 # zmeta-contains: linkRuntimeNeeds = ["thread"]
+# zmeta-contains: hir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread span=src/main.zn:17:1
+# zmeta-contains: hir.thread-capture main name=job type=Job mode=move requirement=Send result=accepted proof=auto-send span=src/main.zn:17:1
+# zmeta-contains: mir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread
+# zmeta-contains: mir.verifier-thread-spawn main result=accepted capture=move reason=move-closure span=src/main.zn:17:1
+# zmeta-contains: mir.verifier-thread-send main place=%job type=Job result=accepted proof=auto-send span=src/main.zn:17:1
+# zmeta-contains: llvm.thread-spawn-preview @main api=Thread.spawn capture=move runtime=thread
+# zmeta-contains: llvm.thread-capture-preview @main place=%job type=Job send=accepted proof=auto-send
 # zmeta-contains: runtime=fnv1a64:
 # purpose: reachable hosted thread APIs are recorded as explicit runtime link needs
 
