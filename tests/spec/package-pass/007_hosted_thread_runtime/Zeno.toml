@@ -5,13 +5,42 @@
 # build-artifact: application
 # zmeta-contains: runtimeNeeds = ["thread"]
 # zmeta-contains: linkRuntimeNeeds = ["thread"]
-# zmeta-contains: hir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread span=src/main.zn:17:1
-# zmeta-contains: hir.thread-capture main name=job type=Job mode=move requirement=Send result=accepted proof=auto-send span=src/main.zn:17:1
+# zmeta-contains: syntax.interface-parent ThreadIdentified.Send module=main span=src/main.zn:15:1 owner=ThreadIdentified index=1 parent=Send
+# zmeta-contains: stmt.val main.handle module=main span=src/main.zn:41:1 expr=try:type-static-call:Thread.spawn
+# zmeta-contains: syntax.type-static-call main.spawn module=main span=src/main.zn:41:1 targetType=Thread method=spawn
+# zmeta-contains: expr.type-static-call main.spawn module=main span=src/main.zn:41:1 generic=Thread
+# zmeta-contains: expr.closure main module=main span=src/main.zn:41:1 capture=move form=block body=block returnType=Result<Unit, Error> capability=OnceFn
+# zmeta-contains: expr.closure spawnBox module=main span=src/main.zn:51:1 capture=move form=block body=block returnType=U32 capability=OnceFn
+# zmeta-contains: hir.interface-parent ThreadIdentified.Send index=1 parent=Send span=src/main.zn:15:1
+# zmeta-contains: hir.local main.handle mode=val expr=try:type-static-call:Thread.spawn type=inferred span=src/main.zn:41:1
+# zmeta-contains: hir.type-static-call main.spawn target=Thread method=spawn span=src/main.zn:41:1
+# zmeta-contains: hir.callable-capability main capture=move form=block body=block capability=OnceFn span=src/main.zn:41:1
+# zmeta-contains: hir.callable-capability spawnBox capture=move form=block body=block capability=OnceFn span=src/main.zn:51:1
+# zmeta-contains: hir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread span=src/main.zn:41:1
+# zmeta-contains: hir.thread-capture main name=job type=Job mode=move requirement=Send result=accepted proof=auto-send span=src/main.zn:41:1
+# zmeta-contains: hir.thread-spawn spawnBox api=Thread.spawn capture=move captures=1 runtime=thread span=src/main.zn:51:1
+# zmeta-contains: hir.thread-capture spawnBox name=service type=Box<ThreadIdentified> mode=move requirement=Send result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# zmeta-contains: hir.box-interface-thread-proof spawnBox capture=service interface=ThreadIdentified result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# zmeta-contains: mir.callable-capability main capability=OnceFn receiver=closure mayEscape=false
+# zmeta-contains: mir.callable-capability spawnBox capability=OnceFn receiver=closure mayEscape=false
+# zmeta-contains: mir.local main.handle mode=val expr=try:type-static-call:Thread.spawn type=inferred
+# zmeta-contains: mir.type-static-call main target=Thread method=spawn
 # zmeta-contains: mir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread
-# zmeta-contains: mir.verifier-thread-spawn main result=accepted capture=move reason=move-closure span=src/main.zn:17:1
-# zmeta-contains: mir.verifier-thread-send main place=%job type=Job result=accepted proof=auto-send span=src/main.zn:17:1
+# zmeta-contains: mir.verifier-thread-spawn main result=accepted capture=move reason=move-closure span=src/main.zn:41:1
+# zmeta-contains: mir.verifier-thread-send main place=%job type=Job result=accepted proof=auto-send span=src/main.zn:41:1
+# zmeta-contains: mir.thread-spawn spawnBox api=Thread.spawn capture=move captures=1 runtime=thread
+# zmeta-contains: mir.verifier-thread-spawn spawnBox result=accepted capture=move reason=move-closure span=src/main.zn:51:1
+# zmeta-contains: mir.verifier-thread-send spawnBox place=%service type=Box<ThreadIdentified> result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# zmeta-contains: mir.verifier-box-interface-thread-proof spawnBox place=%service interface=ThreadIdentified result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# zmeta-contains: llvm.stmt-order-preview @main index=1 kind=val subject=handle expr=try:type-static-call:Thread.spawn
+# zmeta-contains: llvm.type-static-call-preview @main target=Thread method=spawn
+# zmeta-contains: llvm.try-detail-preview @main expr=type-static-call:Thread.spawn
 # zmeta-contains: llvm.thread-spawn-preview @main api=Thread.spawn capture=move runtime=thread
 # zmeta-contains: llvm.thread-capture-preview @main place=%job type=Job send=accepted proof=auto-send
+# zmeta-contains: llvm.thread-spawn-preview @spawnBox api=Thread.spawn capture=move runtime=thread
+# zmeta-contains: llvm.thread-capture-preview @spawnBox place=%service type=Box<ThreadIdentified> send=accepted proof=box-interface-includes-send
+# zmeta-contains: llvm.callable-capability-preview @spawnBox capability=OnceFn mayEscape=false
+# zmeta-contains: llvm.box-interface-thread-preview @spawnBox place=%service interface=ThreadIdentified send=accepted
 # zmeta-contains: runtime=fnv1a64:
 # purpose: reachable hosted thread APIs are recorded as explicit runtime link needs
 

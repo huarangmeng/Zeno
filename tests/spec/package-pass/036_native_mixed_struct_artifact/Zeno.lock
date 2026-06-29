@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeMixedStructApp"
 version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:6bb2933fb3bf21de"
-contentHash = "fnv1a64:13939f37c084b475"
+manifestHash = "fnv1a64:3ffbb5c1887060de"
+contentHash = "fnv1a64:b74b931d91f10765"
 trust = []
 dependencies = [
 ]

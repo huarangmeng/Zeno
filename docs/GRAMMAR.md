@@ -351,9 +351,9 @@ method_receiver = primary_expr method_receiver_part* ;
 method_receiver_part = call_args | index_args | "." ident ;
 mut_expr        = "mut" expr ;
 
-if_expr         = "if" if_condition block ("else" (if_expr | block))? ;
+if_expr         = "if" "(" if_condition ")" block ("else" (if_expr | block))? ;
 if_condition    = pattern_condition | expr ;
-while_expr      = "while" while_condition block ;
+while_expr      = "while" "(" while_condition ")" block ;
 while_condition = pattern_condition | expr ;
 pattern_condition = expr "is" pattern_mode? pattern ;
 for_expr        = "for" for_binding "in" expr block ;

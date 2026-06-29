@@ -100,10 +100,10 @@ fn drain(start: U32) -> U32 {
 fn expressions(buffer: USize, values: ArraySlice<U32>) -> U32 {
     val empty = ();
     val pair = (1, 2);
-    val ch = 'z';
+    val ch = 'z'; val truth = true; val text: StringSlice = "zeno"; val sci: F64 = 1.0e2;
     val widened = 1 as U32;
     val first = values[0];
-    val fresh = Buffer<U8, 4>.withCapacity(4);
+    val fresh = Buffer<U8, 4>.withCapacity(4); val genericBuffer = Buffer<U8, 4> { data: buffer, count: 0 };
     return first;
 }
 
@@ -461,3 +461,16 @@ fn closureCapabilityModes() -> U32 {
 
 type MutableTransform = MutFn<Unit>;
 type OwningTransform = OnceFn<U32>;
+
+fn expressionMatchBlockArms(maybe: Option<U32>) -> U32 {
+    val resolved = match maybe {
+        Some(value) => {
+            const bumped: U32 = value + 1;
+            bumped
+        }
+        None => {
+            0
+        }
+    };
+    return resolved;
+}

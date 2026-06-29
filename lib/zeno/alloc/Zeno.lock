@@ -1,13 +1,13 @@
 version = 1
-root = "nativeTryResultApp"
+root = "alloc"
 compiler = "zeno-stage0 0.1.0"
 
 [[package]]
-name = "nativeTryResultApp"
-version = "0.1.0"
+name = "alloc"
+version = "builtin"
 source = "path:."
-manifestHash = "fnv1a64:0463a11acdeff32e"
-contentHash = "fnv1a64:fc5b332bf325e137"
+manifestHash = "fnv1a64:741d0a9c7989732f"
+contentHash = "fnv1a64:8946d6a103a9105d"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

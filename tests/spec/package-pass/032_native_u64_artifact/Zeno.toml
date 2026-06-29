@@ -7,6 +7,7 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 35
+# zmeta-contains: nativeBodySources = ["classify:ast-fields-scalar-if-return", "isHuge:ast-fields-bool-return", "main:ast-fields"]
 # zmeta-contains: decl.fn isHuge module=main span=src/main.zn:3:1 params=(value: U64) return=Bool
 # zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: U64) return=I32
 # zmeta-contains: stmt.val classify.doubled module=main span=src/main.zn:8:1 expr=binary:* type=U64

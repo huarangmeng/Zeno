@@ -12,6 +12,7 @@
 # zmeta-contains: llvmIrArtifact = "ir/nativeForRangeApp.ll"
 # zmeta-contains: objectArtifact = "obj/nativeForRangeApp.o"
 # zmeta-contains: finalArtifact = "bin/nativeForRangeApp"
+# zmeta-contains: nativeBodySources = ["emptyHalfOpen:ast-fields-for-range-assign", "main:ast-fields", "singleClosed:ast-fields-for-range-assign", "sumClosed:ast-fields-for-range-assign", "sumForSkipBreak:ast-fields-for-range-control", "sumHalfOpen:ast-fields-for-range-assign", "sumWhileSkipBreak:ast-fields-while-control"]
 # zmeta-contains: decl.fn sumHalfOpen module=main span=src/main.zn:3:1 params=(limit: I32) return=I32
 # zmeta-contains: decl.fn sumClosed module=main span=src/main.zn:11:1 params=(start: I32, end: I32) return=I32
 # zmeta-contains: decl.fn emptyHalfOpen module=main span=src/main.zn:19:1 params=(limit: I32) return=I32
@@ -70,24 +71,24 @@
 # zmeta-contains: mir.terminator sumWhileSkipBreak bb=bb3 kind=break target=loop.exit value=unit
 # zmeta-contains: mir.rvalue sumHalfOpen expr=range:half-open kind=range mode=half-open
 # zmeta-contains: mir.rvalue sumClosed expr=range:closed kind=range mode=closed
-# zmeta-contains: mir.store-preview sumHalfOpen place=%acc value=binary:+
-# zmeta-contains: mir.store-preview sumClosed place=%acc value=binary:+
-# zmeta-contains: llvm.loop-preview @sumHalfOpen kind=for mode=read iterable=range:half-open
-# zmeta-contains: llvm.loop-preview @sumClosed kind=for mode=read iterable=range:closed
-# zmeta-contains: llvm.loop-preview @emptyHalfOpen kind=for mode=read iterable=range:half-open
-# zmeta-contains: llvm.loop-preview @singleClosed kind=for mode=read iterable=range:closed
-# zmeta-contains: llvm.loop-preview @sumForSkipBreak kind=for mode=read iterable=range:half-open
-# zmeta-contains: llvm.loop-preview @sumWhileSkipBreak condition=compare:<
-# zmeta-contains: llvm.branch-preview @sumHalfOpen kind=for mode=read iterable=range:half-open
-# zmeta-contains: llvm.branch-preview @sumClosed kind=for mode=read iterable=range:closed
-# zmeta-contains: llvm.branch-preview @sumForSkipBreak kind=if condition=compare:==
-# zmeta-contains: llvm.branch-preview @sumForSkipBreak kind=continue target=loop.header
-# zmeta-contains: llvm.branch-preview @sumForSkipBreak kind=break target=loop.exit
-# zmeta-contains: llvm.branch-preview @sumWhileSkipBreak kind=if condition=compare:==
-# zmeta-contains: llvm.branch-preview @sumWhileSkipBreak kind=continue target=loop.header
-# zmeta-contains: llvm.branch-preview @sumWhileSkipBreak kind=break target=loop.exit
-# zmeta-contains: llvm.store-preview @sumHalfOpen %acc value=binary:+
-# zmeta-contains: llvm.store-preview @sumClosed %acc value=binary:+
+# zmeta-contains: mir.store sumHalfOpen place=%acc value=binary:+
+# zmeta-contains: mir.store sumClosed place=%acc value=binary:+
+# zmeta-contains: llvm.loop @sumHalfOpen kind=for mode=read iterable=range:half-open
+# zmeta-contains: llvm.loop @sumClosed kind=for mode=read iterable=range:closed
+# zmeta-contains: llvm.loop @emptyHalfOpen kind=for mode=read iterable=range:half-open
+# zmeta-contains: llvm.loop @singleClosed kind=for mode=read iterable=range:closed
+# zmeta-contains: llvm.loop @sumForSkipBreak kind=for mode=read iterable=range:half-open
+# zmeta-contains: llvm.loop @sumWhileSkipBreak condition=compare:<
+# zmeta-contains: llvm.branch @sumHalfOpen kind=for mode=read iterable=range:half-open
+# zmeta-contains: llvm.branch @sumClosed kind=for mode=read iterable=range:closed
+# zmeta-contains: llvm.branch @sumForSkipBreak kind=if condition=compare:==
+# zmeta-contains: llvm.branch @sumForSkipBreak kind=continue target=loop.header
+# zmeta-contains: llvm.branch @sumForSkipBreak kind=break target=loop.exit
+# zmeta-contains: llvm.branch @sumWhileSkipBreak kind=if condition=compare:==
+# zmeta-contains: llvm.branch @sumWhileSkipBreak kind=continue target=loop.header
+# zmeta-contains: llvm.branch @sumWhileSkipBreak kind=break target=loop.exit
+# zmeta-contains: llvm.store @sumHalfOpen place=%acc value=binary:+ op== source=mir.store
+# zmeta-contains: llvm.store @sumClosed place=%acc value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.ret-preview @main type=I32 value=binary:+
 # emit-contains: ; module = 'nativeForRangeApp'
 # emit-contains: target triple = "aarch64-apple-darwin"
@@ -112,22 +113,25 @@
 # emit-contains: define i32 @singleClosed(i32 %value)
 # emit-contains: store i32 %value, ptr %i.range.0.addr
 # emit-contains: define i32 @sumForSkipBreak(i32 %limit)
-# emit-contains: br i1 %t3, label %if.then.4, label %if.cont.4
+# emit-contains: br i1 %t3, label %if.then.4, label %if.cont.3
 # emit-contains: if.then.4:
 # emit-contains: br label %for.step.0
-# emit-contains: if.cont.4:
-# emit-contains: br i1 %t5, label %if.then.6, label %if.cont.6
+# emit-contains: if.cont.3:
+# emit-contains: br i1 %t5, label %if.then.6, label %if.cont.5
 # emit-contains: if.then.6:
 # emit-contains: br label %for.exit.0
+# emit-contains: if.cont.5:
 # emit-contains: define i32 @sumWhileSkipBreak(i32 %limit)
 # emit-contains: while.cond.0:
 # emit-contains: br i1 %t2, label %while.body.0, label %while.exit.0
-# emit-contains: br i1 %t6, label %if.then.7, label %if.cont.7
+# emit-contains: br i1 %t6, label %if.then.7, label %if.cont.5
 # emit-contains: if.then.7:
 # emit-contains: br label %while.cond.0
-# emit-contains: br i1 %t9, label %if.then.10, label %if.cont.10
+# emit-contains: if.cont.5:
+# emit-contains: br i1 %t9, label %if.then.10, label %if.cont.8
 # emit-contains: if.then.10:
 # emit-contains: br label %while.exit.0
+# emit-contains: if.cont.8:
 # emit-contains: define i32 @main()
 # emit-contains: call i32 @sumHalfOpen(i32 5)
 # emit-contains: call i32 @sumClosed(i32 2, i32 4)

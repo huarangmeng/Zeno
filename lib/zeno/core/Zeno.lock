@@ -1,0 +1,14 @@
+version = 1
+root = "core"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "path:."
+manifestHash = "fnv1a64:104f2e9c6fa6dd5e"
+contentHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

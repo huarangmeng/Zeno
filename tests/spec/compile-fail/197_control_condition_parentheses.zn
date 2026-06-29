@@ -1,0 +1,17 @@
+// category: compile-fail
+// stage: mvp
+// milestone: M1
+// profile: freestanding
+// purpose: if and while conditions require parentheses before AST construction
+
+module tests.fail.controlConditionParentheses;
+
+fn missingIfParens(flag: Bool) {
+    if flag { // expected-error[E0003]: if condition must be parenthesized
+    }
+}
+
+fn missingWhileParens(flag: Bool) {
+    while flag { // expected-error[E0003]: while condition must be parenthesized
+    }
+}

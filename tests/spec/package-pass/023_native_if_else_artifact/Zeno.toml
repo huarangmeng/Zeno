@@ -10,12 +10,13 @@
 # zmeta-contains: executableFormat = "native-host-executable"
 # zmeta-contains: objectFormat = "native-object"
 # zmeta-contains: finalArtifact = "bin/nativeIfElseApp"
+# zmeta-contains: nativeBodySources = ["choosePositive:ast-fields-if-else-return", "main:ast-fields"]
 # zmeta-contains: stmt.if choosePositive module=main span=src/main.zn:4:1 condition=compare:>
 # zmeta-contains: stmt.else choosePositive module=main span=src/main.zn:6:1
 # zmeta-contains: stmt.return choosePositive module=main span=src/main.zn:5:1 expr=name:value expected=I32
 # zmeta-contains: stmt.return choosePositive module=main span=src/main.zn:7:1 expr=int-literal:7 expected=I32
 # zmeta-contains: mir.branch choosePositive kind=if condition=compare:> then=if.then else=if.cont
-# zmeta-contains: llvm.branch-preview @choosePositive kind=if condition=compare:>
+# zmeta-contains: llvm.branch @choosePositive kind=if condition=compare:>
 # zmeta-contains: mir.rvalue main expr=call:choosePositive kind=call callee=@choosePositive
 # zmeta-contains: llvm.call-preview @choosePositive in @main
 # emit-contains: define i32 @choosePositive(i32 %value)

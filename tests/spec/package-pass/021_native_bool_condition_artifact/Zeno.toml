@@ -7,6 +7,7 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 7
+# zmeta-contains: nativeBodySources = ["isPositive:ast-fields-bool-return", "main:ast-fields", "pick:ast-fields-scalar-if-return"]
 # zmeta-contains: executableFormat = "native-host-executable"
 # zmeta-contains: objectFormat = "native-object"
 # zmeta-contains: finalArtifact = "bin/nativeBoolApp"

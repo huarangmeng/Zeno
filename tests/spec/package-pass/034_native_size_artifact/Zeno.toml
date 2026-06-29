@@ -7,6 +7,7 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 85
+# zmeta-contains: nativeBodySources = ["classifyOffset:ast-fields-scalar-if-return", "classifySize:ast-fields-scalar-if-return", "isWideOffset:ast-fields-bool-return", "isWideSize:ast-fields-bool-return", "main:ast-fields"]
 # zmeta-contains: decl.fn isWideSize module=main span=src/main.zn:3:1 params=(value: USize) return=Bool
 # zmeta-contains: decl.fn classifySize module=main span=src/main.zn:7:1 params=(value: USize) return=I32
 # zmeta-contains: decl.fn isWideOffset module=main span=src/main.zn:19:1 params=(value: ISize) return=Bool

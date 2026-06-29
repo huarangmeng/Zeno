@@ -1,0 +1,34 @@
+version = 1
+root = "std"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "std"
+version = "builtin"
+source = "path:."
+manifestHash = "fnv1a64:408e6ddbef83607d"
+contentHash = "fnv1a64:803180c8ce4dc26c"
+trust = []
+dependencies = [
+  { key = "alloc", package = "alloc" },
+  { key = "core", package = "core" },
+]
+
+[[package]]
+name = "alloc"
+version = "builtin"
+source = "builtin:alloc"
+compilerPackageHash = "fnv1a64:8946d6a103a9105d"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

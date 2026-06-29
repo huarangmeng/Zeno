@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeEnumMatchApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:447af6ecd195907f"
-contentHash = "fnv1a64:356a3a9dc6330716"
+manifestHash = "fnv1a64:841bf961554a7a04"
+contentHash = "fnv1a64:b1b20354fb3a0e4d"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

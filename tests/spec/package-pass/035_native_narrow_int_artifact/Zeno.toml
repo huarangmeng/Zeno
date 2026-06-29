@@ -7,6 +7,7 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 79
+# zmeta-contains: nativeBodySources = ["classifySigned16:ast-fields-scalar-if-return", "classifySigned8:ast-fields-scalar-if-return", "classifyUnsigned16:ast-fields-scalar-if-return", "classifyUnsigned8:ast-fields-scalar-if-return", "isLargeSigned16:ast-fields-bool-return", "isLargeUnsigned16:ast-fields-bool-return", "isSmallSigned8:ast-fields-bool-return", "isSmallUnsigned8:ast-fields-bool-return", "main:ast-fields"]
 # zmeta-contains: decl.fn isSmallSigned8 module=main span=src/main.zn:3:1 params=(value: I8) return=Bool
 # zmeta-contains: decl.fn classifySigned8 module=main span=src/main.zn:7:1 params=(value: I8) return=I32
 # zmeta-contains: decl.fn isSmallUnsigned8 module=main span=src/main.zn:16:1 params=(value: U8) return=Bool

@@ -14,6 +14,7 @@
 # zmeta-contains: llvmIrArtifact = "ir/nativeApp.ll"
 # zmeta-contains: objectArtifact = "obj/nativeApp.o"
 # zmeta-contains: finalArtifact = "bin/nativeApp"
+# zmeta-contains: nativeBodySources = ["addIfPositive:ast-fields-if-return", "main:ast-fields", "sumTo:ast-fields-while-assign"]
 # zmeta-contains: decl.fn addIfPositive module=main span=src/main.zn:3:1
 # zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:5:1 expr=binary:+ expected=I32
 # zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:7:1 expr=name:delta expected=I32
@@ -35,18 +36,18 @@
 # zmeta-contains: hir.assign sumTo.i expr=binary:+ span=src/main.zn:15:1
 # zmeta-contains: mir.loop sumTo condition=compare:< header=while.cond body=while.body exit=while.exit
 # zmeta-contains: mir.branch sumTo kind=while condition=compare:< then=while.body else=while.exit
-# zmeta-contains: mir.store-preview sumTo place=%acc value=binary:+
-# zmeta-contains: mir.store-preview sumTo place=%i value=binary:+
+# zmeta-contains: mir.store sumTo place=%acc value=binary:+
+# zmeta-contains: mir.store sumTo place=%i value=binary:+
 # zmeta-contains: mir.rvalue main expr=call:sumTo kind=call callee=@sumTo
 # zmeta-contains: mir.rvalue main expr=call:addIfPositive kind=call callee=@addIfPositive
 # zmeta-contains: mir.terminator main bb=bb0 kind=return value=name:result
 # zmeta-contains: llvm.binary-preview @addIfPositive op=+
 # zmeta-contains: llvm.call-preview @sumTo in @main
 # zmeta-contains: llvm.call-preview @addIfPositive in @main
-# zmeta-contains: llvm.loop-preview @sumTo condition=compare:<
-# zmeta-contains: llvm.branch-preview @sumTo kind=while condition=compare:<
-# zmeta-contains: llvm.store-preview @sumTo %acc value=binary:+
-# zmeta-contains: llvm.store-preview @sumTo %i value=binary:+
+# zmeta-contains: llvm.loop @sumTo condition=compare:<
+# zmeta-contains: llvm.branch @sumTo kind=while condition=compare:<
+# zmeta-contains: llvm.store @sumTo place=%acc value=binary:+ op== source=mir.store
+# zmeta-contains: llvm.store @sumTo place=%i value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.ret-preview @main type=I32 value=name:result
 # emit-contains: ; module = 'nativeApp'
 # emit-contains: target triple = "aarch64-apple-darwin"
