@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeIfElseApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:cb72c0e3c28fe190"
-contentHash = "fnv1a64:4f3d385adc454f3a"
+manifestHash = "fnv1a64:3495c0491fbfae36"
+contentHash = "fnv1a64:6a5083804a549808"
 trust = []
 dependencies = [
 ]

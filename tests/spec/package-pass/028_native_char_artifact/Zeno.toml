@@ -7,22 +7,38 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 43
-# zmeta-contains: nativeBodySources = ["isAsciiA:ast-fields-bool-return", "main:ast-fields", "score:ast-fields-scalar-if-return"]
+# zmeta-contains: nativeBodySources = ["isAsciiA:ast-expr-bool-return", "main:ast-expr-straight-line", "score:ast-control-body-scalar-if-return"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-bool-return
+# zmeta-forbid: score:ast-fields-scalar-if-return
 # zmeta-contains: decl.fn isAsciiA module=main span=src/main.zn:3:1 params=(ch: Char) return=Bool
 # zmeta-contains: decl.fn score module=main span=src/main.zn:7:1 params=(ch: Char) return=I32
-# zmeta-contains: stmt.val score.newline module=main span=src/main.zn:8:1 expr=char-literal type=Char
+# zmeta-contains: stmt.val score.newline module=main span=src/main.zn:8:1 expr=char-literal
+# zmeta-forbid: stmt.val score.newline module=main span=src/main.zn:8:1 expr=char-literal type=Char
 # zmeta-contains: stmt.if score module=main span=src/main.zn:9:1 condition=call:isAsciiA
 # zmeta-contains: stmt.if score module=main span=src/main.zn:12:1 condition=compare:!=
-# zmeta-contains: stmt.val main.a module=main span=src/main.zn:19:1 expr=char-literal type=Char
-# zmeta-contains: stmt.val main.nl module=main span=src/main.zn:20:1 expr=char-literal type=Char
+# zmeta-contains: expr.control-body-stmt score.control-body.if-then.return.10 module=main span=src/main.zn:10:1 role=if-then kind=return expr=int-literal:40
+# zmeta-contains: expr.control-body-stmt score.control-body.if-then.return.13 module=main span=src/main.zn:13:1 role=if-then kind=return expr=int-literal:1
+# zmeta-contains: stmt.val main.a module=main span=src/main.zn:19:1 expr=char-literal
+# zmeta-contains: stmt.val main.nl module=main span=src/main.zn:20:1 expr=char-literal
+# zmeta-forbid: stmt.val main.a module=main span=src/main.zn:19:1 expr=char-literal type=Char
+# zmeta-forbid: stmt.val main.nl module=main span=src/main.zn:20:1 expr=char-literal type=Char
 # mir-contains: hir.fn-signature isAsciiA params=(ch: Char) return=Bool
 # mir-contains: hir.fn-signature score params=(ch: Char) return=I32
-# mir-contains: hir.val score.newline expr=char-literal type=Char
+# mir-contains: hir.local score.newline mode=val expr=char-literal type=inferred
+# mir-contains: hir.local main.a mode=val expr=char-literal type=inferred
+# mir-contains: hir.local main.nl mode=val expr=char-literal type=inferred
 # mir-contains: hir.if score condition=call:isAsciiA
 # mir-contains: hir.if score condition=compare:!=
+# mir-contains: hir.control-body-stmt score role=if-then kind=return expr=int-literal:40 span=src/main.zn:10:1
+# mir-contains: hir.control-body-stmt score role=if-then kind=return expr=int-literal:1 span=src/main.zn:13:1
 # mir-contains: mir.operand score expr=char-literal kind=const
 # mir-contains: mir.branch score kind=if condition=call:isAsciiA
 # mir-contains: mir.branch score kind=if condition=compare:!=
+# mir-contains: mir.control-body-stmt score role=if-then kind=return expr=int-literal:40
+# mir-contains: mir.control-body-stmt score role=if-then kind=return expr=int-literal:1
+# zmeta-contains: llvm.control-body-preview @score role=if-then kind=return expr=int-literal:40
+# zmeta-contains: llvm.control-body-preview @score role=if-then kind=return expr=int-literal:1
 # emit-contains: define i1 @isAsciiA(i32 %ch)
 # emit-contains: %t0 = icmp eq i32 %ch, 65
 # emit-contains: define i32 @score(i32 %ch)
@@ -38,7 +54,7 @@
 # object-contains: _score
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: Char primitive native lowering is concentrated here: Char parameters, Char locals, escaped Char literals, Char equality/inequality conditions, Bool-returning Char comparison, real LLVM i32 scalar codegen, object code, executable output, and direct run-exit-code validation
+# purpose: Char primitive native lowering is concentrated here: Char parameters, inferred Char locals from escaped Char literals, Char equality/inequality conditions, Bool-returning Char comparison, real LLVM i32 scalar codegen, object code, executable output, and direct run-exit-code validation
 
 [package]
 name = "nativeCharApp"

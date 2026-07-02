@@ -24,7 +24,7 @@ pub fn observe(value: I32) -> I32 {
 }
 
 pub fn compute(value: I32) -> I32 {
-    val next: I32 = value + 1;
+    val next = value + 1;
     var total = next;
     observe(total);
     return total;

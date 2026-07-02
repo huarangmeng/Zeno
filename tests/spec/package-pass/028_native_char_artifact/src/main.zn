@@ -5,7 +5,7 @@ fn isAsciiA(ch: Char) -> Bool {
 }
 
 fn score(ch: Char) -> I32 {
-    val newline: Char = '\n';
+    val newline = '\n';
     if (isAsciiA(ch)) {
         return 40;
     }
@@ -16,7 +16,7 @@ fn score(ch: Char) -> I32 {
 }
 
 fn main() -> I32 {
-    val a: Char = 'A';
-    val nl: Char = '\n';
+    val a = 'A';
+    val nl = '\n';
     return score(a) + score(nl) + score('z');
 }

@@ -1,0 +1,45 @@
+version = 1
+root = "nativePathDepLinkApp"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "nativePathDepLinkApp"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:cde357f340ddde73"
+contentHash = "fnv1a64:d31b4c424b89acfe"
+trust = []
+dependencies = [
+  { key = "mathlib", package = "mathlib" },
+]
+
+[[package]]
+name = "mathlib"
+version = "0.1.0"
+source = "path:mathlib"
+manifestHash = "fnv1a64:b5cfdbfb9f7ac930"
+contentHash = "fnv1a64:95f204cbfe17a8f0"
+trust = []
+dependencies = [
+  { key = "mathbase", package = "mathbase" },
+]
+
+[[package]]
+name = "mathbase"
+version = "0.1.0"
+source = "path:mathlib/mathbase"
+manifestHash = "fnv1a64:47a115e7ff6c0e3c"
+contentHash = "fnv1a64:e74699d40e8015b9"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

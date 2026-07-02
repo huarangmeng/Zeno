@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeBoolApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:9bf8214ba70831dc"
-contentHash = "fnv1a64:99082f2bc5cdb7bd"
+manifestHash = "fnv1a64:539e27b7b9b03c26"
+contentHash = "fnv1a64:6b843de6eced0d5f"
 trust = []
 dependencies = [
 ]

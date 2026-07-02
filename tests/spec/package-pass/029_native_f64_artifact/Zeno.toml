@@ -7,43 +7,70 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 42
-# zmeta-contains: nativeBodySources = ["classify:ast-fields-scalar-if-return", "isLarge:ast-fields-bool-return", "main:ast-fields"]
+# zmeta-contains: nativeBodySources = ["classify:ast-control-body-scalar-if-return", "isLarge:ast-expr-bool-return", "main:ast-expr-straight-line", "scale:ast-expr-scalar-return"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-bool-return
 # zmeta-contains: decl.fn isLarge module=main span=src/main.zn:3:1 params=(value: F64) return=Bool
-# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: F64) return=I32
-# zmeta-contains: stmt.val classify.scaled module=main span=src/main.zn:8:1 expr=binary:* type=F64
-# zmeta-contains: stmt.val classify.pivot module=main span=src/main.zn:9:1 expr=float-literal:2.5 type=F64
-# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isLarge
-# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:>
-# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=float-literal:1.5 type=F64
-# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=float-literal:4.0 type=F64
+# zmeta-contains: decl.fn scale module=main span=src/main.zn:7:1 params=(value: F64) return=F64
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:11:1 params=(value: F64) return=I32
+# zmeta-contains: stmt.return scale module=main span=src/main.zn:8:1 expr=binary:* expected=F64
+# zmeta-contains: stmt.val classify.scaled module=main span=src/main.zn:12:1 expr=call:scale
+# zmeta-forbid: stmt.val classify.scaled module=main span=src/main.zn:12:1 expr=call:scale type=F64
+# zmeta-contains: stmt.val classify.pivot module=main span=src/main.zn:13:1 expr=float-literal:2.5
+# zmeta-forbid: stmt.val classify.pivot module=main span=src/main.zn:13:1 expr=float-literal:2.5 type=F64
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:14:1 condition=call:isLarge
+# zmeta-contains: arg classify.arg.14.0 module=main span=src/main.zn:14:1 index=0 mode=read expr=call:scale
+# zmeta-contains: syntax.arg classify module=main span=src/main.zn:14:1 mode=read expr=call:scale index=0
+# zmeta-contains: expr.call classify.scale module=main span=src/main.zn:14:1 callee=scale
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:17:1 condition=compare:>
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:24:1 expr=float-literal:1.5
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:25:1 expr=float-literal:4.0
+# zmeta-forbid: stmt.val main.low module=main span=src/main.zn:24:1 expr=float-literal:1.5 type=F64
+# zmeta-forbid: stmt.val main.high module=main span=src/main.zn:25:1 expr=float-literal:4.0 type=F64
 # mir-contains: hir.fn-signature isLarge params=(value: F64) return=Bool
+# mir-contains: hir.fn-signature scale params=(value: F64) return=F64
 # mir-contains: hir.fn-signature classify params=(value: F64) return=I32
-# mir-contains: hir.local classify.scaled mode=val expr=binary:* type=F64
-# mir-contains: hir.local classify.pivot mode=val expr=float-literal:2.5 type=F64
+# mir-contains: hir.local classify.scaled mode=val expr=call:scale type=inferred
+# mir-contains: hir.local classify.pivot mode=val expr=float-literal:2.5 type=inferred
+# mir-contains: hir.local main.low mode=val expr=float-literal:1.5 type=inferred
+# mir-contains: hir.local main.high mode=val expr=float-literal:4.0 type=inferred
 # mir-contains: hir.if classify condition=call:isLarge
 # mir-contains: hir.if classify condition=compare:>
-# mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
+# mir-contains: mir.rvalue scale expr=binary:* kind=binary op=*
 # mir-contains: mir.operand classify expr=float-literal:2.5 kind=const
+# mir-contains: mir.local-slot classify %pivot mutable=false type=inferred
+# mir-contains: mir.local-slot main %low mutable=false type=inferred
+# mir-contains: mir.local-slot main %high mutable=false type=inferred
 # mir-contains: mir.branch classify kind=if condition=call:isLarge
 # mir-contains: mir.branch classify kind=if condition=compare:>
+# zmeta-contains: llvm.initialization-preview @classify place=%pivot type=inferred state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.initialization-preview @classify place=%scaled type=F64 state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.call-detail-preview @classify callee=@scale
+# zmeta-contains: llvm.initialization-preview @main place=%low type=inferred state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.initialization-preview @main place=%high type=inferred state=initialized source=mir.verifier-initialization
 # emit-contains: define i1 @isLarge(double %value)
 # emit-contains: %t0 = fcmp ogt double %value, 3.500000
+# emit-contains: define double @scale(double %value)
+# emit-contains: ret double %t0
 # emit-contains: define i32 @classify(double %value)
 # emit-contains: %t0 = fmul double %value, 2.000000
+# emit-contains: %t0 = call double @scale(double %value)
 # emit-contains: %scaled = fadd double 0.000000e+00, %t0
 # emit-contains: %pivot = fadd double 0.000000e+00, 2.5
-# emit-contains: %t1 = call i1 @isLarge(double %scaled)
-# emit-contains: %t3 = fcmp ogt double %scaled, %pivot
+# emit-contains: %t1 = call double @scale(double %value)
+# emit-contains: %t2 = call i1 @isLarge(double %t1)
+# emit-contains: %t4 = fcmp ogt double %scaled, %pivot
 # emit-contains: define i32 @main()
 # emit-contains: %low = fadd double 0.000000e+00, 1.5
 # emit-contains: %high = fadd double 0.000000e+00, 4.0
 # emit-contains: %t0 = call i32 @classify(double %low)
 # emit-contains: %t1 = call i32 @classify(double %high)
 # object-contains: _isLarge
+# object-contains: _scale
 # object-contains: _classify
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: F64 primitive native lowering is concentrated here: F64 parameters, F64 locals, float literals, floating multiply, floating comparisons, Bool-returning F64 comparison calls, real LLVM double scalar codegen, object code, executable output, and direct run-exit-code validation
+# purpose: F64 primitive native lowering is concentrated here: F64 parameters, inferred F64 locals from scalar-return function calls and unannotated float literals, floating multiply, floating comparisons, Bool-returning F64 comparison calls whose arguments can themselves be `F64 -> F64` call results, real LLVM double scalar codegen, object code, executable output, and direct run-exit-code validation
 
 [package]
 name = "nativeF64App"

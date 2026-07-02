@@ -10,11 +10,21 @@
 # zmeta-contains: executableFormat = "native-host-executable"
 # zmeta-contains: objectFormat = "native-object"
 # zmeta-contains: finalArtifact = "bin/nativeIfElseApp"
-# zmeta-contains: nativeBodySources = ["choosePositive:ast-fields-if-else-return", "main:ast-fields"]
+# zmeta-contains: nativeBodySources = ["choosePositive:ast-control-body-if-else-return", "main:ast-expr-straight-line"]
+# zmeta-forbid: main:ast-fields
 # zmeta-contains: stmt.if choosePositive module=main span=src/main.zn:4:1 condition=compare:>
 # zmeta-contains: stmt.else choosePositive module=main span=src/main.zn:6:1
 # zmeta-contains: stmt.return choosePositive module=main span=src/main.zn:5:1 expr=name:value expected=I32
 # zmeta-contains: stmt.return choosePositive module=main span=src/main.zn:7:1 expr=int-literal:7 expected=I32
+# zmeta-contains: expr.control-body-stmt choosePositive.control-body.if-then.return.5 module=main span=src/main.zn:5:1 role=if-then kind=return expr=name:value
+# zmeta-contains: expr.control-body-stmt choosePositive.control-body.if-else.return.7 module=main span=src/main.zn:7:1 role=if-else kind=return expr=int-literal:7
+# zmeta-forbid: expr.control-body-stmt choosePositive.control-body.if-then.else
+# zmeta-contains: hir.control-body-stmt choosePositive role=if-then kind=return expr=name:value span=src/main.zn:5:1
+# zmeta-contains: hir.control-body-stmt choosePositive role=if-else kind=return expr=int-literal:7 span=src/main.zn:7:1
+# zmeta-contains: mir.control-body-stmt choosePositive role=if-then kind=return expr=name:value
+# zmeta-contains: mir.control-body-stmt choosePositive role=if-else kind=return expr=int-literal:7
+# zmeta-contains: llvm.control-body-preview @choosePositive role=if-then kind=return expr=name:value
+# zmeta-contains: llvm.control-body-preview @choosePositive role=if-else kind=return expr=int-literal:7
 # zmeta-contains: mir.branch choosePositive kind=if condition=compare:> then=if.then else=if.cont
 # zmeta-contains: llvm.branch @choosePositive kind=if condition=compare:>
 # zmeta-contains: mir.rvalue main expr=call:choosePositive kind=call callee=@choosePositive
@@ -29,7 +39,7 @@
 # emit-contains: define i32 @main()
 # emit-contains: %t0 = call i32 @choosePositive(i32 0)
 # emit-contains: ret i32 %t0
-# purpose: simple if/else return control flow lowers to real LLVM IR, native object, and host executable
+# purpose: simple if/else return control flow lowers from control-body AST statements to real LLVM IR, native object, and host executable
 
 [package]
 name = "nativeIfElseApp"

@@ -5,8 +5,8 @@ fn isLarge(value: U32) -> Bool {
 }
 
 fn classify(value: U32) -> I32 {
-    val doubled: U32 = value * 2;
-    val half: U32 = doubled / 2;
+    val doubled = value * 2;
+    val half = doubled / 2;
     if (isLarge(half)) {
         return 30;
     }
@@ -17,7 +17,7 @@ fn classify(value: U32) -> I32 {
 }
 
 fn main() -> I32 {
-    val low: U32 = 6;
-    val high: U32 = 11;
+    val low = 6;
+    val high = 11;
     return classify(low) + classify(high);
 }

@@ -21,17 +21,17 @@
 # zmeta-contains: hir.thread-spawn spawnBox api=Thread.spawn capture=move captures=1 runtime=thread span=src/main.zn:51:1
 # zmeta-contains: hir.thread-capture spawnBox name=service type=Box<ThreadIdentified> mode=move requirement=Send result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
 # zmeta-contains: hir.box-interface-thread-proof spawnBox capture=service interface=ThreadIdentified result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
-# zmeta-contains: mir.callable-capability main capability=OnceFn receiver=closure mayEscape=false
-# zmeta-contains: mir.callable-capability spawnBox capability=OnceFn receiver=closure mayEscape=false
-# zmeta-contains: mir.local main.handle mode=val expr=try:type-static-call:Thread.spawn type=inferred
-# zmeta-contains: mir.type-static-call main target=Thread method=spawn
-# zmeta-contains: mir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread
-# zmeta-contains: mir.verifier-thread-spawn main result=accepted capture=move reason=move-closure span=src/main.zn:41:1
-# zmeta-contains: mir.verifier-thread-send main place=%job type=Job result=accepted proof=auto-send span=src/main.zn:41:1
-# zmeta-contains: mir.thread-spawn spawnBox api=Thread.spawn capture=move captures=1 runtime=thread
-# zmeta-contains: mir.verifier-thread-spawn spawnBox result=accepted capture=move reason=move-closure span=src/main.zn:51:1
-# zmeta-contains: mir.verifier-thread-send spawnBox place=%service type=Box<ThreadIdentified> result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
-# zmeta-contains: mir.verifier-box-interface-thread-proof spawnBox place=%service interface=ThreadIdentified result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# mir-contains: mir.callable-capability main capability=OnceFn receiver=closure mayEscape=false
+# mir-contains: mir.callable-capability spawnBox capability=OnceFn receiver=closure mayEscape=false
+# mir-contains: mir.local main.handle mode=val expr=try:type-static-call:Thread.spawn type=inferred
+# mir-contains: mir.type-static-call main target=Thread method=spawn
+# mir-contains: mir.thread-spawn main api=Thread.spawn capture=move captures=1 runtime=thread
+# mir-contains: mir.verifier-thread-spawn main result=accepted capture=move reason=move-closure span=src/main.zn:41:1
+# mir-contains: mir.verifier-thread-send main place=%job type=Job result=accepted proof=auto-send span=src/main.zn:41:1
+# mir-contains: mir.thread-spawn spawnBox api=Thread.spawn capture=move captures=1 runtime=thread
+# mir-contains: mir.verifier-thread-spawn spawnBox result=accepted capture=move reason=move-closure span=src/main.zn:51:1
+# mir-contains: mir.verifier-thread-send spawnBox place=%service type=Box<ThreadIdentified> result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
+# mir-contains: mir.verifier-box-interface-thread-proof spawnBox place=%service interface=ThreadIdentified result=accepted proof=box-interface-includes-send span=src/main.zn:51:1
 # zmeta-contains: llvm.stmt-order-preview @main index=1 kind=val subject=handle expr=try:type-static-call:Thread.spawn
 # zmeta-contains: llvm.type-static-call-preview @main target=Thread method=spawn
 # zmeta-contains: llvm.try-detail-preview @main expr=type-static-call:Thread.spawn

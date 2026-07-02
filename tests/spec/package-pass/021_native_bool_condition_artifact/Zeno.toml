@@ -7,24 +7,59 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 7
-# zmeta-contains: nativeBodySources = ["isPositive:ast-fields-bool-return", "main:ast-fields", "pick:ast-fields-scalar-if-return"]
+# zmeta-contains: nativeBodySources = ["answer:ast-expr-scalar-return", "isPositive:ast-expr-bool-return", "main:ast-expr-straight-line", "pick:ast-control-body-scalar-if-return"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-bool-return
+# zmeta-forbid: pick:ast-fields-scalar-if-return
 # zmeta-contains: executableFormat = "native-host-executable"
 # zmeta-contains: objectFormat = "native-object"
 # zmeta-contains: finalArtifact = "bin/nativeBoolApp"
 # zmeta-contains: stmt.return isPositive module=main span=src/main.zn:4:1 expr=compare:> expected=Bool
-# zmeta-contains: stmt.if pick module=main span=src/main.zn:8:1 condition=call:isPositive
+# zmeta-contains: stmt.return answer module=main span=src/main.zn:8:1 expr=int-literal:3 expected=I32
+# zmeta-contains: stmt.const pick.target module=main span=src/main.zn:12:1 expr=int-literal:0
+# zmeta-forbid: stmt.const pick.target module=main span=src/main.zn:12:1 type=I32
+# zmeta-contains: stmt.if pick module=main span=src/main.zn:13:1 condition=call:isPositive
+# zmeta-contains: expr.binary pick module=main span=src/main.zn:13:1 generic=- op=- left=name:value right=name:target
+# zmeta-contains: expr.control-body-stmt pick.control-body.if-then.return.14 module=main span=src/main.zn:14:1 role=if-then kind=return expr=int-literal:7
+# zmeta-contains: stmt.val main.base module=main span=src/main.zn:20:1 expr=call:answer
+# zmeta-forbid: stmt.val main.base module=main span=src/main.zn:20:1 expr=call:answer type=I32
+# zmeta-contains: hir.local-const pick.target expr=int-literal:0 type=inferred span=src/main.zn:12:1
+# zmeta-contains: hir.local main.base mode=val expr=call:answer type=inferred span=src/main.zn:20:1
+# zmeta-contains: hir.binary pick op=- left=name:value right=name:target span=src/main.zn:13:1
+# zmeta-contains: hir.control-body-stmt pick role=if-then kind=return expr=int-literal:7 span=src/main.zn:14:1
+# zmeta-contains: mir.local-const pick.target value=int-literal:0 type=inferred
+# zmeta-contains: mir.local-slot main %base mutable=false type=inferred
+# zmeta-contains: mir.verifier-ctfe pick.target role=local-const subject=target result=materialized reason=literal span=src/main.zn:12:1
+# zmeta-contains: mir.rvalue main expr=call:answer kind=call callee=@answer
+# zmeta-contains: mir.rvalue pick expr=binary:- kind=binary op=-
+# zmeta-contains: mir.control-body-stmt pick role=if-then kind=return expr=int-literal:7
+# zmeta-contains: llvm.ctfe-materialized-preview @pick.target role=local-const subject=target type=inferred materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.initialization-preview @pick place=%target type=inferred state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.initialization-preview @main place=%base type=I32 state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.binary-preview @pick op=-
+# zmeta-contains: llvm.control-body-preview @pick role=if-then kind=return expr=int-literal:7
 # zmeta-contains: llvm.compare-preview @isPositive op=>
+# zmeta-contains: llvm.call-preview @answer in @main
 # zmeta-contains: llvm.call-preview @isPositive in @pick
+# zmeta-contains: llvm.call-preview @pick in @main
+# emit-contains: define i32 @answer()
+# emit-contains: ret i32 3
 # emit-contains: define i1 @isPositive(i32 %value)
 # emit-contains: %t0 = icmp sgt i32 %value, 0
 # emit-contains: ret i1 %t0
-# emit-contains: define i32 @pick(i32 %value)
-# emit-contains: %t0 = call i1 @isPositive(i32 %value)
-# emit-contains: br i1 %t0, label %if.then.1, label %if.cont.1
-# emit-contains: ret i32 7
 # emit-contains: define i32 @main()
-# emit-contains: %t0 = call i32 @pick(i32 3)
-# purpose: minimal native Bool lowering emits i1 functions and uses Bool calls as real branch conditions before producing a host executable
+# emit-contains: %t0 = call i32 @answer()
+# emit-contains: %base = add i32 0, %t0
+# emit-contains: %t1 = call i32 @pick(i32 %base)
+# emit-contains: ret i32 %t1
+# emit-contains: define i32 @pick(i32 %value)
+# emit-contains: %target = add i32 0, 0
+# emit-contains: %t0 = sub i32 %value, %target
+# emit-contains: %t1 = call i1 @isPositive(i32 %t0)
+# emit-contains: br i1 %t1, label %if.then.2, label %if.cont.2
+# emit-contains: ret i32 7
+# object-contains: _answer
+# purpose: minimal native Bool lowering supports inferred local consts, inferred call-result vals from unannotated val bindings, and binary Bool-call arguments before branching in a host executable
 
 [package]
 name = "nativeBoolApp"

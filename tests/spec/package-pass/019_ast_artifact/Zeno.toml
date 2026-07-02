@@ -22,7 +22,8 @@
 # zmeta-contains: decl.fn observe module=lib span=src/lib.zn:22:1
 # zmeta-contains: stmt.return observe module=lib span=src/lib.zn:23:1 expr=name:value expected=I32
 # zmeta-contains: decl.fn compute module=lib span=src/lib.zn:26:1
-# zmeta-contains: stmt.val compute.next module=lib span=src/lib.zn:27:1 expr=binary:+ type=I32
+# zmeta-contains: stmt.val compute.next module=lib span=src/lib.zn:27:1 expr=binary:+
+# zmeta-forbid: stmt.val compute.next module=lib span=src/lib.zn:27:1 expr=binary:+ type=I32
 # zmeta-contains: stmt.var compute.total module=lib span=src/lib.zn:28:1 expr=name:next
 # zmeta-contains: stmt.expr compute module=lib span=src/lib.zn:29:1 expr=call:observe
 # zmeta-contains: stmt.return compute module=lib span=src/lib.zn:30:1 expr=name:total expected=I32
@@ -32,7 +33,7 @@
 # zmeta-contains: hir.return readHost expr=trust-block expected=I32 span=src/lib.zn:17:1
 # zmeta-contains: hir.trust-expr readHost span=src/lib.zn:17:1
 # zmeta-contains: hir.fn compute module=lib span=src/lib.zn:26:1
-# zmeta-contains: hir.local compute.next mode=val expr=binary:+ type=I32 span=src/lib.zn:27:1
+# zmeta-contains: hir.local compute.next mode=val expr=binary:+ type=inferred span=src/lib.zn:27:1
 # zmeta-contains: hir.local compute.total mode=var expr=name:next type=inferred span=src/lib.zn:28:1
 # zmeta-contains: hir.expr compute expr=call:observe span=src/lib.zn:29:1
 # zmeta-contains: hir.return compute expr=name:total expected=I32 span=src/lib.zn:30:1
@@ -42,7 +43,7 @@
 # zmeta-contains: mir.return readHost value=trust-block type=I32
 # zmeta-contains: mir.trust-expr readHost
 # zmeta-contains: mir.fn compute entry=bb0 return=I32
-# zmeta-contains: mir.local-slot compute %next mutable=false type=I32
+# zmeta-contains: mir.local-slot compute %next mutable=false type=inferred
 # zmeta-contains: mir.place compute %next kind=local span=src/lib.zn:27:1
 # zmeta-contains: mir.operand compute expr=binary:+ kind=rvalue
 # zmeta-contains: mir.rvalue compute expr=binary:+ kind=binary op=+
@@ -84,8 +85,8 @@
 # emit-contains: hir.return readHost expr=trust-block expected=I32 span=src/lib.zn:17:1
 # emit-contains: mir.return readHost value=trust-block type=I32
 # emit-contains: mir.cfg compute entry=bb0 blocks=bb0 cleanup=none
-# emit-contains: mir.local-slot compute %next mutable=false type=I32
-# emit-contains: hir.local compute.next mode=val expr=binary:+ type=I32 span=src/lib.zn:27:1
+# emit-contains: mir.local-slot compute %next mutable=false type=inferred
+# emit-contains: hir.local compute.next mode=val expr=binary:+ type=inferred span=src/lib.zn:27:1
 # emit-contains: mir.rvalue compute expr=binary:+ kind=binary op=+
 # emit-contains: mir.local compute.next init=binary:+ mutable=false
 # emit-contains: mir.assign compute bb=bb0 place=%total rvalue=name:next

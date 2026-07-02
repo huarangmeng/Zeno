@@ -1,0 +1,9 @@
+import mathbase;
+
+pub fn answer() -> I32 {
+    return mathbase.seed();
+}
+
+pub fn add(value: I32, delta: I32) -> I32 {
+    return value + delta;
+}

@@ -1011,6 +1011,8 @@ fn archive(move packet: Packet) -> I32 { ... }
 
 当所有分支产生兼容类型时，`if`、`match`、`while`、`for` 和块可以作为表达式。
 
+`if` 和 `while` 的条件必须被括号包住；`if condition { ... }` 和 `while condition { ... }` 是语法错误。
+
 ```zn
 val sign = if (value < 0) { -1 } else { 1 };
 ```

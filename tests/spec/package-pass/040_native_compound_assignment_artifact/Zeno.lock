@@ -1,0 +1,23 @@
+version = 1
+root = "nativeCompoundAssignmentApp"
+compiler = "zeno-stage0 0.1.0"
+
+[[package]]
+name = "nativeCompoundAssignmentApp"
+version = "0.1.0"
+source = "path:."
+manifestHash = "fnv1a64:799a01231c0ea7d5"
+contentHash = "fnv1a64:5e2e99a6c352830e"
+trust = []
+dependencies = [
+]
+
+[[package]]
+name = "core"
+version = "builtin"
+source = "builtin:core"
+compilerPackageHash = "fnv1a64:855693cef2029600"
+trust = []
+dependencies = [
+]
+

@@ -20,10 +20,21 @@ if(NOT ZENO_LLVM_CLANG)
   message(FATAL_ERROR "Zeno stage0 requires clang from LLVM 21 tools; LLVM_TOOLS_BINARY_DIR=${LLVM_TOOLS_BINARY_DIR}")
 endif()
 
+find_program(ZENO_LLVM_AR
+  NAMES llvm-ar
+  HINTS "${LLVM_TOOLS_BINARY_DIR}"
+  NO_DEFAULT_PATH
+)
+if(NOT ZENO_LLVM_AR)
+  message(FATAL_ERROR "Zeno stage0 requires llvm-ar from LLVM 21 tools; LLVM_TOOLS_BINARY_DIR=${LLVM_TOOLS_BINARY_DIR}")
+endif()
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVM clang ${ZENO_LLVM_CLANG}")
+message(STATUS "Using LLVM ar ${ZENO_LLVM_AR}")
 
 target_compile_definitions(zeno-stage0 PRIVATE
   ZENO_LLVM_VERSION="${LLVM_PACKAGE_VERSION}"
   ZENO_NATIVE_CLANG="${ZENO_LLVM_CLANG}"
+  ZENO_NATIVE_AR="${ZENO_LLVM_AR}"
 )

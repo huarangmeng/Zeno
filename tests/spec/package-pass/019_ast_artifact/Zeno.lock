@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "astArtifact"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:5bb5040b88793d1c"
-contentHash = "fnv1a64:c1fd11e4818b530d"
+manifestHash = "fnv1a64:994a1aca1954bebb"
+contentHash = "fnv1a64:54f95a0ac992b9a2"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

@@ -1,0 +1,34 @@
+module main;
+
+fn positive(value: I32) -> Bool {
+    return value > 0;
+}
+
+fn small(value: I32) -> Bool {
+    return value < 10;
+}
+
+fn inWindow(value: I32) -> Bool {
+    return positive(value) && small(value);
+}
+
+fn notPositive(value: I32) -> Bool {
+    return !positive(value);
+}
+
+fn classify(value: I32) -> I32 {
+    if (!positive(value)) {
+        return 2;
+    }
+    if ((value > 0) && small(value)) {
+        return 5;
+    }
+    if ((value == 42) || positive(value)) {
+        return 3;
+    }
+    return 1;
+}
+
+fn main() -> I32 {
+    return classify(7);
+}

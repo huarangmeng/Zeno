@@ -12,7 +12,11 @@
 # zmeta-contains: llvmIrArtifact = "ir/nativeForRangeApp.ll"
 # zmeta-contains: objectArtifact = "obj/nativeForRangeApp.o"
 # zmeta-contains: finalArtifact = "bin/nativeForRangeApp"
-# zmeta-contains: nativeBodySources = ["emptyHalfOpen:ast-fields-for-range-assign", "main:ast-fields", "singleClosed:ast-fields-for-range-assign", "sumClosed:ast-fields-for-range-assign", "sumForSkipBreak:ast-fields-for-range-control", "sumHalfOpen:ast-fields-for-range-assign", "sumWhileSkipBreak:ast-fields-while-control"]
+# zmeta-contains: nativeBodySources = ["emptyHalfOpen:ast-range-for-assign", "main:ast-expr-straight-line", "singleClosed:ast-range-for-assign", "sumClosed:ast-range-for-assign", "sumForSkipBreak:ast-control-body-for-range-control", "sumHalfOpen:ast-range-for-assign", "sumWhileSkipBreak:ast-control-body-while-control"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-for-range-assign
+# zmeta-forbid: ast-fields-for-range-control
+# zmeta-forbid: ast-fields-while-control
 # zmeta-contains: decl.fn sumHalfOpen module=main span=src/main.zn:3:1 params=(limit: I32) return=I32
 # zmeta-contains: decl.fn sumClosed module=main span=src/main.zn:11:1 params=(start: I32, end: I32) return=I32
 # zmeta-contains: decl.fn emptyHalfOpen module=main span=src/main.zn:19:1 params=(limit: I32) return=I32

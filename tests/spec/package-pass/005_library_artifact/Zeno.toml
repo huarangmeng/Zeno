@@ -9,6 +9,8 @@
 # zmeta-contains: declarations=fnv1a64:
 # zmeta-contains: runtime=fnv1a64:
 # zmeta-contains: archiveFormat = "ar-native-object"
+# zmeta-contains: llvm-ar
+# zmeta-contains: archiveMember = "artifactLib.o"
 # zmeta-contains: objectFormat = "native-object"
 # zmeta-contains: finalArtifact = "lib/libartifactLib.a"
 # zmeta-contains: fn answer stableNodeId=fnv1a64:
@@ -17,6 +19,7 @@
 # emit-contains: target triple = "x86_64-unknown-linux-gnu"
 # emit-contains: ; declarationFingerprint = "fnv1a64:
 # emit-contains: ; buildFingerprint = "fnv1a64:
+# object-contains: answer
 # purpose: library package builds produce a static archive and zmeta
 
 [package]

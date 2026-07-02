@@ -100,7 +100,7 @@ fn drain(start: U32) -> U32 {
 fn expressions(buffer: USize, values: ArraySlice<U32>) -> U32 {
     val empty = ();
     val pair = (1, 2);
-    val ch = 'z'; val truth = true; val text: StringSlice = "zeno"; val sci: F64 = 1.0e2;
+    val ch = 'z'; val truth = true; val text: StringSlice = "zeno"; val sci = 1.0e2;
     val widened = 1 as U32;
     val first = values[0];
     val fresh = Buffer<U8, 4>.withCapacity(4); val genericBuffer = Buffer<U8, 4> { data: buffer, count: 0 };
@@ -261,7 +261,7 @@ fn controlExpressions(value: U32) -> U32 {
     val looped = while (value == 0) { break; };
     val iterated = for i in 0..1 { };
     val matched = match Some(value) {
-        Some(found) => found,
+        Some(found) if found > 0 => found,
         None => 0,
     };
     return chosen;
@@ -473,4 +473,49 @@ fn expressionMatchBlockArms(maybe: Option<U32>) -> U32 {
         }
     };
     return resolved;
+}
+
+fn renamedStructPattern(point: Point) -> U32 {
+    val Point { x: left, y: right } = point;
+    return left + right;
+}
+
+fn tuplePattern() -> U32 {
+    val pair = (3, 4);
+    val (left, right) = pair;
+    return left + right;
+}
+
+type PredicateTransform = Fn<U32, Bool, U32>;
+
+fn multiClosureParams() -> U32 {
+    val choose = (value: U32, flag: Bool) => value;
+    val combine = (left: U32, right: U32) -> U32 { val sum = left + right; return sum; };
+    return 0;
+}
+
+fn compoundAssignmentBodies(value: U32) -> U32 {
+    var outer: U32 = value;
+    outer &= 255;
+    val scoped = {
+        var inner: U32 = outer;
+        inner <<= 1;
+        inner
+    };
+    val adjust = () -> U32 {
+        var copy: U32 = scoped;
+        copy >>= 1;
+        return copy;
+    };
+    val future = async {
+        var asyncValue: U32 = scoped;
+        asyncValue |= 1;
+        return asyncValue;
+    };
+    val trusted = trust {
+        var trustedValue: U32 = scoped;
+        trustedValue ^= 1;
+        trustedValue
+    };
+    return scoped;
 }

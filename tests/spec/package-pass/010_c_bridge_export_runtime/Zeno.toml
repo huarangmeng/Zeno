@@ -3,11 +3,23 @@
 # target: x86_64-unknown-linux-gnu
 # profile: hosted
 # build-artifact: library
+# artifact-emit: llvm-ir
 # zmeta-contains: runtimeNeeds = ["c-abi-boundary"]
 # zmeta-contains: linkRuntimeNeeds = ["c-abi-boundary"]
 # zmeta-contains: exports = ["zeno_first_byte:bridge=C", "zeno_name_len:bridge=C", "zeno_read:bridge=C"]
+# zmeta-contains: nativeBodySources = ["firstByte:bridge-c-source", "nameLen:bridge-c-source", "read:bridge-c-source", "zeno_first_byte:bridge-c-thunk", "zeno_name_len:bridge-c-thunk", "zeno_read:bridge-c-thunk"]
 # zmeta-contains: runtime=fnv1a64:
-# purpose: exported C bridge thunks are recorded separately from direct C ABI exports
+# emit-contains: %Result_USize_IoError = type { i32, i64 }
+# emit-contains: %Option_U8 = type { i1, i8 }
+# emit-contains: define %Result_USize_IoError @read(%FileDescriptor %fd, ptr %out_data, i64 %out_len)
+# emit-contains: define i32 @zeno_read(%FileDescriptor %fd, ptr %out_data, i64 %out_len, ptr %result_out)
+# emit-contains: %result = call %Result_USize_IoError @read(%FileDescriptor %fd, ptr %out_data, i64 %out_len)
+# emit-contains: define i32 @zeno_name_len(ptr %name_data, i64 %name_len, ptr %result_out)
+# emit-contains: define i1 @zeno_first_byte(ptr %bytes_data, i64 %bytes_len, ptr %out_byte)
+# object-contains: zeno_read
+# object-contains: zeno_name_len
+# object-contains: zeno_first_byte
+# purpose: exported C bridge thunks are recorded separately from direct C ABI exports and now emit real LLVM/native object bridge symbols for the covered Result<USize, IoError>, StringSlice, ArraySlice<U8>, and Option<U8> shapes
 
 [package]
 name = "cBridgeRuntime"

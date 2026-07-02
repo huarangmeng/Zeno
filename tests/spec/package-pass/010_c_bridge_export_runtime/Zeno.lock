@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "cBridgeRuntime"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:2841dbff425a0462"
-contentHash = "fnv1a64:1a29d43a8c02589f"
+manifestHash = "fnv1a64:8db91e5bdf136736"
+contentHash = "fnv1a64:f8593e57c5c61e9f"
 trust = []
 dependencies = [
 ]

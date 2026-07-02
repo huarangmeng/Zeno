@@ -7,7 +7,12 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 147
-# zmeta-contains: nativeBodySources = ["consumeHeader:ast-fields-aggregate-i32", "consumeReading:ast-fields-aggregate-i32", "inspect:ast-fields-payload-return-match", "main:ast-fields-aggregate-i32", "makeEmpty:ast-fields-payload-constructor-return", "makeHeader:ast-fields-aggregate-return", "makeReading:ast-fields-payload-constructor-return", "scoreExact:ast-fields-scalar-if-return", "scoreLength:ast-fields-scalar-if-return", "scoreRatio:ast-fields-scalar-if-return", "scoreTag:ast-fields-scalar-if-return", "scoreWeight:ast-fields-scalar-if-return", "unwrapHeader:ast-fields-payload-if-else-return"]
+# zmeta-contains: nativeBodySources = ["consumeHeader:ast-expr-scalar-return", "consumeReading:ast-expr-scalar-return", "inspect:ast-match-expr-payload-return", "main:ast-expr-aggregate-i32", "makeEmpty:ast-constructor-payload-return", "makeHeader:ast-expr-aggregate-return", "makePacketHeader:ast-constructor-payload-return", "makeReading:ast-constructor-payload-return", "scoreExact:ast-control-body-scalar-if-return", "scoreLength:ast-control-body-scalar-if-return", "scoreRatio:ast-control-body-scalar-if-return", "scoreTag:ast-control-body-scalar-if-return", "scoreWeight:ast-control-body-scalar-if-return", "unwrapHeader:ast-control-body-payload-if-else-return"]
+# zmeta-forbid: ast-fields-aggregate-i32
+# zmeta-forbid: ast-fields-aggregate-return
+# zmeta-forbid: ast-fields-payload-return-match
+# zmeta-forbid: ast-fields-payload-constructor-return
+# zmeta-forbid: unwrapHeader:ast-fields-payload-if-else-return
 # zmeta-contains: decl.enum Packet module=main span=src/main.zn:11:1
 # zmeta-contains: decl.variant Header module=main span=src/main.zn:12:1 payload=(Header)
 # zmeta-contains: decl.variant Reading module=main span=src/main.zn:13:1 payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 }
@@ -20,17 +25,23 @@
 # zmeta-contains: stmt.if-pattern unwrapHeader.Packet.Header(header) module=main span=src/main.zn:78:1 condition=name:packet pattern=Packet.Header(header)
 # zmeta-contains: syntax.pattern-condition unwrapHeader module=main span=src/main.zn:78:1 control=if scrutinee=name:packet pattern=Packet.Header(header) mode=read
 # zmeta-contains: expr.pattern-condition unwrapHeader.pattern-condition.78 module=main span=src/main.zn:78:1 generic=if control=if mode=read scrutinee=name:packet pattern=Packet.Header(header)
+# zmeta-contains: expr.control-body-stmt unwrapHeader.control-body.if-then.return.79 module=main span=src/main.zn:79:1 role=if-then kind=return expr=call:consumeHeader
+# zmeta-contains: expr.control-body-stmt unwrapHeader.control-body.if-else.return.81 module=main span=src/main.zn:81:1 role=if-else kind=return expr=int-literal:0
 # zmeta-contains: hir.enum-variant Header payload=(Header) span=src/main.zn:12:1
 # zmeta-contains: hir.enum-variant Reading payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 } span=src/main.zn:13:1
 # zmeta-contains: hir.fn-signature makePacketHeader params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Packet span=src/main.zn:64:1
 # zmeta-contains: hir.if-pattern unwrapHeader pattern=Packet.Header(header) mode=read scrutinee=name:packet span=src/main.zn:78:1
 # zmeta-contains: hir.pattern-condition unwrapHeader control=if mode=read scrutinee=name:packet pattern=Packet.Header(header) span=src/main.zn:78:1
+# zmeta-contains: hir.control-body-stmt unwrapHeader role=if-then kind=return expr=call:consumeHeader span=src/main.zn:79:1
+# zmeta-contains: hir.control-body-stmt unwrapHeader role=if-else kind=return expr=int-literal:0 span=src/main.zn:81:1
 # zmeta-contains: hir.match-arm inspect pattern=Packet.Header(header) guard=none expr=call:consumeHeader span=src/main.zn:87:1
 # zmeta-contains: hir.match-arm inspect pattern=Packet.Reading { tag, length, weight, ratio, exact } guard=none expr=call:consumeReading span=src/main.zn:88:1
 # zmeta-contains: mir.enum-variant Header payload=(Header)
 # zmeta-contains: mir.enum-variant Reading payload={ tag: U8, length: U16, weight: I64, ratio: F32, exact: F64 }
 # zmeta-contains: mir.branch unwrapHeader kind=if-pattern pattern=Packet.Header(header) mode=read scrutinee=name:packet then=if.then else=if.cont
 # zmeta-contains: mir.pattern-test unwrapHeader control=if mode=read scrutinee=name:packet pattern=Packet.Header(header)
+# zmeta-contains: mir.control-body-stmt unwrapHeader role=if-then kind=return expr=call:consumeHeader
+# zmeta-contains: mir.control-body-stmt unwrapHeader role=if-else kind=return expr=int-literal:0
 # zmeta-contains: mir.match-arm inspect pattern=Packet.Header(header) guard=none body=call:consumeHeader
 # zmeta-contains: mir.match-arm inspect pattern=Packet.Reading { tag, length, weight, ratio, exact } guard=none body=call:consumeReading
 # zmeta-contains: mir.rvalue scoreTag expr=compare:== kind=compare op===
@@ -39,6 +50,8 @@
 # zmeta-contains: llvm.control-preview @inspect expr=match mode=read scrutinee=name:packet arms=3
 # zmeta-contains: llvm.branch @unwrapHeader kind=if-pattern pattern=Packet.Header(header) mode=read scrutinee=name:packet
 # zmeta-contains: llvm.pattern-test-preview @unwrapHeader control=if mode=read scrutinee=name:packet pattern=Packet.Header(header)
+# zmeta-contains: llvm.control-body-preview @unwrapHeader role=if-then kind=return expr=call:consumeHeader
+# zmeta-contains: llvm.control-body-preview @unwrapHeader role=if-else kind=return expr=int-literal:0
 # emit-contains: %Header = type { i8, i16, i64, float, double }
 # emit-contains: %Packet = type { i32, i8, i16, i64, float, double }
 # emit-contains: define %Packet @makePacketHeader(i8 %tag, i16 %length, i64 %weight, float %ratio, double %exact)
@@ -78,7 +91,7 @@
 # object-contains: _consumeReading
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: mixed primitive scalar enum payload lowering is concentrated here: one enum carries both a mixed-scalar struct payload and a mixed-scalar record payload, constructors insert typed payload slots, if-pattern and return-match bind/reconstruct payloads, helper calls preserve U8/U16/I64/F32/F64 LLVM scalar types, and the path emits real object code plus a host executable with direct run-exit-code validation
+# purpose: mixed primitive scalar enum payload lowering is concentrated here: one enum carries both a mixed-scalar struct payload and a mixed-scalar record payload, constructors insert typed payload slots, if-pattern control-body returns and return-match bind/reconstruct payloads, helper calls preserve U8/U16/I64/F32/F64 LLVM scalar types, and the path emits real object code plus a host executable with direct run-exit-code validation
 
 [package]
 name = "nativeMixedEnumApp"

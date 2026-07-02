@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeU32App"
 version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:0de2409beec940ef"
-contentHash = "fnv1a64:e1d7b3debcf72c5b"
+manifestHash = "fnv1a64:9ef644fc2402fe07"
+contentHash = "fnv1a64:eb1c121debeea757"
 trust = []
 dependencies = [
 ]

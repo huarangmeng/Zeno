@@ -14,38 +14,68 @@
 # zmeta-contains: llvmIrArtifact = "ir/nativeApp.ll"
 # zmeta-contains: objectArtifact = "obj/nativeApp.o"
 # zmeta-contains: finalArtifact = "bin/nativeApp"
-# zmeta-contains: nativeBodySources = ["addIfPositive:ast-fields-if-return", "main:ast-fields", "sumTo:ast-fields-while-assign"]
+# zmeta-contains: nativeBodySources = ["addIfPositive:ast-control-body-if-return", "main:ast-expr-straight-line", "sumTo:ast-control-body-while-assign"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: addIfPositive:ast-fields-if-return
+# zmeta-forbid: sumTo:ast-fields-while-assign
 # zmeta-contains: decl.fn addIfPositive module=main span=src/main.zn:3:1
+# zmeta-contains: stmt.if addIfPositive module=main span=src/main.zn:4:1 condition=compare:>
 # zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:5:1 expr=binary:+ expected=I32
 # zmeta-contains: stmt.return addIfPositive module=main span=src/main.zn:7:1 expr=name:delta expected=I32
+# zmeta-contains: expr.control-body-stmt addIfPositive.control-body.if-then.return.5 module=main span=src/main.zn:5:1 role=if-then kind=return expr=binary:+
 # zmeta-contains: decl.fn sumTo module=main span=src/main.zn:10:1
 # zmeta-contains: stmt.var sumTo.i module=main span=src/main.zn:11:1 expr=int-literal:0 type=I32
 # zmeta-contains: stmt.var sumTo.acc module=main span=src/main.zn:12:1 expr=int-literal:0 type=I32
 # zmeta-contains: stmt.while sumTo module=main span=src/main.zn:13:1 condition=compare:<
 # zmeta-contains: stmt.assign sumTo.acc module=main span=src/main.zn:14:1 expr=binary:+
 # zmeta-contains: stmt.assign sumTo.i module=main span=src/main.zn:15:1 expr=binary:+
+# zmeta-contains: expr.control-body-stmt sumTo.control-body.while-body.assign.14 module=main span=src/main.zn:14:1 role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: expr.control-body-stmt sumTo.control-body.while-body.assign.15 module=main span=src/main.zn:15:1 role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: stmt.return sumTo module=main span=src/main.zn:17:1 expr=name:acc expected=I32
-# zmeta-contains: stmt.val main.total module=main span=src/main.zn:21:1 expr=call:sumTo type=I32
-# zmeta-contains: stmt.val main.result module=main span=src/main.zn:22:1 expr=call:addIfPositive type=I32
-# zmeta-contains: stmt.return main module=main span=src/main.zn:23:1 expr=name:result expected=I32
+# zmeta-contains: stmt.const main.offset module=main span=src/main.zn:21:1 expr=int-literal:1
+# zmeta-forbid: stmt.const main.offset module=main span=src/main.zn:21:1 expr=int-literal:1 type=I32
+# zmeta-contains: stmt.val main.total module=main span=src/main.zn:22:1 expr=call:sumTo
+# zmeta-contains: stmt.val main.result module=main span=src/main.zn:23:1 expr=call:addIfPositive
+# zmeta-forbid: stmt.val main.total module=main span=src/main.zn:22:1 expr=call:sumTo type=I32
+# zmeta-forbid: stmt.val main.result module=main span=src/main.zn:23:1 expr=call:addIfPositive type=I32
+# zmeta-contains: stmt.return main module=main span=src/main.zn:24:1 expr=name:result expected=I32
+# zmeta-contains: hir.if addIfPositive condition=compare:> span=src/main.zn:4:1
+# zmeta-contains: hir.control-body-stmt addIfPositive role=if-then kind=return expr=binary:+ span=src/main.zn:5:1
 # zmeta-contains: mir.rvalue addIfPositive expr=binary:+ kind=binary op=+
+# zmeta-contains: mir.branch addIfPositive kind=if condition=compare:> then=if.then else=if.cont
+# zmeta-contains: mir.control-body-stmt addIfPositive role=if-then kind=return expr=binary:+
 # zmeta-contains: mir.local sumTo.i init=int-literal:0 mutable=true
 # zmeta-contains: mir.local sumTo.acc init=int-literal:0 mutable=true
 # zmeta-contains: hir.while sumTo condition=compare:< span=src/main.zn:13:1
 # zmeta-contains: hir.assign sumTo.acc expr=binary:+ span=src/main.zn:14:1
 # zmeta-contains: hir.assign sumTo.i expr=binary:+ span=src/main.zn:15:1
+# zmeta-contains: hir.local-const main.offset expr=int-literal:1 type=inferred span=src/main.zn:21:1
+# zmeta-contains: hir.local main.total mode=val expr=call:sumTo type=inferred span=src/main.zn:22:1
+# zmeta-contains: hir.local main.result mode=val expr=call:addIfPositive type=inferred span=src/main.zn:23:1
+# zmeta-contains: hir.control-body-stmt sumTo role=while-body kind=assign target=acc op== expr=binary:+ span=src/main.zn:14:1
+# zmeta-contains: hir.control-body-stmt sumTo role=while-body kind=assign target=i op== expr=binary:+ span=src/main.zn:15:1
 # zmeta-contains: mir.loop sumTo condition=compare:< header=while.cond body=while.body exit=while.exit
 # zmeta-contains: mir.branch sumTo kind=while condition=compare:< then=while.body else=while.exit
 # zmeta-contains: mir.store sumTo place=%acc value=binary:+
 # zmeta-contains: mir.store sumTo place=%i value=binary:+
+# zmeta-contains: mir.control-body-stmt sumTo role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: mir.control-body-stmt sumTo role=while-body kind=assign target=i op== expr=binary:+
+# zmeta-contains: mir.local-const main.offset value=int-literal:1 type=inferred
+# zmeta-contains: mir.verifier-ctfe main.offset role=local-const subject=offset result=materialized reason=literal span=src/main.zn:21:1
 # zmeta-contains: mir.rvalue main expr=call:sumTo kind=call callee=@sumTo
 # zmeta-contains: mir.rvalue main expr=call:addIfPositive kind=call callee=@addIfPositive
 # zmeta-contains: mir.terminator main bb=bb0 kind=return value=name:result
 # zmeta-contains: llvm.binary-preview @addIfPositive op=+
+# zmeta-contains: llvm.branch @addIfPositive kind=if condition=compare:>
+# zmeta-contains: llvm.control-body-preview @addIfPositive role=if-then kind=return expr=binary:+
 # zmeta-contains: llvm.call-preview @sumTo in @main
 # zmeta-contains: llvm.call-preview @addIfPositive in @main
 # zmeta-contains: llvm.loop @sumTo condition=compare:<
 # zmeta-contains: llvm.branch @sumTo kind=while condition=compare:<
+# zmeta-contains: llvm.control-body-preview @sumTo role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: llvm.control-body-preview @sumTo role=while-body kind=assign target=i op== expr=binary:+
+# zmeta-contains: llvm.ctfe-materialized-preview @main.offset role=local-const subject=offset type=inferred materialization=constant-value source=mir.verifier-ctfe
+# zmeta-contains: llvm.initialization-preview @main place=%offset type=inferred state=initialized source=mir.verifier-initialization
 # zmeta-contains: llvm.store @sumTo place=%acc value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.store @sumTo place=%i value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.ret-preview @main type=I32 value=name:result
@@ -73,12 +103,13 @@
 # emit-contains: while.exit.0:
 # emit-contains: ret i32 %t8
 # emit-contains: define i32 @main()
+# emit-contains: %offset = add i32 0, 1
 # emit-contains: %t0 = call i32 @sumTo(i32 4)
 # emit-contains: %total = add i32 0, %t0
-# emit-contains: %t1 = call i32 @addIfPositive(i32 %total, i32 1)
+# emit-contains: %t1 = call i32 @addIfPositive(i32 %total, i32 %offset)
 # emit-contains: %result = add i32 0, %t1
 # emit-contains: ret i32 %result
-# purpose: minimal native application build lowers I32 locals, mutable vars, binary expressions, direct calls, simple if-return control flow, and while loops to real LLVM IR, native object, and host executable
+# purpose: minimal native application build lowers inferred local consts, inferred call-result vals, mutable vars, binary expressions, direct calls, simple if-return control flow, and while loops to real LLVM IR, native object, and host executable
 
 [package]
 name = "nativeApp"

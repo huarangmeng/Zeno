@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeSizeApp"
 version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:5f81c8541ec938ef"
-contentHash = "fnv1a64:c0a110b5e540ac4a"
+manifestHash = "fnv1a64:ac301f442a302a50"
+contentHash = "fnv1a64:3eb82077a80c9063"
 trust = []
 dependencies = [
 ]

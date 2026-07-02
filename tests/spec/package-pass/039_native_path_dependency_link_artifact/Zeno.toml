@@ -1,0 +1,69 @@
+# category: package-pass
+# stage: mvp
+# milestone: M4
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 43
+# zmeta-contains: linkedLibraries = ["mathbase:lib/libmathbase.a", "mathlib:lib/libmathlib.a"]
+# zmeta-contains: linkedLibraryOrder = ["mathlib:lib/libmathlib.a", "mathbase:lib/libmathbase.a"]
+# zmeta-contains: nativeBodySources = ["add:path-dependency-declare", "answer:path-dependency-declare", "main:ast-expr-straight-line", "seed:path-dependency-declare"]
+# zmeta-contains: expr.method-call main.add module=root span=src/main.zn:4:1 generic=read mode=read receiver=mathlib method=add
+# zmeta-contains: expr.method-call main.answer module=root span=src/main.zn:4:1 generic=read mode=read receiver=mathlib method=answer
+# zmeta-contains: stmt.val main.base module=root span=src/main.zn:4:1 expr=method-call:add
+# zmeta-forbid: stmt.val main.base module=root span=src/main.zn:4:1 expr=method-call:add type=I32
+# zmeta-contains: hir.local main.base mode=val expr=method-call:add type=inferred span=src/main.zn:4:1
+# zmeta-contains: mir.local-slot main %base mutable=false type=inferred
+# zmeta-contains: llvm.initialization-preview @main place=%base type=inferred state=initialized
+# zmeta-contains: syntax.method-call main.add module=root span=src/main.zn:4:1 owner=main receiver=mathlib receiverExpr=name:mathlib method=add mode=read
+# zmeta-contains: syntax.method-call main.answer module=root span=src/main.zn:4:1 owner=main receiver=mathlib receiverExpr=name:mathlib method=answer mode=read
+# zmeta-contains: finalArtifact = "bin/nativePathDepLinkApp"
+# emit-contains: declare i32 @add(i32, i32)
+# emit-contains: declare i32 @answer()
+# emit-contains: declare i32 @seed()
+# emit-contains: %t1 = call i32 @add(i32 %t0, i32 1)
+# emit-contains: %t0 = call i32 @answer()
+# emit-contains: define i32 @main()
+# object-contains: _add
+# object-contains: _answer
+# object-contains: _main
+# archive-contains: mathlib.o
+# archive-contains: mathbase.o
+# archive-contains: _add
+# archive-contains: _answer
+# archive-contains: _seed
+# archive-forbid: zeno-stage0-preview-object
+# purpose: application linking consumes real local path dependency static archives through clang, including a transitive mathlib -> mathbase archive edge, leaving external dependency calls in root/library objects and validating the final host executable exit code
+
+[package]
+name = "nativePathDepLinkApp"
+version = "0.1.0"
+kind = "application"
+
+[dependencies]
+mathlib = { path = "mathlib" }
+
+[target]
+triple = "aarch64-apple-darwin"
+profile = "hosted"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "abort"
+stack = "none"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+threadSafety = false
+dependencyTrust = false

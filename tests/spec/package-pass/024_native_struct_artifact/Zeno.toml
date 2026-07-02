@@ -7,7 +7,9 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 7
-# zmeta-contains: nativeBodySources = ["consumePair:ast-fields-aggregate-i32", "exportedConsumePair:ast-fields-aggregate-i32", "identityPair:ast-fields-aggregate-return", "main:ast-fields-aggregate-i32", "makePair:ast-fields-aggregate-return", "sumPair:ast-fields-aggregate-i32"]
+# zmeta-contains: nativeBodySources = ["consumePair:ast-expr-aggregate-i32", "exportedConsumePair:ast-expr-aggregate-i32", "identityPair:ast-expr-aggregate-return", "main:ast-expr-aggregate-i32", "makePair:ast-expr-aggregate-return", "sumPair:ast-expr-aggregate-i32"]
+# zmeta-forbid: ast-fields-aggregate-i32
+# zmeta-forbid: ast-fields-aggregate-return
 # zmeta-contains: decl.struct Pair module=main span=src/main.zn:3:1
 # zmeta-contains: decl.field Pair.left module=main span=src/main.zn:4:1 type=I32
 # zmeta-contains: decl.field Pair.right module=main span=src/main.zn:5:1 type=I32
@@ -26,7 +28,9 @@
 # zmeta-contains: stmt.return sumPair module=main span=src/main.zn:11:1 expr=call:consumePair expected=I32
 # zmeta-contains: stmt.return consumePair module=main span=src/main.zn:15:1 expr=binary:+ expected=I32
 # zmeta-contains: stmt.return identityPair module=main span=src/main.zn:19:1 expr=name:pair expected=Pair
+# zmeta-contains: expr.name identityPair.pair module=main span=src/main.zn:19:1 name=pair exprFact=name:pair
 # zmeta-contains: stmt.return makePair module=main span=src/main.zn:23:1 expr=struct-literal:Pair expected=Pair
+# zmeta-contains: expr.struct-literal makePair module=main span=src/main.zn:23:1 generic=Pair type=Pair exprFact=struct-literal:Pair
 # zmeta-contains: stmt.return exportedConsumePair module=main span=src/main.zn:38:1 expr=binary:+ expected=I32
 # zmeta-contains: hir.field Pair.left type=I32 span=src/main.zn:4:1
 # zmeta-contains: hir.field Pair.right type=I32 span=src/main.zn:5:1

@@ -7,7 +7,22 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 114
-# zmeta-contains: nativeBodySources = ["chooseMode:ast-fields-enum-return", "firstKey:ast-fields-payload-while-return", "inspect:ast-fields-payload-return-match", "makeCode:ast-fields-payload-constructor-return", "makeFinished:ast-fields-payload-constructor-return", "makeKey:ast-fields-payload-constructor-return", "makeMaybe:ast-fields-payload-constructor-return", "makeMaybeJob:ast-fields-payload-constructor-return", "makeMaybeTask:ast-fields-payload-constructor-return", "makeNoJob:ast-fields-payload-constructor-return", "makeNoTask:ast-fields-payload-constructor-return", "makeNone:ast-fields-payload-constructor-return", "makePair:ast-fields-payload-constructor-return", "makeReady:ast-fields-payload-constructor-return", "matchJob:ast-fields-payload-return-match", "matchMaybe:ast-fields-payload-return-match", "matchTask:ast-fields-payload-return-match", "simpleEventCode:ast-fields-payload-return-match", "sumKeys:ast-fields-payload-while-assign", "sumMaybe:ast-fields-payload-while-assign", "unwrapJob:ast-fields-payload-if-else-return", "unwrapMaybe:ast-fields-payload-if-else-return"]
+# zmeta-contains: nativeBodySources = ["bump:ast-control-body-payload-if-return", "chooseMode:ast-constructor-enum-return", "consume:ast-expr-aggregate-i32", "eventCode:ast-match-expr-payload-return", "firstKey:ast-control-body-payload-while-return", "inspect:ast-match-expr-payload-return", "isHot:ast-expr-bool-return", "keyUntil:ast-control-body-payload-constructor-if-return", "main:ast-expr-aggregate-i32", "makeCode:ast-constructor-payload-return", "makeFinished:ast-constructor-payload-return", "makeKey:ast-constructor-payload-return", "makeMaybe:ast-constructor-payload-return", "makeMaybeJob:ast-constructor-payload-return", "makeMaybeTask:ast-constructor-payload-return", "makeNoJob:ast-constructor-payload-return", "makeNoTask:ast-constructor-payload-return", "makeNone:ast-constructor-payload-return", "makePair:ast-constructor-payload-return", "makeReady:ast-constructor-payload-return", "matchJob:ast-match-expr-payload-return", "matchMaybe:ast-match-expr-payload-return", "matchTask:ast-match-expr-payload-return", "maybeUntil:ast-control-body-payload-constructor-if-return", "score:ast-match-expr-enum-return", "simpleEventCode:ast-match-expr-payload-return", "statementScore:ast-match-stmt-enum-return", "sumKeys:ast-control-body-payload-while-assign", "sumMaybe:ast-control-body-payload-while-assign", "unwrapJob:ast-control-body-payload-if-else-return", "unwrapMaybe:ast-control-body-payload-if-else-return"]
+# zmeta-forbid: ast-fields-aggregate-i32
+# zmeta-forbid: ast-fields-bool-return
+# zmeta-forbid: bump:ast-fields-payload-if-return
+# zmeta-forbid: firstKey:ast-fields-payload-while-return
+# zmeta-forbid: keyUntil:ast-fields-payload-if-return
+# zmeta-forbid: maybeUntil:ast-fields-payload-if-return
+# zmeta-forbid: sumKeys:ast-fields-payload-while-assign
+# zmeta-forbid: sumMaybe:ast-fields-payload-while-assign
+# zmeta-forbid: unwrapMaybe:ast-fields-payload-if-else-return
+# zmeta-forbid: unwrapJob:ast-fields-payload-if-else-return
+# zmeta-forbid: chooseMode:ast-fields-enum-return
+# zmeta-forbid: score:ast-fields-enum-return-match
+# zmeta-forbid: statementScore:ast-fields-enum-statement-match
+# zmeta-forbid: ast-fields-payload-return-match
+# zmeta-forbid: ast-fields-payload-constructor-return
 # zmeta-contains: decl.enum Mode module=main span=src/main.zn:3:1
 # zmeta-contains: decl.enum Maybe module=main span=src/main.zn:9:1 generic=<T>
 # zmeta-contains: decl.struct Job module=main span=src/main.zn:14:1
@@ -55,11 +70,16 @@
 # zmeta-contains: decl.fn sumMaybe module=main span=src/main.zn:215:1 params=(limit: I32) return=I32
 # zmeta-contains: decl.fn main module=main span=src/main.zn:225:1 params=() return=I32
 # zmeta-contains: stmt.return score module=main span=src/main.zn:31:1 expr=match expected=I32
+# zmeta-contains: expr.match-arm score.match-arm.32.0 module=main span=src/main.zn:32:1 index=0 pattern=Mode.Cold guard=none expr=int-literal:1
+# zmeta-contains: expr.match-arm score.match-arm.33.1 module=main span=src/main.zn:33:1 index=1 pattern=Mode.Hot guard=none expr=int-literal:7
+# zmeta-contains: expr.match-arm score.match-arm.34.2 module=main span=src/main.zn:34:1 index=2 pattern=Mode.Done guard=none expr=int-literal:3
 # zmeta-contains: stmt.match statementScore module=main span=src/main.zn:39:1 condition=name:mode
 # zmeta-contains: syntax.return-expr statementScore module=main span=src/main.zn:41:1 expr=int-literal:5
 # zmeta-contains: expr.return statementScore module=main span=src/main.zn:41:1 expr=int-literal:5
 # zmeta-contains: stmt.match-arm statementScore.Mode.Hot module=main span=src/main.zn:41:1 expr=return-expr:int-literal:5
 # zmeta-contains: stmt.return isHot module=main span=src/main.zn:47:1 expr=compare:== expected=Bool
+# zmeta-contains: stmt.return chooseMode module=main span=src/main.zn:51:1 expr=variant-value:Mode.Hot expected=Mode
+# zmeta-contains: expr.variant-value chooseMode.Mode.Hot module=main span=src/main.zn:51:1 generic=Mode exprFact=variant-value:Mode.Hot
 # zmeta-contains: stmt.return makeReady module=main span=src/main.zn:59:1 expr=type-static-call:WorkState.Ready expected=WorkState
 # zmeta-contains: stmt.return inspect module=main span=src/main.zn:63:1 expr=match expected=I32
 # zmeta-contains: stmt.return finish module=main span=src/main.zn:70:1 expr=match:move expected=I32
@@ -67,9 +87,12 @@
 # zmeta-contains: stmt.if-pattern bump.WorkState.Ready(job) module=main span=src/main.zn:77:1 mode=mut condition=name:state pattern=WorkState.Ready(job)
 # zmeta-contains: syntax.pattern-condition bump module=main span=src/main.zn:77:1 control=if scrutinee=name:state pattern=WorkState.Ready(job) mode=mut
 # zmeta-contains: expr.pattern-condition bump.pattern-condition.77 module=main span=src/main.zn:77:1 generic=if control=if mode=mut scrutinee=name:state pattern=WorkState.Ready(job)
+# zmeta-contains: expr.control-body-stmt bump.control-body.if-then.return.78 module=main span=src/main.zn:78:1 role=if-then kind=return expr=binary:+
 # zmeta-contains: stmt.if-pattern unwrapMaybe.Maybe.Some(value) module=main span=src/main.zn:84:1 condition=name:maybe pattern=Maybe.Some(value)
 # zmeta-contains: syntax.pattern-condition unwrapMaybe module=main span=src/main.zn:84:1 control=if scrutinee=name:maybe pattern=Maybe.Some(value) mode=read
 # zmeta-contains: expr.pattern-condition unwrapMaybe.pattern-condition.84 module=main span=src/main.zn:84:1 generic=if control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(value)
+# zmeta-contains: expr.control-body-stmt unwrapMaybe.control-body.if-then.return.85 module=main span=src/main.zn:85:1 role=if-then kind=return expr=name:value
+# zmeta-contains: expr.control-body-stmt unwrapMaybe.control-body.if-else.return.87 module=main span=src/main.zn:87:1 role=if-else kind=return expr=int-literal:0
 # zmeta-contains: stmt.return makeKey module=main span=src/main.zn:116:1 expr=type-static-call:Event.Key expected=Event
 # zmeta-contains: stmt.return makeCode module=main span=src/main.zn:120:1 expr=type-static-call:Event.Code expected=Event
 # zmeta-contains: stmt.return makePair module=main span=src/main.zn:124:1 expr=variant-literal:Event.Pair expected=Event
@@ -80,7 +103,10 @@
 # zmeta-contains: stmt.match-arm simpleEventCode.Event.Key(code) module=main span=src/main.zn:133:1 expr=name:code
 # zmeta-contains: stmt.match-arm simpleEventCode.Event.Code(code) module=main span=src/main.zn:134:1 expr=binary:+
 # zmeta-contains: stmt.match-arm simpleEventCode.Event.Pair { left, right } module=main span=src/main.zn:135:1 expr=binary:+
-# zmeta-contains: stmt.match-arm eventCode.Event.Key(code) module=main span=src/main.zn:142:1 expr=name:code guard=compare:<
+# zmeta-contains: stmt.match-arm eventCode.Event.Key(code) module=main span=src/main.zn:142:1 expr=name:code guard=compare:< pattern=Event.Key(code) exprFact=name:code patternFact=Event.Key(code) guardFact=compare:< sourceExprFact=name:code guardFact=compare:< guardLeftFact=name:code guardOpFact=< guardRightFact=int-literal:10
+# zmeta-contains: expr.match-arm eventCode.match-arm.142.0 module=main span=src/main.zn:142:1 index=0 pattern=Event.Key(code) guard=compare:< expr=name:code
+# zmeta-contains: expr.compare eventCode module=main span=src/main.zn:142:1 generic=< op=< left=name:code right=int-literal:10 exprFact=compare:< leftFact=name:code opFact=< rightFact=int-literal:10
+# zmeta-contains: syntax.stmt eventCode module=main span=src/main.zn:142:1 kind=match-arm pattern=Event.Key(code) guard=compare:< guardOp=< guardLeft=name:code guardRight=int-literal:10 expr=name:code
 # zmeta-contains: stmt.match-arm eventCode.Event.Code(10..=20) module=main span=src/main.zn:143:1 expr=int-literal:20
 # zmeta-contains: stmt.match-arm eventCode.Event.Key(code) | Event.Code(code) module=main span=src/main.zn:144:1 expr=name:code
 # zmeta-contains: stmt.match-arm eventCode.Event.Pair { left, right } module=main span=src/main.zn:145:1 expr=binary:+
@@ -92,6 +118,7 @@
 # zmeta-contains: expr.pattern-condition firstKey.pattern-condition.151 module=main span=src/main.zn:151:1 generic=while control=while mode=read scrutinee=call:makeKey pattern=Event.Key(value)
 # zmeta-contains: stmt.return firstKey module=main span=src/main.zn:152:1 expr=binary:+ expected=I32
 # zmeta-contains: stmt.return firstKey module=main span=src/main.zn:154:1 expr=int-literal:0 expected=I32
+# zmeta-contains: expr.control-body-stmt firstKey.control-body.while-body.return.152 module=main span=src/main.zn:152:1 role=while-body kind=return expr=binary:+
 # zmeta-contains: stmt.return makeMaybe module=main span=src/main.zn:92:1 expr=type-static-call:Maybe.Some expected=Maybe<I32>
 # zmeta-contains: syntax.variant-value makeNone.Maybe.None module=main span=src/main.zn:96:1 owner=makeNone enum=Maybe variant=None constructor=Maybe.None
 # zmeta-contains: stmt.return makeNone module=main span=src/main.zn:96:1 expr=variant-value:Maybe.None expected=Maybe<I32>
@@ -100,15 +127,20 @@
 # zmeta-contains: stmt.if-pattern unwrapJob.Maybe.Some(job) module=main span=src/main.zn:108:1 condition=name:maybe pattern=Maybe.Some(job)
 # zmeta-contains: stmt.return unwrapJob module=main span=src/main.zn:109:1 expr=field:job.priority expected=I32
 # zmeta-contains: stmt.return unwrapJob module=main span=src/main.zn:111:1 expr=int-literal:0 expected=I32
+# zmeta-contains: expr.control-body-stmt unwrapJob.control-body.if-then.return.109 module=main span=src/main.zn:109:1 role=if-then kind=return expr=field:job.priority
+# zmeta-contains: expr.control-body-stmt unwrapJob.control-body.if-else.return.111 module=main span=src/main.zn:111:1 role=if-else kind=return expr=int-literal:0
 # zmeta-contains: stmt.if keyUntil module=main span=src/main.zn:158:1 condition=compare:<
 # zmeta-contains: stmt.return keyUntil module=main span=src/main.zn:159:1 expr=type-static-call:Event.Key expected=Event
 # zmeta-contains: stmt.return keyUntil module=main span=src/main.zn:161:1 expr=variant-value:Event.Finished expected=Event
+# zmeta-contains: expr.control-body-stmt keyUntil.control-body.if-then.return.159 module=main span=src/main.zn:159:1 role=if-then kind=return expr=type-static-call:Event.Key
 # zmeta-contains: stmt.var sumKeys.i module=main span=src/main.zn:165:1 expr=int-literal:0
 # zmeta-contains: stmt.var sumKeys.acc module=main span=src/main.zn:166:1 expr=int-literal:0
 # zmeta-contains: stmt.while-pattern sumKeys.Event.Key(value) module=main span=src/main.zn:167:1 condition=call:keyUntil pattern=Event.Key(value)
 # zmeta-contains: stmt.assign sumKeys.acc module=main span=src/main.zn:168:1 expr=binary:+
 # zmeta-contains: stmt.assign sumKeys.i module=main span=src/main.zn:169:1 expr=binary:+
 # zmeta-contains: stmt.return sumKeys module=main span=src/main.zn:171:1 expr=name:acc expected=I32
+# zmeta-contains: expr.control-body-stmt sumKeys.control-body.while-body.assign.168 module=main span=src/main.zn:168:1 role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: expr.control-body-stmt sumKeys.control-body.while-body.assign.169 module=main span=src/main.zn:169:1 role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: stmt.return matchMaybe module=main span=src/main.zn:175:1 expr=match expected=I32
 # zmeta-contains: stmt.match-arm matchMaybe.Maybe.Some(value) module=main span=src/main.zn:176:1 expr=name:value
 # zmeta-contains: stmt.match-arm matchMaybe.Maybe.None module=main span=src/main.zn:177:1 expr=int-literal:0
@@ -123,6 +155,7 @@
 # zmeta-contains: stmt.if maybeUntil module=main span=src/main.zn:209:1 condition=compare:<
 # zmeta-contains: stmt.return maybeUntil module=main span=src/main.zn:210:1 expr=type-static-call:Maybe.Some expected=Maybe<I32>
 # zmeta-contains: stmt.return maybeUntil module=main span=src/main.zn:212:1 expr=variant-value:Maybe.None expected=Maybe<I32>
+# zmeta-contains: expr.control-body-stmt maybeUntil.control-body.if-then.return.210 module=main span=src/main.zn:210:1 role=if-then kind=return expr=type-static-call:Maybe.Some
 # zmeta-contains: stmt.var sumMaybe.i module=main span=src/main.zn:216:1 expr=int-literal:0
 # zmeta-contains: stmt.var sumMaybe.acc module=main span=src/main.zn:217:1 expr=int-literal:0
 # zmeta-contains: stmt.while-pattern sumMaybe.Maybe.Some(value) module=main span=src/main.zn:218:1 condition=call:maybeUntil pattern=Maybe.Some(value)
@@ -131,6 +164,8 @@
 # zmeta-contains: stmt.assign sumMaybe.acc module=main span=src/main.zn:219:1 expr=binary:+
 # zmeta-contains: stmt.assign sumMaybe.i module=main span=src/main.zn:220:1 expr=binary:+
 # zmeta-contains: stmt.return sumMaybe module=main span=src/main.zn:222:1 expr=name:acc expected=I32
+# zmeta-contains: expr.control-body-stmt sumMaybe.control-body.while-body.assign.219 module=main span=src/main.zn:219:1 role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: expr.control-body-stmt sumMaybe.control-body.while-body.assign.220 module=main span=src/main.zn:220:1 role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: stmt.val main.ready module=main span=src/main.zn:226:1 expr=call:makeReady
 # zmeta-contains: stmt.val main.some module=main span=src/main.zn:227:1 expr=call:makeMaybe
 # zmeta-contains: stmt.val main.none module=main span=src/main.zn:228:1 expr=call:makeNone
@@ -186,6 +221,10 @@
 # zmeta-contains: hir.if-pattern unwrapJob pattern=Maybe.Some(job) mode=read scrutinee=name:maybe span=src/main.zn:108:1
 # zmeta-contains: hir.return unwrapJob expr=field:job.priority expected=I32 span=src/main.zn:109:1
 # zmeta-contains: hir.return unwrapJob expr=int-literal:0 expected=I32 span=src/main.zn:111:1
+# zmeta-contains: hir.control-body-stmt unwrapMaybe role=if-then kind=return expr=name:value span=src/main.zn:85:1
+# zmeta-contains: hir.control-body-stmt unwrapMaybe role=if-else kind=return expr=int-literal:0 span=src/main.zn:87:1
+# zmeta-contains: hir.control-body-stmt unwrapJob role=if-then kind=return expr=field:job.priority span=src/main.zn:109:1
+# zmeta-contains: hir.control-body-stmt unwrapJob role=if-else kind=return expr=int-literal:0 span=src/main.zn:111:1
 # zmeta-contains: hir.return makeKey expr=type-static-call:Event.Key expected=Event span=src/main.zn:116:1
 # zmeta-contains: hir.return makeCode expr=type-static-call:Event.Code expected=Event span=src/main.zn:120:1
 # zmeta-contains: hir.ctfe-body makePair features=function-body,variant-literal return=Event evaluator=available span=src/main.zn:123:1
@@ -197,6 +236,7 @@
 # zmeta-contains: hir.return finish expr=match:move expected=I32 span=src/main.zn:70:1
 # zmeta-contains: hir.if-pattern bump pattern=WorkState.Ready(job) mode=mut scrutinee=name:state span=src/main.zn:77:1
 # zmeta-contains: hir.pattern-condition bump control=if mode=mut scrutinee=name:state pattern=WorkState.Ready(job) span=src/main.zn:77:1
+# zmeta-contains: hir.control-body-stmt bump role=if-then kind=return expr=binary:+ span=src/main.zn:78:1
 # zmeta-contains: hir.pattern-condition unwrapMaybe control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(value) span=src/main.zn:84:1
 # zmeta-contains: hir.match-arm simpleEventCode pattern=Event.Key(code) guard=none expr=name:code span=src/main.zn:133:1
 # zmeta-contains: hir.match-arm simpleEventCode pattern=Event.Pair { left, right } guard=none expr=binary:+ span=src/main.zn:135:1
@@ -206,7 +246,9 @@
 # zmeta-contains: hir.while-pattern firstKey pattern=Event.Key(value) mode=read scrutinee=call:makeKey span=src/main.zn:151:1
 # zmeta-contains: hir.pattern-condition firstKey control=while mode=read scrutinee=call:makeKey pattern=Event.Key(value) span=src/main.zn:151:1
 # zmeta-contains: hir.return firstKey expr=binary:+ expected=I32 span=src/main.zn:152:1
+# zmeta-contains: hir.control-body-stmt firstKey role=while-body kind=return expr=binary:+ span=src/main.zn:152:1
 # zmeta-contains: hir.if keyUntil condition=compare:< span=src/main.zn:158:1
+# zmeta-contains: hir.control-body-stmt keyUntil role=if-then kind=return expr=type-static-call:Event.Key span=src/main.zn:159:1
 # zmeta-contains: hir.return keyUntil expr=type-static-call:Event.Key expected=Event span=src/main.zn:159:1
 # zmeta-contains: hir.return keyUntil expr=variant-value:Event.Finished expected=Event span=src/main.zn:161:1
 # zmeta-contains: hir.local sumKeys.i mode=var expr=int-literal:0 type=inferred span=src/main.zn:165:1
@@ -214,6 +256,8 @@
 # zmeta-contains: hir.while-pattern sumKeys pattern=Event.Key(value) mode=read scrutinee=call:keyUntil span=src/main.zn:167:1
 # zmeta-contains: hir.assign sumKeys.acc expr=binary:+ span=src/main.zn:168:1
 # zmeta-contains: hir.assign sumKeys.i expr=binary:+ span=src/main.zn:169:1
+# zmeta-contains: hir.control-body-stmt sumKeys role=while-body kind=assign target=acc op== expr=binary:+ span=src/main.zn:168:1
+# zmeta-contains: hir.control-body-stmt sumKeys role=while-body kind=assign target=i op== expr=binary:+ span=src/main.zn:169:1
 # zmeta-contains: hir.return sumKeys expr=name:acc expected=I32 span=src/main.zn:171:1
 # zmeta-contains: hir.return matchMaybe expr=match expected=I32 span=src/main.zn:175:1
 # zmeta-contains: hir.match-arm matchMaybe pattern=Maybe.Some(value) guard=none expr=name:value span=src/main.zn:176:1
@@ -227,6 +271,7 @@
 # zmeta-contains: hir.match-arm matchTask pattern=Maybe.Some(task) guard=none expr=binary:+ span=src/main.zn:203:1
 # zmeta-contains: hir.match-arm matchTask pattern=Maybe.None guard=none expr=int-literal:0 span=src/main.zn:204:1
 # zmeta-contains: hir.if maybeUntil condition=compare:< span=src/main.zn:209:1
+# zmeta-contains: hir.control-body-stmt maybeUntil role=if-then kind=return expr=type-static-call:Maybe.Some span=src/main.zn:210:1
 # zmeta-contains: hir.return maybeUntil expr=type-static-call:Maybe.Some expected=Maybe<I32> span=src/main.zn:210:1
 # zmeta-contains: hir.return maybeUntil expr=variant-value:Maybe.None expected=Maybe<I32> span=src/main.zn:212:1
 # zmeta-contains: hir.local sumMaybe.i mode=var expr=int-literal:0 type=inferred span=src/main.zn:216:1
@@ -235,6 +280,8 @@
 # zmeta-contains: hir.pattern-condition sumMaybe control=while mode=read scrutinee=call:maybeUntil pattern=Maybe.Some(value) span=src/main.zn:218:1
 # zmeta-contains: hir.assign sumMaybe.acc expr=binary:+ span=src/main.zn:219:1
 # zmeta-contains: hir.assign sumMaybe.i expr=binary:+ span=src/main.zn:220:1
+# zmeta-contains: hir.control-body-stmt sumMaybe role=while-body kind=assign target=acc op== expr=binary:+ span=src/main.zn:219:1
+# zmeta-contains: hir.control-body-stmt sumMaybe role=while-body kind=assign target=i op== expr=binary:+ span=src/main.zn:220:1
 # zmeta-contains: hir.return sumMaybe expr=name:acc expected=I32 span=src/main.zn:222:1
 # zmeta-contains: hir.local main.ready mode=val expr=call:makeReady type=inferred span=src/main.zn:226:1
 # zmeta-contains: hir.local main.some mode=val expr=call:makeMaybe type=inferred span=src/main.zn:227:1
@@ -289,12 +336,17 @@
 # zmeta-contains: mir.return makeMaybeTask value=type-static-call:Maybe.Some type=Maybe<Task>
 # zmeta-contains: mir.return makeNoTask value=variant-value:Maybe.None type=Maybe<Task>
 # zmeta-contains: mir.branch maybeUntil kind=if condition=compare:< then=if.then else=if.cont
+# zmeta-contains: mir.control-body-stmt maybeUntil role=if-then kind=return expr=type-static-call:Maybe.Some
 # zmeta-contains: mir.rvalue maybeUntil expr=compare:< kind=compare op=<
 # zmeta-contains: mir.return maybeUntil value=type-static-call:Maybe.Some type=Maybe<I32>
 # zmeta-contains: mir.return maybeUntil value=variant-value:Maybe.None type=Maybe<I32>
 # zmeta-contains: mir.branch unwrapJob kind=if-pattern pattern=Maybe.Some(job) mode=read scrutinee=name:maybe then=if.then else=if.cont
 # zmeta-contains: mir.return unwrapJob value=field:job.priority type=I32
 # zmeta-contains: mir.return unwrapJob value=int-literal:0 type=I32
+# zmeta-contains: mir.control-body-stmt unwrapMaybe role=if-then kind=return expr=name:value
+# zmeta-contains: mir.control-body-stmt unwrapMaybe role=if-else kind=return expr=int-literal:0
+# zmeta-contains: mir.control-body-stmt unwrapJob role=if-then kind=return expr=field:job.priority
+# zmeta-contains: mir.control-body-stmt unwrapJob role=if-else kind=return expr=int-literal:0
 # zmeta-contains: mir.return makeKey value=type-static-call:Event.Key type=Event
 # zmeta-contains: mir.return makeCode value=type-static-call:Event.Code type=Event
 # zmeta-contains: mir.return makePair value=variant-literal:Event.Pair type=Event
@@ -315,11 +367,13 @@
 # zmeta-contains: mir.rvalue main expr=call:makeFinished kind=call callee=@makeFinished
 # zmeta-contains: mir.loop firstKey kind=while-pattern pattern=Event.Key(value) mode=read scrutinee=call:makeKey header=while.cond body=while.body exit=while.exit
 # zmeta-contains: mir.pattern-test firstKey control=while mode=read scrutinee=call:makeKey pattern=Event.Key(value)
+# zmeta-contains: mir.control-body-stmt firstKey role=while-body kind=return expr=binary:+
 # zmeta-contains: mir.branch firstKey kind=while-pattern pattern=Event.Key(value) mode=read then=while.body else=while.exit
 # zmeta-contains: mir.rvalue firstKey expr=call:makeKey kind=call callee=@makeKey
 # zmeta-contains: mir.rvalue firstKey expr=binary:+ kind=binary op=+
 # zmeta-contains: mir.return firstKey value=binary:+ type=I32
 # zmeta-contains: mir.branch keyUntil kind=if condition=compare:< then=if.then else=if.cont
+# zmeta-contains: mir.control-body-stmt keyUntil role=if-then kind=return expr=type-static-call:Event.Key
 # zmeta-contains: mir.rvalue keyUntil expr=compare:< kind=compare op=<
 # zmeta-contains: mir.return keyUntil value=type-static-call:Event.Key type=Event
 # zmeta-contains: mir.return keyUntil value=variant-value:Event.Finished type=Event
@@ -331,6 +385,8 @@
 # zmeta-contains: mir.rvalue sumKeys expr=binary:+ kind=binary op=+
 # zmeta-contains: mir.store sumKeys place=%acc value=binary:+
 # zmeta-contains: mir.store sumKeys place=%i value=binary:+
+# zmeta-contains: mir.control-body-stmt sumKeys role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: mir.control-body-stmt sumKeys role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: mir.return sumKeys value=name:acc type=I32
 # zmeta-contains: mir.return matchMaybe value=match type=I32
 # zmeta-contains: mir.rvalue matchMaybe expr=match kind=match mode=read scrutinee=name:maybe arms=2
@@ -353,6 +409,8 @@
 # zmeta-contains: mir.rvalue sumMaybe expr=binary:+ kind=binary op=+
 # zmeta-contains: mir.store sumMaybe place=%acc value=binary:+
 # zmeta-contains: mir.store sumMaybe place=%i value=binary:+
+# zmeta-contains: mir.control-body-stmt sumMaybe role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: mir.control-body-stmt sumMaybe role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: mir.return sumMaybe value=name:acc type=I32
 # zmeta-contains: mir.return score value=match type=I32
 # zmeta-contains: mir.rvalue score expr=match kind=match mode=read scrutinee=name:mode arms=3
@@ -377,6 +435,7 @@
 # zmeta-contains: mir.branch bump kind=if-pattern pattern=WorkState.Ready(job) mode=mut scrutinee=name:state then=if.then else=if.cont
 # zmeta-contains: mir.branch unwrapMaybe kind=if-pattern pattern=Maybe.Some(value) mode=read scrutinee=name:maybe then=if.then else=if.cont
 # zmeta-contains: mir.pattern-test bump control=if mode=mut scrutinee=name:state pattern=WorkState.Ready(job)
+# zmeta-contains: mir.control-body-stmt bump role=if-then kind=return expr=binary:+
 # zmeta-contains: mir.pattern-test unwrapMaybe control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(value)
 # zmeta-contains: mir.match-arm eventCode pattern=Event.Code(10..=20) guard=none body=int-literal:20
 # zmeta-contains: mir.match-arm eventCode pattern=Event.Key(code) | Event.Code(code) guard=none body=name:code
@@ -388,10 +447,14 @@
 # zmeta-contains: llvm.define-preview @unwrapMaybe return=I32
 # zmeta-contains: llvm.branch @unwrapMaybe kind=if-pattern pattern=Maybe.Some(value) mode=read scrutinee=name:maybe
 # zmeta-contains: llvm.pattern-test-preview @unwrapMaybe control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(value)
+# zmeta-contains: llvm.control-body-preview @unwrapMaybe role=if-then kind=return expr=name:value
+# zmeta-contains: llvm.control-body-preview @unwrapMaybe role=if-else kind=return expr=int-literal:0
 # zmeta-contains: llvm.define-preview @makeMaybeJob return=Maybe<Job>
 # zmeta-contains: llvm.define-preview @makeNoJob return=Maybe<Job>
 # zmeta-contains: llvm.define-preview @unwrapJob return=I32
 # zmeta-contains: llvm.branch @unwrapJob kind=if-pattern pattern=Maybe.Some(job) mode=read scrutinee=name:maybe
+# zmeta-contains: llvm.control-body-preview @unwrapJob role=if-then kind=return expr=field:job.priority
+# zmeta-contains: llvm.control-body-preview @unwrapJob role=if-else kind=return expr=int-literal:0
 # zmeta-contains: llvm.define-preview @makeMaybeTask return=Maybe<Task>
 # zmeta-contains: llvm.define-preview @makeNoTask return=Maybe<Task>
 # zmeta-contains: llvm.define-preview @matchTask return=I32
@@ -403,23 +466,30 @@
 # zmeta-contains: llvm.define-preview @firstKey return=I32
 # zmeta-contains: llvm.loop @firstKey kind=while-pattern pattern=Event.Key(value) mode=read scrutinee=call:makeKey
 # zmeta-contains: llvm.pattern-test-preview @firstKey control=while mode=read scrutinee=call:makeKey pattern=Event.Key(value)
+# zmeta-contains: llvm.control-body-preview @firstKey role=while-body kind=return expr=binary:+
 # zmeta-contains: llvm.ret-preview @firstKey type=I32 value=binary:+
 # zmeta-contains: llvm.define-preview @keyUntil return=Event
 # zmeta-contains: llvm.branch @keyUntil kind=if condition=compare:<
+# zmeta-contains: llvm.control-body-preview @keyUntil role=if-then kind=return expr=type-static-call:Event.Key
 # zmeta-contains: llvm.ret-preview @keyUntil type=Event value=type-static-call:Event.Key
 # zmeta-contains: llvm.ret-preview @keyUntil type=Event value=variant-value:Event.Finished
 # zmeta-contains: llvm.define-preview @sumKeys return=I32
 # zmeta-contains: llvm.loop @sumKeys kind=while-pattern pattern=Event.Key(value) mode=read scrutinee=call:keyUntil
+# zmeta-contains: llvm.control-body-preview @sumKeys role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: llvm.control-body-preview @sumKeys role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: llvm.store @sumKeys place=%acc value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.store @sumKeys place=%i value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.ret-preview @sumKeys type=I32 value=name:acc
 # zmeta-contains: llvm.define-preview @maybeUntil return=Maybe<I32>
 # zmeta-contains: llvm.branch @maybeUntil kind=if condition=compare:<
+# zmeta-contains: llvm.control-body-preview @maybeUntil role=if-then kind=return expr=type-static-call:Maybe.Some
 # zmeta-contains: llvm.ret-preview @maybeUntil type=Maybe<I32> value=type-static-call:Maybe.Some
 # zmeta-contains: llvm.ret-preview @maybeUntil type=Maybe<I32> value=variant-value:Maybe.None
 # zmeta-contains: llvm.define-preview @sumMaybe return=I32
 # zmeta-contains: llvm.loop @sumMaybe kind=while-pattern pattern=Maybe.Some(value) mode=read scrutinee=call:maybeUntil
 # zmeta-contains: llvm.pattern-test-preview @sumMaybe control=while mode=read scrutinee=call:maybeUntil pattern=Maybe.Some(value)
+# zmeta-contains: llvm.control-body-preview @sumMaybe role=while-body kind=assign target=acc op== expr=binary:+
+# zmeta-contains: llvm.control-body-preview @sumMaybe role=while-body kind=assign target=i op== expr=binary:+
 # zmeta-contains: llvm.store @sumMaybe place=%acc value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.store @sumMaybe place=%i value=binary:+ op== source=mir.store
 # zmeta-contains: llvm.ret-preview @sumMaybe type=I32 value=name:acc
@@ -475,6 +545,7 @@
 # zmeta-contains: llvm.control-preview @finish expr=match mode=move scrutinee=name:state arms=2
 # zmeta-contains: llvm.branch @bump kind=if-pattern pattern=WorkState.Ready(job) mode=mut scrutinee=name:state
 # zmeta-contains: llvm.pattern-test-preview @bump control=if mode=mut scrutinee=name:state pattern=WorkState.Ready(job)
+# zmeta-contains: llvm.control-body-preview @bump role=if-then kind=return expr=binary:+
 # zmeta-contains: llvm.branch @eventCode kind=match-guard pattern=Event.Key(code) condition=compare:<
 # zmeta-contains: llvm.variant-preview Pair payload={ left: I32, right: I32 }
 # zmeta-contains: llvm.variant-payload-preview Maybe.Some.0 variant=Some index=0 type=T

@@ -1,0 +1,6 @@
+import mathlib;
+
+fn main() -> I32 {
+    val base = mathlib.add(mathlib.answer(), 1);
+    return base;
+}

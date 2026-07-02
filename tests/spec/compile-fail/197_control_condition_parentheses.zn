@@ -15,3 +15,12 @@ fn missingWhileParens(flag: Bool) {
     while flag { // expected-error[E0003]: while condition must be parenthesized
     }
 }
+
+fn missingIfExprParens(flag: Bool) -> I32 {
+    val chosen = if flag { 1 } else { 0 }; // expected-error[E0003]: if condition must be parenthesized
+    return chosen;
+}
+
+fn missingWhileExprParens(flag: Bool) {
+    val looped = while flag { break; }; // expected-error[E0003]: while condition must be parenthesized
+}

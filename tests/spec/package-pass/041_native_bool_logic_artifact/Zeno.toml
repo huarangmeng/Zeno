@@ -1,0 +1,82 @@
+# category: package-pass
+# stage: mvp
+# milestone: M2
+# feature: build-artifact
+# target: aarch64-apple-darwin
+# profile: hosted
+# build-artifact: application
+# artifact-emit: llvm-ir
+# run-exit-code: 5
+# zmeta-contains: target = "aarch64-apple-darwin"
+# zmeta-contains: profile = "hosted"
+# zmeta-contains: executableFormat = "native-host-executable"
+# zmeta-contains: objectFormat = "native-object"
+# zmeta-contains: llvmIrArtifact = "ir/nativeBoolLogicApp.ll"
+# zmeta-contains: objectArtifact = "obj/nativeBoolLogicApp.o"
+# zmeta-contains: finalArtifact = "bin/nativeBoolLogicApp"
+# zmeta-contains: nativeBodySources = ["classify:ast-control-body-scalar-if-return", "inWindow:ast-expr-bool-return", "main:ast-expr-straight-line", "notPositive:ast-expr-bool-return", "positive:ast-expr-bool-return", "small:ast-expr-bool-return"]
+# zmeta-forbid: ast-fields-bool-return
+# zmeta-forbid: classify:ast-fields-scalar-if-return
+# zmeta-contains: stmt.return inWindow module=main span=src/main.zn:12:1 expr=binary:&& expected=Bool
+# zmeta-contains: stmt.return notPositive module=main span=src/main.zn:16:1 expr=prefix:! expected=Bool
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:20:1 condition=prefix:!
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:23:1 condition=binary:&&
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:26:1 condition=binary:||
+# zmeta-contains: expr.binary inWindow module=main span=src/main.zn:12:1 generic=&& op=&& left=call:positive right=call:small
+# zmeta-contains: expr.prefix notPositive module=main span=src/main.zn:16:1 generic=! op=! operand=call:positive
+# zmeta-contains: expr.condition classify.condition.if.20 module=main span=src/main.zn:20:1 control=if kind=expr mode=read expr=prefix:!
+# zmeta-contains: expr.condition classify.condition.if.23 module=main span=src/main.zn:23:1 control=if kind=expr mode=read expr=binary:&&
+# zmeta-contains: expr.condition classify.condition.if.26 module=main span=src/main.zn:26:1 control=if kind=expr mode=read expr=binary:||
+# zmeta-contains: hir.binary inWindow op=&& left=call:positive right=call:small span=src/main.zn:12:1
+# zmeta-contains: hir.prefix notPositive op=! operand=call:positive span=src/main.zn:16:1
+# zmeta-contains: hir.condition classify control=if kind=expr expr=prefix:! span=src/main.zn:20:1
+# zmeta-contains: hir.condition classify control=if kind=expr expr=binary:&& span=src/main.zn:23:1
+# zmeta-contains: hir.condition classify control=if kind=expr expr=binary:|| span=src/main.zn:26:1
+# zmeta-contains: mir.rvalue inWindow expr=binary:&& kind=binary op=&&
+# zmeta-contains: mir.rvalue notPositive expr=prefix:! kind=prefix op=!
+# zmeta-contains: mir.condition classify control=if kind=expr expr=prefix:!
+# zmeta-contains: mir.condition classify control=if kind=expr expr=binary:&&
+# zmeta-contains: mir.condition classify control=if kind=expr expr=binary:||
+# zmeta-contains: llvm.binary-preview @inWindow op=&&
+# zmeta-contains: llvm.prefix-preview @notPositive op=!
+# zmeta-contains: llvm.condition-preview @classify control=if kind=expr expr=prefix:!
+# zmeta-contains: llvm.condition-preview @classify control=if kind=expr expr=binary:&&
+# zmeta-contains: llvm.condition-preview @classify control=if kind=expr expr=binary:||
+# emit-contains: define i1 @positive(i32 %value)
+# emit-contains: define i1 @small(i32 %value)
+# emit-contains: define i1 @inWindow(i32 %value)
+# emit-contains: define i1 @notPositive(i32 %value)
+# emit-contains: call i1 @positive(i32 %value)
+# emit-contains: call i1 @small(i32 %value)
+# emit-contains: = xor i1
+# emit-contains: br i1 %t1, label %logic.and.rhs.0, label %logic.and.false.0
+# emit-contains: logic.and.rhs.0:
+# emit-contains: logic.and.merge.0:
+# emit-contains: = phi i1 [ false, %logic.and.false.0 ],
+# emit-contains: label %logic.or.true.
+# emit-contains: logic.or.merge.
+# emit-contains: = phi i1 [ true, %logic.or.true.
+# emit-forbid: = and i1
+# emit-forbid: = or i1
+# emit-contains: define i32 @classify(i32 %value)
+# emit-contains: call i1 @small(i32 %value)
+# emit-contains: call i1 @positive(i32 %value)
+# emit-contains: define i32 @main()
+# emit-contains: call i32 @classify(i32 7)
+# object-contains: _positive
+# object-contains: _small
+# object-contains: _inWindow
+# object-contains: _notPositive
+# object-contains: _classify
+# object-contains: _main
+# bin-contains: Mach-O 64-bit executable arm64
+# purpose: concentrated native Bool logical operator artifact: AST prefix ! and binary &&/|| flow through HIR/MIR/LLVM-preview facts and real LLVM xor plus short-circuit CFG/phi lowering before native object, host executable, and run-exit-code validation.
+
+[package]
+name = "nativeBoolLogicApp"
+version = "0.1.0"
+kind = "application"
+
+[target]
+triple = "aarch64-apple-darwin"
+profile = "hosted"

@@ -18,7 +18,8 @@ pub fn sumTo(limit: I32) -> I32 {
 }
 
 pub fn main() -> I32 {
-    val total: I32 = sumTo(4);
-    val result: I32 = addIfPositive(total, 1);
+    const offset = 1;
+    val total = sumTo(4);
+    val result = addIfPositive(total, offset);
     return result;
 }

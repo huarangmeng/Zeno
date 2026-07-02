@@ -7,79 +7,185 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 79
-# zmeta-contains: nativeBodySources = ["classifySigned16:ast-fields-scalar-if-return", "classifySigned8:ast-fields-scalar-if-return", "classifyUnsigned16:ast-fields-scalar-if-return", "classifyUnsigned8:ast-fields-scalar-if-return", "isLargeSigned16:ast-fields-bool-return", "isLargeUnsigned16:ast-fields-bool-return", "isSmallSigned8:ast-fields-bool-return", "isSmallUnsigned8:ast-fields-bool-return", "main:ast-fields"]
+# zmeta-contains: nativeBodySources = ["classifySigned16:ast-control-body-scalar-if-return", "classifySigned8:ast-control-body-scalar-if-return", "classifyUnsigned16:ast-control-body-scalar-if-return", "classifyUnsigned8:ast-control-body-scalar-if-return", "isLargeSigned16:ast-expr-bool-return", "isLargeUnsigned16:ast-expr-bool-return", "isSmallSigned8:ast-expr-bool-return", "isSmallUnsigned8:ast-expr-bool-return", "main:ast-expr-straight-line", "normalizeSigned16:ast-expr-scalar-return", "normalizeSigned8:ast-expr-scalar-return", "normalizeUnsigned16:ast-expr-scalar-return", "normalizeUnsigned8:ast-expr-scalar-return"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-bool-return
 # zmeta-contains: decl.fn isSmallSigned8 module=main span=src/main.zn:3:1 params=(value: I8) return=Bool
-# zmeta-contains: decl.fn classifySigned8 module=main span=src/main.zn:7:1 params=(value: I8) return=I32
-# zmeta-contains: decl.fn isSmallUnsigned8 module=main span=src/main.zn:16:1 params=(value: U8) return=Bool
-# zmeta-contains: decl.fn classifyUnsigned8 module=main span=src/main.zn:20:1 params=(value: U8) return=I32
-# zmeta-contains: decl.fn isLargeSigned16 module=main span=src/main.zn:29:1 params=(value: I16) return=Bool
-# zmeta-contains: decl.fn classifySigned16 module=main span=src/main.zn:33:1 params=(value: I16) return=I32
-# zmeta-contains: decl.fn isLargeUnsigned16 module=main span=src/main.zn:42:1 params=(value: U16) return=Bool
-# zmeta-contains: decl.fn classifyUnsigned16 module=main span=src/main.zn:46:1 params=(value: U16) return=I32
-# zmeta-contains: stmt.val classifySigned8.doubled module=main span=src/main.zn:8:1 expr=binary:* type=I8
-# zmeta-contains: stmt.val classifySigned8.half module=main span=src/main.zn:9:1 expr=binary:/ type=I8
-# zmeta-contains: stmt.val classifyUnsigned8.doubled module=main span=src/main.zn:21:1 expr=binary:* type=U8
-# zmeta-contains: stmt.val classifyUnsigned8.half module=main span=src/main.zn:22:1 expr=binary:/ type=U8
-# zmeta-contains: stmt.val classifySigned16.doubled module=main span=src/main.zn:34:1 expr=binary:* type=I16
-# zmeta-contains: stmt.val classifySigned16.half module=main span=src/main.zn:35:1 expr=binary:/ type=I16
-# zmeta-contains: stmt.val classifyUnsigned16.doubled module=main span=src/main.zn:47:1 expr=binary:* type=U16
-# zmeta-contains: stmt.val classifyUnsigned16.half module=main span=src/main.zn:48:1 expr=binary:/ type=U16
-# zmeta-contains: stmt.val main.i8Value module=main span=src/main.zn:56:1 expr=int-literal:8 type=I8
-# zmeta-contains: stmt.val main.u8Value module=main span=src/main.zn:57:1 expr=int-literal:8 type=U8
-# zmeta-contains: stmt.val main.i16Value module=main span=src/main.zn:58:1 expr=int-literal:300 type=I16
-# zmeta-contains: stmt.val main.u16Value module=main span=src/main.zn:59:1 expr=int-literal:300 type=U16
+# zmeta-contains: decl.fn normalizeSigned8 module=main span=src/main.zn:7:1 params=(value: I8) return=I8
+# zmeta-contains: decl.fn classifySigned8 module=main span=src/main.zn:11:1 params=(value: I8) return=I32
+# zmeta-contains: decl.fn isSmallUnsigned8 module=main span=src/main.zn:20:1 params=(value: U8) return=Bool
+# zmeta-contains: decl.fn normalizeUnsigned8 module=main span=src/main.zn:24:1 params=(value: U8) return=U8
+# zmeta-contains: decl.fn classifyUnsigned8 module=main span=src/main.zn:28:1 params=(value: U8) return=I32
+# zmeta-contains: decl.fn isLargeSigned16 module=main span=src/main.zn:37:1 params=(value: I16) return=Bool
+# zmeta-contains: decl.fn normalizeSigned16 module=main span=src/main.zn:41:1 params=(value: I16) return=I16
+# zmeta-contains: decl.fn classifySigned16 module=main span=src/main.zn:45:1 params=(value: I16) return=I32
+# zmeta-contains: decl.fn isLargeUnsigned16 module=main span=src/main.zn:54:1 params=(value: U16) return=Bool
+# zmeta-contains: decl.fn normalizeUnsigned16 module=main span=src/main.zn:58:1 params=(value: U16) return=U16
+# zmeta-contains: decl.fn classifyUnsigned16 module=main span=src/main.zn:62:1 params=(value: U16) return=I32
+# zmeta-contains: stmt.return normalizeSigned8 module=main span=src/main.zn:8:1 expr=binary:+ expected=I8
+# zmeta-contains: stmt.return normalizeUnsigned8 module=main span=src/main.zn:25:1 expr=binary:+ expected=U8
+# zmeta-contains: stmt.return normalizeSigned16 module=main span=src/main.zn:42:1 expr=binary:+ expected=I16
+# zmeta-contains: stmt.return normalizeUnsigned16 module=main span=src/main.zn:59:1 expr=binary:+ expected=U16
+# zmeta-contains: stmt.val classifySigned8.doubled module=main span=src/main.zn:12:1 expr=binary:*
+# zmeta-contains: stmt.val classifySigned8.half module=main span=src/main.zn:13:1 expr=call:normalizeSigned8
+# zmeta-contains: stmt.val classifyUnsigned8.doubled module=main span=src/main.zn:29:1 expr=binary:*
+# zmeta-contains: stmt.val classifyUnsigned8.half module=main span=src/main.zn:30:1 expr=call:normalizeUnsigned8
+# zmeta-contains: stmt.val classifySigned16.doubled module=main span=src/main.zn:46:1 expr=binary:*
+# zmeta-contains: stmt.val classifySigned16.half module=main span=src/main.zn:47:1 expr=call:normalizeSigned16
+# zmeta-contains: stmt.val classifyUnsigned16.doubled module=main span=src/main.zn:63:1 expr=binary:*
+# zmeta-contains: stmt.val classifyUnsigned16.half module=main span=src/main.zn:64:1 expr=call:normalizeUnsigned16
+# zmeta-forbid: stmt.val classifySigned8.doubled module=main span=src/main.zn:12:1 expr=binary:* type=I8
+# zmeta-forbid: stmt.val classifySigned8.half module=main span=src/main.zn:13:1 expr=call:normalizeSigned8 type=I8
+# zmeta-forbid: stmt.val classifyUnsigned8.doubled module=main span=src/main.zn:29:1 expr=binary:* type=U8
+# zmeta-forbid: stmt.val classifyUnsigned8.half module=main span=src/main.zn:30:1 expr=call:normalizeUnsigned8 type=U8
+# zmeta-forbid: stmt.val classifySigned16.doubled module=main span=src/main.zn:46:1 expr=binary:* type=I16
+# zmeta-forbid: stmt.val classifySigned16.half module=main span=src/main.zn:47:1 expr=call:normalizeSigned16 type=I16
+# zmeta-forbid: stmt.val classifyUnsigned16.doubled module=main span=src/main.zn:63:1 expr=binary:* type=U16
+# zmeta-forbid: stmt.val classifyUnsigned16.half module=main span=src/main.zn:64:1 expr=call:normalizeUnsigned16 type=U16
+# zmeta-contains: expr.call classifySigned8.normalizeSigned8 module=main span=src/main.zn:13:1 callee=normalizeSigned8
+# zmeta-contains: expr.call classifySigned8.normalizeSigned8 module=main span=src/main.zn:14:1 callee=normalizeSigned8
+# zmeta-contains: expr.call classifyUnsigned8.normalizeUnsigned8 module=main span=src/main.zn:30:1 callee=normalizeUnsigned8
+# zmeta-contains: expr.call classifyUnsigned8.normalizeUnsigned8 module=main span=src/main.zn:31:1 callee=normalizeUnsigned8
+# zmeta-contains: expr.call classifySigned16.normalizeSigned16 module=main span=src/main.zn:47:1 callee=normalizeSigned16
+# zmeta-contains: expr.call classifySigned16.normalizeSigned16 module=main span=src/main.zn:48:1 callee=normalizeSigned16
+# zmeta-contains: expr.call classifyUnsigned16.normalizeUnsigned16 module=main span=src/main.zn:64:1 callee=normalizeUnsigned16
+# zmeta-contains: expr.call classifyUnsigned16.normalizeUnsigned16 module=main span=src/main.zn:65:1 callee=normalizeUnsigned16
+# zmeta-contains: arg classifySigned8.arg.13.0 module=main span=src/main.zn:13:1 index=0 mode=read expr=binary:/
+# zmeta-contains: arg classifySigned8.arg.14.0 module=main span=src/main.zn:14:1 index=0 mode=read expr=call:normalizeSigned8
+# zmeta-contains: arg classifySigned8.arg.14.0 module=main span=src/main.zn:14:1 index=0 mode=read expr=name:half
+# zmeta-contains: arg classifyUnsigned8.arg.30.0 module=main span=src/main.zn:30:1 index=0 mode=read expr=binary:/
+# zmeta-contains: arg classifyUnsigned8.arg.31.0 module=main span=src/main.zn:31:1 index=0 mode=read expr=call:normalizeUnsigned8
+# zmeta-contains: arg classifyUnsigned8.arg.31.0 module=main span=src/main.zn:31:1 index=0 mode=read expr=name:half
+# zmeta-contains: arg classifySigned16.arg.47.0 module=main span=src/main.zn:47:1 index=0 mode=read expr=binary:/
+# zmeta-contains: arg classifySigned16.arg.48.0 module=main span=src/main.zn:48:1 index=0 mode=read expr=call:normalizeSigned16
+# zmeta-contains: arg classifySigned16.arg.48.0 module=main span=src/main.zn:48:1 index=0 mode=read expr=name:half
+# zmeta-contains: arg classifyUnsigned16.arg.64.0 module=main span=src/main.zn:64:1 index=0 mode=read expr=binary:/
+# zmeta-contains: arg classifyUnsigned16.arg.65.0 module=main span=src/main.zn:65:1 index=0 mode=read expr=call:normalizeUnsigned16
+# zmeta-contains: arg classifyUnsigned16.arg.65.0 module=main span=src/main.zn:65:1 index=0 mode=read expr=name:half
+# zmeta-contains: syntax.arg classifySigned8 module=main span=src/main.zn:13:1 mode=read expr=binary:/ index=0
+# zmeta-contains: syntax.arg classifySigned8 module=main span=src/main.zn:14:1 mode=read expr=call:normalizeSigned8 index=0
+# zmeta-contains: syntax.arg classifySigned8 module=main span=src/main.zn:14:1 mode=read expr=name:half index=0
+# zmeta-contains: syntax.arg classifyUnsigned8 module=main span=src/main.zn:30:1 mode=read expr=binary:/ index=0
+# zmeta-contains: syntax.arg classifyUnsigned8 module=main span=src/main.zn:31:1 mode=read expr=call:normalizeUnsigned8 index=0
+# zmeta-contains: syntax.arg classifyUnsigned8 module=main span=src/main.zn:31:1 mode=read expr=name:half index=0
+# zmeta-contains: syntax.arg classifySigned16 module=main span=src/main.zn:47:1 mode=read expr=binary:/ index=0
+# zmeta-contains: syntax.arg classifySigned16 module=main span=src/main.zn:48:1 mode=read expr=call:normalizeSigned16 index=0
+# zmeta-contains: syntax.arg classifySigned16 module=main span=src/main.zn:48:1 mode=read expr=name:half index=0
+# zmeta-contains: syntax.arg classifyUnsigned16 module=main span=src/main.zn:64:1 mode=read expr=binary:/ index=0
+# zmeta-contains: syntax.arg classifyUnsigned16 module=main span=src/main.zn:65:1 mode=read expr=call:normalizeUnsigned16 index=0
+# zmeta-contains: syntax.arg classifyUnsigned16 module=main span=src/main.zn:65:1 mode=read expr=name:half index=0
+# zmeta-contains: stmt.val main.i8Value module=main span=src/main.zn:72:1 expr=int-literal:8
+# zmeta-contains: stmt.val main.u8Value module=main span=src/main.zn:73:1 expr=int-literal:8
+# zmeta-contains: stmt.val main.i16Value module=main span=src/main.zn:74:1 expr=int-literal:300
+# zmeta-contains: stmt.val main.u16Value module=main span=src/main.zn:75:1 expr=int-literal:300
+# zmeta-forbid: stmt.val main.i8Value module=main span=src/main.zn:72:1 expr=int-literal:8 type=I8
+# zmeta-forbid: stmt.val main.u8Value module=main span=src/main.zn:73:1 expr=int-literal:8 type=U8
+# zmeta-forbid: stmt.val main.i16Value module=main span=src/main.zn:74:1 expr=int-literal:300 type=I16
+# zmeta-forbid: stmt.val main.u16Value module=main span=src/main.zn:75:1 expr=int-literal:300 type=U16
 # mir-contains: hir.fn-signature isSmallSigned8 params=(value: I8) return=Bool
+# mir-contains: hir.fn-signature normalizeSigned8 params=(value: I8) return=I8
 # mir-contains: hir.fn-signature classifySigned8 params=(value: I8) return=I32
 # mir-contains: hir.fn-signature isSmallUnsigned8 params=(value: U8) return=Bool
+# mir-contains: hir.fn-signature normalizeUnsigned8 params=(value: U8) return=U8
 # mir-contains: hir.fn-signature classifyUnsigned8 params=(value: U8) return=I32
 # mir-contains: hir.fn-signature isLargeSigned16 params=(value: I16) return=Bool
+# mir-contains: hir.fn-signature normalizeSigned16 params=(value: I16) return=I16
 # mir-contains: hir.fn-signature classifySigned16 params=(value: I16) return=I32
 # mir-contains: hir.fn-signature isLargeUnsigned16 params=(value: U16) return=Bool
+# mir-contains: hir.fn-signature normalizeUnsigned16 params=(value: U16) return=U16
 # mir-contains: hir.fn-signature classifyUnsigned16 params=(value: U16) return=I32
-# mir-contains: mir.local-slot classifySigned8 %doubled mutable=false type=I8
-# mir-contains: mir.local-slot classifySigned8 %half mutable=false type=I8
-# mir-contains: mir.local-slot classifyUnsigned8 %doubled mutable=false type=U8
-# mir-contains: mir.local-slot classifyUnsigned8 %half mutable=false type=U8
-# mir-contains: mir.local-slot classifySigned16 %doubled mutable=false type=I16
-# mir-contains: mir.local-slot classifySigned16 %half mutable=false type=I16
-# mir-contains: mir.local-slot classifyUnsigned16 %doubled mutable=false type=U16
-# mir-contains: mir.local-slot classifyUnsigned16 %half mutable=false type=U16
-# mir-contains: mir.local main.i8Value init=int-literal:8 mutable=false
-# mir-contains: mir.local main.u8Value init=int-literal:8 mutable=false
-# mir-contains: mir.local main.i16Value init=int-literal:300 mutable=false
-# mir-contains: mir.local main.u16Value init=int-literal:300 mutable=false
+# mir-contains: hir.local classifySigned8.doubled mode=val expr=binary:* type=inferred
+# mir-contains: hir.local classifySigned8.half mode=val expr=call:normalizeSigned8 type=inferred
+# mir-contains: hir.local classifyUnsigned8.doubled mode=val expr=binary:* type=inferred
+# mir-contains: hir.local classifyUnsigned8.half mode=val expr=call:normalizeUnsigned8 type=inferred
+# mir-contains: hir.local classifySigned16.doubled mode=val expr=binary:* type=inferred
+# mir-contains: hir.local classifySigned16.half mode=val expr=call:normalizeSigned16 type=inferred
+# mir-contains: hir.local classifyUnsigned16.doubled mode=val expr=binary:* type=inferred
+# mir-contains: hir.local classifyUnsigned16.half mode=val expr=call:normalizeUnsigned16 type=inferred
+# mir-contains: hir.local main.i8Value mode=val expr=int-literal:8 type=inferred
+# mir-contains: hir.local main.u8Value mode=val expr=int-literal:8 type=inferred
+# mir-contains: hir.local main.i16Value mode=val expr=int-literal:300 type=inferred
+# mir-contains: hir.local main.u16Value mode=val expr=int-literal:300 type=inferred
+# mir-contains: mir.local-slot classifySigned8 %doubled mutable=false type=inferred
+# mir-contains: mir.local-slot classifySigned8 %half mutable=false type=inferred
+# mir-contains: mir.local-slot classifyUnsigned8 %doubled mutable=false type=inferred
+# mir-contains: mir.local-slot classifyUnsigned8 %half mutable=false type=inferred
+# mir-contains: mir.local-slot classifySigned16 %doubled mutable=false type=inferred
+# mir-contains: mir.local-slot classifySigned16 %half mutable=false type=inferred
+# mir-contains: mir.local-slot classifyUnsigned16 %doubled mutable=false type=inferred
+# mir-contains: mir.local-slot classifyUnsigned16 %half mutable=false type=inferred
+# mir-contains: mir.local-slot main %i8Value mutable=false type=inferred
+# mir-contains: mir.local-slot main %u8Value mutable=false type=inferred
+# mir-contains: mir.local-slot main %i16Value mutable=false type=inferred
+# mir-contains: mir.local-slot main %u16Value mutable=false type=inferred
+# mir-contains: llvm.initialization-preview @main place=%i8Value type=inferred state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @main place=%u8Value type=inferred state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @main place=%i16Value type=inferred state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @main place=%u16Value type=inferred state=initialized source=mir.verifier-initialization
+# mir-contains: mir.rvalue classifySigned8 expr=call:normalizeSigned8 kind=call callee=@normalizeSigned8
+# mir-contains: mir.rvalue classifyUnsigned8 expr=call:normalizeUnsigned8 kind=call callee=@normalizeUnsigned8
+# mir-contains: mir.rvalue classifySigned16 expr=call:normalizeSigned16 kind=call callee=@normalizeSigned16
+# mir-contains: mir.rvalue classifyUnsigned16 expr=call:normalizeUnsigned16 kind=call callee=@normalizeUnsigned16
+# mir-contains: llvm.call-preview @normalizeSigned8 in @classifySigned8
+# mir-contains: llvm.call-preview @normalizeUnsigned8 in @classifyUnsigned8
+# mir-contains: llvm.call-preview @normalizeSigned16 in @classifySigned16
+# mir-contains: llvm.call-preview @normalizeUnsigned16 in @classifyUnsigned16
+# mir-contains: llvm.initialization-preview @classifySigned8 place=%half type=I8 state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @classifyUnsigned8 place=%half type=U8 state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @classifySigned16 place=%half type=I16 state=initialized source=mir.verifier-initialization
+# mir-contains: llvm.initialization-preview @classifyUnsigned16 place=%half type=U16 state=initialized source=mir.verifier-initialization
 # emit-contains: define i1 @isSmallSigned8(i8 %value)
 # emit-contains: %t0 = icmp slt i8 %value, 9
+# emit-contains: define i8 @normalizeSigned8(i8 %value)
 # emit-contains: define i32 @classifySigned8(i8 %value)
 # emit-contains: %t1 = sdiv i8 %doubled, 2
+# emit-contains: %t2 = call i8 @normalizeSigned8(i8 %t1)
+# emit-contains: %t3 = call i8 @normalizeSigned8(i8 %half)
+# emit-contains: %t4 = call i1 @isSmallSigned8(i8 %t3)
 # emit-contains: define i1 @isSmallUnsigned8(i8 %value)
 # emit-contains: %t0 = icmp ult i8 %value, 9
+# emit-contains: define i8 @normalizeUnsigned8(i8 %value)
 # emit-contains: define i32 @classifyUnsigned8(i8 %value)
 # emit-contains: %t1 = udiv i8 %doubled, 2
+# emit-contains: %t2 = call i8 @normalizeUnsigned8(i8 %t1)
+# emit-contains: %t3 = call i8 @normalizeUnsigned8(i8 %half)
+# emit-contains: %t4 = call i1 @isSmallUnsigned8(i8 %t3)
 # emit-contains: define i1 @isLargeSigned16(i16 %value)
 # emit-contains: %t0 = icmp sge i16 %value, 300
+# emit-contains: define i16 @normalizeSigned16(i16 %value)
 # emit-contains: define i32 @classifySigned16(i16 %value)
 # emit-contains: %t1 = sdiv i16 %doubled, 2
+# emit-contains: %t2 = call i16 @normalizeSigned16(i16 %t1)
+# emit-contains: %t3 = call i16 @normalizeSigned16(i16 %half)
+# emit-contains: %t4 = call i1 @isLargeSigned16(i16 %t3)
 # emit-contains: define i1 @isLargeUnsigned16(i16 %value)
 # emit-contains: %t0 = icmp uge i16 %value, 300
+# emit-contains: define i16 @normalizeUnsigned16(i16 %value)
 # emit-contains: define i32 @classifyUnsigned16(i16 %value)
 # emit-contains: %t1 = udiv i16 %doubled, 2
+# emit-contains: %t2 = call i16 @normalizeUnsigned16(i16 %t1)
+# emit-contains: %t3 = call i16 @normalizeUnsigned16(i16 %half)
+# emit-contains: %t4 = call i1 @isLargeUnsigned16(i16 %t3)
 # emit-contains: define i32 @main()
 # emit-contains: %i8Value = add i8 0, 8
 # emit-contains: %u8Value = add i8 0, 8
 # emit-contains: %i16Value = add i16 0, 300
 # emit-contains: %u16Value = add i16 0, 300
 # object-contains: _isSmallSigned8
+# object-contains: _normalizeSigned8
 # object-contains: _classifySigned8
 # object-contains: _isSmallUnsigned8
+# object-contains: _normalizeUnsigned8
 # object-contains: _classifyUnsigned8
 # object-contains: _isLargeSigned16
+# object-contains: _normalizeSigned16
 # object-contains: _classifySigned16
 # object-contains: _isLargeUnsigned16
+# object-contains: _normalizeUnsigned16
 # object-contains: _classifyUnsigned16
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: I8, U8, I16, and U16 primitive native lowering is concentrated here: narrow integer parameters, annotated locals, integer literals typed by context, signed and unsigned divide/comparison semantics, Bool-returning comparison calls, real LLVM i8/i16 scalar codegen, object code, executable output, and direct run-exit-code validation
+# purpose: I8, U8, I16, and U16 primitive native lowering is concentrated here: narrow integer parameters, unannotated integer literals inferred from call-site context, inferred locals from parameter-driven binary expressions and helper-call returns, helper calls consumed by local bindings and nested Bool-call arguments, signed and unsigned divide/comparison semantics, Bool-returning comparison calls, real LLVM i8/i16 scalar codegen, object code, executable output, and direct run-exit-code validation
 
 [package]
 name = "nativeNarrowIntApp"

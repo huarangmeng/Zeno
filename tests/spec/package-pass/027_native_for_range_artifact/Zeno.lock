@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeForRangeApp"
 version = "0.1.0"
 source = "path:."
-manifestHash = "fnv1a64:e4dd0263151cfbbb"
-contentHash = "fnv1a64:8854badd8d7d2b4b"
+manifestHash = "fnv1a64:62591d3b91817416"
+contentHash = "fnv1a64:6df20fbe75811c5e"
 trust = []
 dependencies = [
   { key = "core", package = "core" },

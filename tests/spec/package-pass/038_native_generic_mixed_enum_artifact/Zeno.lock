@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeGenericMixedEnumApp"
 version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:da73954ffd8f2998"
-contentHash = "fnv1a64:ffbe8cad33bb6fc7"
+manifestHash = "fnv1a64:ca9e11e5ea7cfeb0"
+contentHash = "fnv1a64:1953e16383bb795b"
 trust = []
 dependencies = [
 ]

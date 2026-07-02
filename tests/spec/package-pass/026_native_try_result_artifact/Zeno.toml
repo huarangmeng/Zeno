@@ -7,7 +7,11 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 34
-# zmeta-contains: nativeBodySources = ["checkErr:ast-fields-result-try-stmt", "checkOk:ast-fields-result-try-stmt", "errValue:ast-fields-payload-constructor-return", "fail:ast-fields-result-try-binding", "okValue:ast-fields-payload-constructor-return", "step:ast-fields-result-try-binding", "unwrapOrCode:ast-fields-payload-return-match"]
+# zmeta-contains: nativeBodySources = ["checkErr:ast-try-result-stmt", "checkOk:ast-try-result-stmt", "errValue:ast-constructor-payload-return", "fail:ast-try-result-binding", "okValue:ast-constructor-payload-return", "step:ast-try-result-binding", "unwrapOrCode:ast-match-expr-payload-return"]
+# zmeta-forbid: ast-fields-payload-return-match
+# zmeta-forbid: ast-fields-payload-constructor-return
+# zmeta-forbid: ast-fields-result-try-binding
+# zmeta-forbid: ast-fields-result-try-stmt
 # zmeta-contains: decl.enum Result module=main span=src/main.zn:3:1 generic=<T, E>
 # zmeta-contains: decl.variant Ok module=main span=src/main.zn:4:1 payload=(T)
 # zmeta-contains: decl.variant Err module=main span=src/main.zn:5:1 payload=(E)
@@ -22,14 +26,20 @@
 # zmeta-contains: stmt.return okValue module=main span=src/main.zn:9:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
 # zmeta-contains: stmt.return errValue module=main span=src/main.zn:13:1 expr=type-static-call:Result.Err expected=Result<I32, I32>
 # zmeta-contains: stmt.val step.first module=main span=src/main.zn:17:1 expr=try:call:okValue
+# zmeta-contains: expr.try step module=main span=src/main.zn:17:1 expr=call:okValue
 # zmeta-contains: stmt.val step.second module=main span=src/main.zn:18:1 expr=try:call:okValue
+# zmeta-contains: expr.try step module=main span=src/main.zn:18:1 expr=call:okValue
 # zmeta-contains: stmt.return step module=main span=src/main.zn:19:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
 # zmeta-contains: stmt.val fail.first module=main span=src/main.zn:23:1 expr=try:call:okValue
+# zmeta-contains: expr.try fail module=main span=src/main.zn:23:1 expr=call:okValue
 # zmeta-contains: stmt.val fail.second module=main span=src/main.zn:24:1 expr=try:call:errValue
+# zmeta-contains: expr.try fail module=main span=src/main.zn:24:1 expr=call:errValue
 # zmeta-contains: stmt.return fail module=main span=src/main.zn:25:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
 # zmeta-contains: stmt.try checkOk module=main span=src/main.zn:29:1 expr=try:call:okValue
+# zmeta-contains: expr.try checkOk module=main span=src/main.zn:29:1 expr=call:okValue
 # zmeta-contains: stmt.return checkOk module=main span=src/main.zn:30:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
 # zmeta-contains: stmt.try checkErr module=main span=src/main.zn:34:1 expr=try:call:errValue
+# zmeta-contains: expr.try checkErr module=main span=src/main.zn:34:1 expr=call:errValue
 # zmeta-contains: stmt.return checkErr module=main span=src/main.zn:35:1 expr=type-static-call:Result.Ok expected=Result<I32, I32>
 # zmeta-contains: stmt.return unwrapOrCode module=main span=src/main.zn:39:1 expr=match expected=I32
 # zmeta-contains: stmt.match-arm unwrapOrCode.Result.Ok(value) module=main span=src/main.zn:40:1 expr=name:value

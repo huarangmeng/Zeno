@@ -5,8 +5,8 @@ fn isWide(value: F32) -> Bool {
 }
 
 fn classify(value: F32) -> I32 {
-    val squared: F32 = value * value;
-    val pivot: F32 = 1.250000;
+    val squared = value * value;
+    val pivot = 1.250000;
     if (isWide(squared)) {
         return 30;
     }
@@ -17,7 +17,7 @@ fn classify(value: F32) -> I32 {
 }
 
 fn main() -> I32 {
-    val low: F32 = 1.500000;
-    val high: F32 = 2.000000;
+    val low = 1.500000;
+    val high = 2.000000;
     return classify(low) + classify(high);
 }

@@ -1,0 +1,23 @@
+[package]
+name = "mathbase"
+version = "0.1.0"
+kind = "library"
+
+[allocator]
+default = false
+
+[panic]
+strategy = "abort"
+stack = "none"
+
+[oom]
+strategy = "abort"
+
+[trust]
+ffi = false
+rawMemory = false
+hardware = false
+inlineAsm = false
+interrupts = false
+threadSafety = false
+dependencyTrust = false

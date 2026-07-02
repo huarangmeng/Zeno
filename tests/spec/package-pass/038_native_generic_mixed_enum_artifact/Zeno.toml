@@ -7,7 +7,12 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 98
-# zmeta-contains: nativeBodySources = ["consume:ast-fields-aggregate-i32", "inspect:ast-fields-payload-return-match", "main:ast-fields-aggregate-i32", "makeHeader:ast-fields-aggregate-return", "makeNone:ast-fields-payload-constructor-return", "scoreExact:ast-fields-scalar-if-return", "scoreLength:ast-fields-scalar-if-return", "scoreRatio:ast-fields-scalar-if-return", "scoreTag:ast-fields-scalar-if-return", "scoreWeight:ast-fields-scalar-if-return", "unwrap:ast-fields-payload-if-else-return"]
+# zmeta-contains: nativeBodySources = ["consume:ast-expr-scalar-return", "inspect:ast-match-expr-payload-return", "main:ast-expr-aggregate-i32", "makeHeader:ast-expr-aggregate-return", "makeNone:ast-constructor-payload-return", "makeSome:ast-constructor-payload-return", "scoreExact:ast-control-body-scalar-if-return", "scoreLength:ast-control-body-scalar-if-return", "scoreRatio:ast-control-body-scalar-if-return", "scoreTag:ast-control-body-scalar-if-return", "scoreWeight:ast-control-body-scalar-if-return", "unwrap:ast-control-body-payload-if-else-return"]
+# zmeta-forbid: ast-fields-aggregate-i32
+# zmeta-forbid: ast-fields-aggregate-return
+# zmeta-forbid: ast-fields-payload-return-match
+# zmeta-forbid: ast-fields-payload-constructor-return
+# zmeta-forbid: unwrap:ast-fields-payload-if-else-return
 # zmeta-contains: decl.enum Maybe module=main span=src/main.zn:11:1 generic=<T>
 # zmeta-contains: decl.variant Some module=main span=src/main.zn:12:1 payload=(T)
 # zmeta-contains: decl.variant None module=main span=src/main.zn:13:1
@@ -18,12 +23,16 @@
 # zmeta-contains: stmt.if-pattern unwrap.Maybe.Some(header) module=main span=src/main.zn:69:1 condition=name:maybe pattern=Maybe.Some(header)
 # zmeta-contains: syntax.pattern-condition unwrap module=main span=src/main.zn:69:1 control=if scrutinee=name:maybe pattern=Maybe.Some(header) mode=read
 # zmeta-contains: expr.pattern-condition unwrap.pattern-condition.69 module=main span=src/main.zn:69:1 generic=if control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(header)
+# zmeta-contains: expr.control-body-stmt unwrap.control-body.if-then.return.70 module=main span=src/main.zn:70:1 role=if-then kind=return expr=call:consume
+# zmeta-contains: expr.control-body-stmt unwrap.control-body.if-else.return.72 module=main span=src/main.zn:72:1 role=if-else kind=return expr=int-literal:0
 # zmeta-contains: stmt.match-arm inspect.Maybe.Some(header) module=main span=src/main.zn:78:1 expr=call:consume
 # zmeta-contains: hir.generic-params Maybe params=<T> span=src/main.zn:11:1
 # zmeta-contains: hir.fn-signature makeSome params=(tag: U8, length: U16, weight: I64, ratio: F32, exact: F64) return=Maybe<Header> span=src/main.zn:59:1
 # zmeta-contains: hir.fn-signature makeNone params=() return=Maybe<Header> span=src/main.zn:64:1
 # zmeta-contains: hir.if-pattern unwrap pattern=Maybe.Some(header) mode=read scrutinee=name:maybe span=src/main.zn:69:1
 # zmeta-contains: hir.pattern-condition unwrap control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(header) span=src/main.zn:69:1
+# zmeta-contains: hir.control-body-stmt unwrap role=if-then kind=return expr=call:consume span=src/main.zn:70:1
+# zmeta-contains: hir.control-body-stmt unwrap role=if-else kind=return expr=int-literal:0 span=src/main.zn:72:1
 # zmeta-contains: hir.match-arm inspect pattern=Maybe.Some(header) guard=none expr=call:consume span=src/main.zn:78:1
 # zmeta-contains: hir.match-arm inspect pattern=Maybe.None guard=none expr=int-literal:0 span=src/main.zn:79:1
 # zmeta-contains: mir.generic-input Maybe params=<T>
@@ -31,12 +40,16 @@
 # zmeta-contains: mir.fn makeNone entry=bb0 return=Maybe<Header>
 # zmeta-contains: mir.branch unwrap kind=if-pattern pattern=Maybe.Some(header) mode=read scrutinee=name:maybe then=if.then else=if.cont
 # zmeta-contains: mir.pattern-test unwrap control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(header)
+# zmeta-contains: mir.control-body-stmt unwrap role=if-then kind=return expr=call:consume
+# zmeta-contains: mir.control-body-stmt unwrap role=if-else kind=return expr=int-literal:0
 # zmeta-contains: mir.match-arm inspect pattern=Maybe.Some(header) guard=none body=call:consume
 # zmeta-contains: mir.match-arm inspect pattern=Maybe.None guard=none body=int-literal:0
 # zmeta-contains: llvm.define-preview @makeSome return=Maybe<Header>
 # zmeta-contains: llvm.define-preview @makeNone return=Maybe<Header>
 # zmeta-contains: llvm.branch @unwrap kind=if-pattern pattern=Maybe.Some(header) mode=read scrutinee=name:maybe
 # zmeta-contains: llvm.pattern-test-preview @unwrap control=if mode=read scrutinee=name:maybe pattern=Maybe.Some(header)
+# zmeta-contains: llvm.control-body-preview @unwrap role=if-then kind=return expr=call:consume
+# zmeta-contains: llvm.control-body-preview @unwrap role=if-else kind=return expr=int-literal:0
 # zmeta-contains: llvm.control-preview @inspect expr=match mode=read scrutinee=name:maybe arms=2
 # zmeta-contains: llvm.variant-preview Some payload=(T)
 # zmeta-contains: llvm.variant-preview None payload=unit
@@ -73,7 +86,7 @@
 # object-contains: _consume
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: generic mixed primitive scalar enum payload lowering is concentrated here: Maybe<Header> monomorphizes to typed payload slots, Some(Header) constructors flatten U8/U16/I64/F32/F64 fields, if-pattern and return-match reconstruct the mixed-scalar struct payload, and the path emits real object code plus a host executable with direct run-exit-code validation
+# purpose: generic mixed primitive scalar enum payload lowering is concentrated here: Maybe<Header> monomorphizes to typed payload slots, Some(Header) constructors flatten U8/U16/I64/F32/F64 fields, if-pattern control-body returns and return-match reconstruct the mixed-scalar struct payload, and the path emits real object code plus a host executable with direct run-exit-code validation
 
 [package]
 name = "nativeGenericMixedEnumApp"

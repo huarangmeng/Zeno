@@ -6,8 +6,8 @@ compiler = "zeno-stage0 0.1.0"
 name = "nativeCharApp"
 version = "0.0.0"
 source = "path:."
-manifestHash = "fnv1a64:1d8cc8098f25567c"
-contentHash = "fnv1a64:8942a46e913eaca7"
+manifestHash = "fnv1a64:3444bbab7d1efbfb"
+contentHash = "fnv1a64:6f386b1387007a02"
 trust = []
 dependencies = [
 ]

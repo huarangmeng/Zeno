@@ -4,10 +4,14 @@ fn isHuge(value: I64) -> Bool {
     return value >= 4294967296;
 }
 
+fn normalize(value: I64) -> I64 {
+    return value + 0;
+}
+
 fn classify(value: I64) -> I32 {
-    val doubled: I64 = value * 2;
-    val half: I64 = doubled / 2;
-    if (isHuge(half)) {
+    val doubled = value * 2;
+    val half = normalize(doubled / 2);
+    if (isHuge(normalize(half))) {
         return 30;
     }
     if (half < 9) {
@@ -17,7 +21,7 @@ fn classify(value: I64) -> I32 {
 }
 
 fn main() -> I32 {
-    val low: I64 = 8;
-    val high: I64 = 4294967296;
+    val low = 8;
+    val high = 4294967296;
     return classify(low) + classify(high);
 }

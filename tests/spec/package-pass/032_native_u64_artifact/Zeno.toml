@@ -7,47 +7,75 @@
 # build-artifact: application
 # artifact-emit: llvm-ir
 # run-exit-code: 35
-# zmeta-contains: nativeBodySources = ["classify:ast-fields-scalar-if-return", "isHuge:ast-fields-bool-return", "main:ast-fields"]
+# zmeta-contains: nativeBodySources = ["classify:ast-control-body-scalar-if-return", "isHuge:ast-expr-bool-return", "main:ast-expr-straight-line", "normalize:ast-expr-scalar-return"]
+# zmeta-forbid: main:ast-fields
+# zmeta-forbid: ast-fields-bool-return
 # zmeta-contains: decl.fn isHuge module=main span=src/main.zn:3:1 params=(value: U64) return=Bool
-# zmeta-contains: decl.fn classify module=main span=src/main.zn:7:1 params=(value: U64) return=I32
-# zmeta-contains: stmt.val classify.doubled module=main span=src/main.zn:8:1 expr=binary:* type=U64
-# zmeta-contains: stmt.val classify.half module=main span=src/main.zn:9:1 expr=binary:/ type=U64
-# zmeta-contains: stmt.if classify module=main span=src/main.zn:10:1 condition=call:isHuge
-# zmeta-contains: stmt.if classify module=main span=src/main.zn:13:1 condition=compare:<
-# zmeta-contains: stmt.val main.low module=main span=src/main.zn:20:1 expr=int-literal:8 type=U64
-# zmeta-contains: stmt.val main.high module=main span=src/main.zn:21:1 expr=int-literal:4294967296 type=U64
+# zmeta-contains: decl.fn normalize module=main span=src/main.zn:7:1 params=(value: U64) return=U64
+# zmeta-contains: decl.fn classify module=main span=src/main.zn:11:1 params=(value: U64) return=I32
+# zmeta-contains: stmt.return normalize module=main span=src/main.zn:8:1 expr=binary:+ expected=U64
+# zmeta-contains: stmt.val classify.doubled module=main span=src/main.zn:12:1 expr=binary:*
+# zmeta-contains: stmt.val classify.half module=main span=src/main.zn:13:1 expr=call:normalize
+# zmeta-forbid: stmt.val classify.doubled module=main span=src/main.zn:12:1 expr=binary:* type=U64
+# zmeta-forbid: stmt.val classify.half module=main span=src/main.zn:13:1 expr=call:normalize type=U64
+# zmeta-contains: expr.call classify.normalize module=main span=src/main.zn:13:1 callee=normalize
+# zmeta-contains: expr.call classify.normalize module=main span=src/main.zn:14:1 callee=normalize
+# zmeta-contains: arg classify.arg.13.0 module=main span=src/main.zn:13:1 index=0 mode=read expr=binary:/
+# zmeta-contains: arg classify.arg.14.0 module=main span=src/main.zn:14:1 index=0 mode=read expr=call:normalize
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:14:1 condition=call:isHuge
+# zmeta-contains: stmt.if classify module=main span=src/main.zn:17:1 condition=compare:<
+# zmeta-contains: stmt.val main.low module=main span=src/main.zn:24:1 expr=int-literal:8
+# zmeta-contains: stmt.val main.high module=main span=src/main.zn:25:1 expr=int-literal:4294967296
+# zmeta-forbid: stmt.val main.low module=main span=src/main.zn:24:1 expr=int-literal:8 type=U64
+# zmeta-forbid: stmt.val main.high module=main span=src/main.zn:25:1 expr=int-literal:4294967296 type=U64
 # mir-contains: hir.fn-signature isHuge params=(value: U64) return=Bool
+# mir-contains: hir.fn-signature normalize params=(value: U64) return=U64
 # mir-contains: hir.fn-signature classify params=(value: U64) return=I32
-# mir-contains: hir.local classify.doubled mode=val expr=binary:* type=U64
-# mir-contains: hir.local classify.half mode=val expr=binary:/ type=U64
+# mir-contains: hir.local classify.doubled mode=val expr=binary:* type=inferred
+# mir-contains: hir.local classify.half mode=val expr=call:normalize type=inferred
+# mir-contains: hir.local main.low mode=val expr=int-literal:8 type=inferred
+# mir-contains: hir.local main.high mode=val expr=int-literal:4294967296 type=inferred
 # mir-contains: hir.if classify condition=call:isHuge
 # mir-contains: hir.if classify condition=compare:<
-# mir-contains: mir.local-slot classify %doubled mutable=false type=U64
-# mir-contains: mir.local-slot classify %half mutable=false type=U64
+# mir-contains: mir.local-slot classify %doubled mutable=false type=inferred
+# mir-contains: mir.local-slot classify %half mutable=false type=inferred
+# mir-contains: mir.local-slot main %low mutable=false type=inferred
+# mir-contains: mir.local-slot main %high mutable=false type=inferred
 # mir-contains: mir.local main.high init=int-literal:4294967296 mutable=false
 # mir-contains: mir.rvalue classify expr=binary:* kind=binary op=*
 # mir-contains: mir.rvalue classify expr=binary:/ kind=binary op=/
+# mir-contains: mir.rvalue classify expr=call:normalize kind=call callee=@normalize
 # mir-contains: mir.branch classify kind=if condition=call:isHuge
 # mir-contains: mir.branch classify kind=if condition=compare:<
+# zmeta-contains: llvm.initialization-preview @classify place=%half type=U64 state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.call-preview @normalize in @classify
+# zmeta-contains: llvm.initialization-preview @main place=%low type=inferred state=initialized source=mir.verifier-initialization
+# zmeta-contains: llvm.initialization-preview @main place=%high type=inferred state=initialized source=mir.verifier-initialization
 # emit-contains: define i1 @isHuge(i64 %value)
 # emit-contains: %t0 = icmp uge i64 %value, 4294967296
+# emit-contains: define i64 @normalize(i64 %value)
+# emit-contains: %t0 = add i64 %value, 0
+# emit-contains: ret i64 %t0
 # emit-contains: define i32 @classify(i64 %value)
 # emit-contains: %t0 = mul i64 %value, 2
 # emit-contains: %doubled = add i64 0, %t0
 # emit-contains: %t1 = udiv i64 %doubled, 2
-# emit-contains: %half = add i64 0, %t1
-# emit-contains: %t2 = call i1 @isHuge(i64 %half)
-# emit-contains: %t4 = icmp ult i64 %half, 9
+# emit-contains: %t2 = call i64 @normalize(i64 %t1)
+# emit-contains: %half = add i64 0, %t2
+# emit-contains: %t3 = call i64 @normalize(i64 %half)
+# emit-contains: %t4 = call i1 @isHuge(i64 %t3)
+# emit-contains: %t6 = icmp ult i64 %half, 9
 # emit-contains: define i32 @main()
 # emit-contains: %low = add i64 0, 8
 # emit-contains: %high = add i64 0, 4294967296
 # emit-contains: %t0 = call i32 @classify(i64 %low)
 # emit-contains: %t1 = call i32 @classify(i64 %high)
 # object-contains: _isHuge
+# object-contains: _normalize
 # object-contains: _classify
 # object-contains: _main
 # bin-contains: Mach-O 64-bit executable arm64
-# purpose: U64 primitive native lowering is concentrated here: U64 parameters, annotated U64 locals, integer literals typed by context including values wider than U32, unsigned multiply/divide, unsigned comparisons, Bool-returning U64 comparison calls, real LLVM i64 unsigned scalar codegen, object code, executable output, and direct run-exit-code validation
+# purpose: U64 primitive native lowering is concentrated here: U64 parameters, inferred U64 locals from parameter-driven binary expressions and unannotated integer literals including values wider than U32, unsigned multiply/divide, U64-returning helper calls consumed by local bindings and nested Bool-call arguments, unsigned comparisons, Bool-returning U64 comparison calls, real LLVM i64 unsigned scalar codegen, object code, executable output, and direct run-exit-code validation
 
 [package]
 name = "nativeU64App"

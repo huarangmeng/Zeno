@@ -4,10 +4,14 @@ fn isLarge(value: F64) -> Bool {
     return value > 3.500000;
 }
 
+fn scale(value: F64) -> F64 {
+    return value * 2.000000;
+}
+
 fn classify(value: F64) -> I32 {
-    val scaled: F64 = value * 2.000000;
-    val pivot: F64 = 2.5;
-    if (isLarge(scaled)) {
+    val scaled = scale(value);
+    val pivot = 2.5;
+    if (isLarge(scale(value))) {
         return 40;
     }
     if (scaled > pivot) {
@@ -17,7 +21,7 @@ fn classify(value: F64) -> I32 {
 }
 
 fn main() -> I32 {
-    val low: F64 = 1.5;
-    val high: F64 = 4.0;
+    val low = 1.5;
+    val high = 4.0;
     return classify(low) + classify(high);
 }
